@@ -13,7 +13,7 @@ Check off a slice here when its "done when" is true.
 ### Phase A — Foundations
 
 - [x] [A1. Project setup and scripts](01-A1-ProjectSetupAndScripts.md) — Engine, 1 session
-- [ ] [A2. Installing the daemon](02-A2-InstallingTheDaemon.md) — Mixed, 1–2 sessions, installed build, needs you
+- [x] [A2. Installing the daemon](02-A2-InstallingTheDaemon.md) — Mixed, 1–2 sessions, installed build, needs you
 - [ ] [A3. Secure Enclave keys and secrets](03-A3-SecureEnclaveKeysAndSecrets.md) — Engine, 1 session, installed build, needs you
 
 ### Phase B — Connecting Beekeeper on the Mac
@@ -132,9 +132,9 @@ Check off a slice here when its "done when" is true.
 - **After starting, Hive waits a few minutes for the backup drive** before running overdue jobs, so a drive that mounts late doesn't fail every job at boot.
 - **It runs as the user who installed it, never as root once started.** launchd starts it as root. On its first start, right after approval, it records the user logged in at the screen in a root-owned file under `/Library/Application Support/Hive/`. On every start it reads that file, then permanently gives up root (`initgroups`, `setgid`, `setuid`) and confirms root can't be regained. Nothing touches the network, keys or secrets while it's root.
 - **Data directory:** `~/Library/Application Support/Hive/` in that user's home folder, so the regular Mac backup includes it.
-- **`Hive.app` stays owned by the user who installed it.** Two macOS protections stop other programs from swapping the executable launchd starts as root: App Management stops one app from changing another's bundle, and launchd only starts a registered daemon signed by the same team that registered it. A2 confirms both. If either doesn't hold, `Hive.app` is installed owned by root instead.
+- **`Hive.app` is installed owned by root,** writable only by root, and the daemon refuses to start from a bundle anyone else can change. A2 found that App Management doesn't stop the user's other programs from changing a locally built `Hive.app`, and that a fresh registration starts whatever executable is in the bundle at that moment. launchd does refuse a changed executable under an existing registration, and macOS withdraws the approval, so getting root that way always needs a new approval in Login Items. Root ownership closes the in-place change. An administrator account can still rename `Hive.app` within `/Applications`, which also needs a new approval. Installing and updating `Hive.app` therefore needs an administrator password (G2).
 - **Changing the user** is a reset command run on the Hive Mac, which needs an administrator password. It isn't available from Beekeeper.
-- **Full Disk Access** is granted once to the daemon's executable so it can write to the backup drive. A daemon can't ask for it, so Beekeeper warns while Hive doesn't have it.
+- **Full Disk Access** is granted once, to the "Hive" entry macOS lists for the daemon (it's tied to `Hive.app` through `AssociatedBundleIdentifiers`), so it can write to the backup drive. A daemon can't ask for it, so Beekeeper warns while Hive doesn't have it.
 
 ## §5. The network and TLS
 

@@ -46,6 +46,11 @@ custom_rules:
     message: "HiveKit, HiveCore and the daemon have no interface. Keep AppKit, UIKit and SwiftUI in Hive.app and Beekeeper."
     severity: error
 
+# A public type in a package needs an explicit public init, which is often empty.
+no_empty_block:
+  disabled_block_types:
+    - initializer_bodies
+
 identifier_name:
   excluded:
     - id

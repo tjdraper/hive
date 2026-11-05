@@ -4,8 +4,7 @@ import SwiftUI
 struct HiveApp: App {
     var body: some Scene {
         Window("Hive", id: "status") {
-            Color.clear
-                .frame(minWidth: 360, minHeight: 200)
+            DaemonSetupView()
         }
         .windowResizability(.contentSize)
     }

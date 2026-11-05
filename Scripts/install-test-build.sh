@@ -4,13 +4,18 @@
 #
 # With --mac, builds Debug copies of Hive and Beekeeper for the Mac, as Xcode's Run does, keeping
 # the build between runs so only what changed is built again, then quits the copies it built last
-# time and opens the new ones.
+# time and opens the new ones. It also restarts the development daemon: the Debug HiveDaemon, run by
+# launchd as a user agent with its own label, Mach service and data folder, apart from an installed
+# Hive. It lasts until you log out. A Mach service only exists for a process launchd starts, so the
+# daemon is never run straight from Xcode.
 #
 # With --mac-installed, builds Developer ID copies of both, swaps them in for the copies in
-# /Applications, and opens them. Permissions, entitlements, code signing and the daemon's
-# registration only behave correctly in an installed, signed build: macOS attributes a permission
-# to whatever launched the app, so a build run from Terminal or Xcode borrows their access. Not
-# notarized. A build made on this Mac carries no quarantine flag, so Gatekeeper never checks it.
+# /Applications, with Hive owned by root, restarts the installed daemon if there is one, and opens
+# them. It asks for an administrator password, so run it where you can type one. Permissions,
+# entitlements, code signing and the daemon's registration only behave correctly in an installed,
+# signed build: macOS attributes a permission to whatever launched the app, so a build run from
+# Terminal or Xcode borrows their access. Not notarized. A build made on this Mac carries no
+# quarantine flag, so Gatekeeper never checks it.
 #
 # With --simulator, builds Debug Beekeeper for an iOS simulator, as Xcode's Run does, installs it
 # there, launches it and shows the simulator. Permissions on iPad and iPhone are checked through
@@ -74,6 +79,54 @@ usage() {
     exit "$1"
 }
 
+# Prints the bundle ID of the app at $1.
+bundle_id_of() {
+    /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$1/Contents/Info.plist"
+}
+
+# Waits up to 5 seconds for launchd to finish removing the service $1, such as gui/501/<label>.
+wait_for_bootout() {
+    for _ in {1..50}; do
+        launchctl print "$1" >/dev/null 2>&1 || return 0
+        sleep 0.1
+    done
+    fail "launchd did not stop $1"
+}
+
+# Restarts the development daemon from the Debug Hive at $1. The Debug Hive's bundle ID ends in
+# .Debug, so the daemon's label and Mach service are its own, never mixing with an installed Hive.
+restart_development_daemon() {
+    local hive_app="$1"
+    local hive_id label plist service
+    hive_id="$(bundle_id_of "$hive_app")"
+    label="$hive_id.Daemon"
+    plist="$REPO_ROOT/build/mac/$label.plist"
+    service="gui/$(id -u)/$label"
+
+    "$REPO_ROOT/Scripts/write-launchd-plist.sh" \
+        --label "$label" \
+        --mach-service "$hive_id.Pairing" \
+        --program "$hive_app/Contents/MacOS/HiveDaemon" \
+        --output "$plist"
+
+    launchctl bootout "$service" 2>/dev/null || true
+    wait_for_bootout "$service"
+    launchctl bootstrap "gui/$(id -u)" "$plist"
+}
+
+# Installs the app at $1 as $2, owned by root and writable only by root. launchd starts Hive's daemon
+# as root from whatever is in the bundle when it's registered, so nothing running as the user may be
+# able to change it, and the daemon refuses to start otherwise. Trash can't take a folder the user
+# doesn't own, so the old copy is deleted.
+install_owned_by_root() {
+    local source="$1" destination="$2"
+    [[ "$destination" == /Applications/*.app ]] || fail "refusing to replace $destination"
+    sudo rm -rf "$destination"
+    sudo ditto "$source" "$destination"
+    sudo chown -R root:wheel "$destination"
+    sudo chmod -R go-w "$destination"
+}
+
 check_signing_config() {
     [[ -f "$REPO_ROOT/Configuration/Signing.local.xcconfig" ]] \
         || fail "copy Configuration/Signing.template.xcconfig to Configuration/Signing.local.xcconfig and fill it in"
@@ -99,6 +152,9 @@ run_on_mac() {
     for app in "${MAC_APPS[@]}"; do
         quit_process "$app built last time" "$products/$app (Debug).app/Contents/MacOS/$app (Debug)"
     done
+
+    step "Restarting the development daemon"
+    restart_development_daemon "$products/Hive (Debug).app"
 
     step "Opening"
     for app in "${MAC_APPS[@]}"; do
@@ -149,14 +205,29 @@ install_on_mac() {
         codesign --verify --deep --strict "$export_dir/$app.app"
     done
 
+    step "Asking for an administrator password, to install Hive owned by root"
+    sudo -v
+
     for app in "${MAC_APPS[@]}"; do
         local installed_app="/Applications/$app.app"
 
         step "Replacing $installed_app"
         quit_process "the installed $app" "$installed_app/Contents/MacOS/$app"
-        [[ -e "$installed_app" ]] && trash "$installed_app"
-        ditto "$work_dir/export-$app/$app.app" "$installed_app"
+        if [[ "$app" == "Hive" ]]; then
+            install_owned_by_root "$work_dir/export-$app/$app.app" "$installed_app"
+        else
+            [[ -e "$installed_app" ]] && trash "$installed_app"
+            ditto "$work_dir/export-$app/$app.app" "$installed_app"
+        fi
     done
+
+    # launchd keeps running the replaced executable until the daemon restarts.
+    local daemon_service
+    daemon_service="system/$(bundle_id_of /Applications/Hive.app).Daemon"
+    if launchctl print "$daemon_service" >/dev/null 2>&1; then
+        step "Restarting the daemon"
+        sudo launchctl kickstart -k "$daemon_service"
+    fi
 
     step "Opening"
     for app in "${MAC_APPS[@]}"; do
