@@ -1,0 +1,107 @@
+{
+  "fill": {
+    "automatic-gradient": "display-p3:0.78000,0.70000,1.00000,1.00000"
+  },
+  "groups": [
+    {
+      "blur-material": 1,
+      "layers": [
+        {
+          "image-name": "wings.svg",
+          "name": "wings",
+          "glass": true
+        }
+      ],
+      "name": "wings",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 1
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.5
+      }
+    },
+    {
+      "blur-material": 1,
+      "layers": [
+        {
+          "image-name": "bee.svg",
+          "name": "bee"
+        }
+      ],
+      "name": "bee",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 1
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.0
+      },
+      "specular": true
+    },
+    {
+      "blur-material": 1,
+      "layers": [
+        {
+          "image-name": "cell.svg",
+          "name": "cell"
+        }
+      ],
+      "name": "cell",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 1
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.0
+      },
+      "specular": true
+    },
+    {
+      "blend-mode": "normal",
+      "blur-material": null,
+      "layers": [
+        {
+          "glass": true,
+          "hidden": false,
+          "image-name": "background-light.svg",
+          "name": "background-light",
+          "opacity-specializations": [
+            {
+              "appearance": "dark",
+              "value": 0
+            },
+            {
+              "appearance": "tinted",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "image-name": "background-dark.svg",
+          "name": "background-dark"
+        }
+      ],
+      "lighting": "individual",
+      "name": "background",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}

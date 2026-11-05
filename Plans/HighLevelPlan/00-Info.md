@@ -14,7 +14,7 @@ Check off a slice here when its "done when" is true.
 
 - [x] [A1. Project setup and scripts](01-A1-ProjectSetupAndScripts.md) — Engine, 1 session
 - [x] [A2. Installing the daemon](02-A2-InstallingTheDaemon.md) — Mixed, 1–2 sessions, installed build, needs you
-- [ ] [A3. App icons](03-A3-AppIcons.md) — UI, 1 session, needs you
+- [x] [A3. App icons](03-A3-AppIcons.md) — UI, 1 session, needs you
 - [ ] [A4. Secure Enclave keys and secrets](04-A4-SecureEnclaveKeysAndSecrets.md) — Engine, 1 session, installed build, needs you
 
 ### Phase B — Connecting Beekeeper on the Mac

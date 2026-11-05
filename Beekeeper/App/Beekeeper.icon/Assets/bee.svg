@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="100%" height="100%" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
+<defs><clipPath id="beebody"><rect x="-260" y="-135" width="440" height="270" rx="135"/></clipPath></defs><g transform="translate(488,600) rotate(-16) scale(0.84)"><path d="M200 -70 C230 -160 280 -200 330 -210" style="fill:none;stroke:rgb(58,34,12);stroke-width:24;stroke-linecap:round;"/><path d="M235 -45 C300 -110 350 -125 390 -118" style="fill:none;stroke:rgb(58,34,12);stroke-width:24;stroke-linecap:round;"/><path d="M-250 -28 L-335 0 L-250 28 Z" style="fill:rgb(58,34,12);"/><circle cx="205" cy="10" r="108" style="fill:rgb(58,34,12);"/><rect x="-260" y="-135" width="440" height="270" rx="135" style="fill:rgb(255,255,255);"/><g clip-path="url(#beebody)" style="fill:rgb(58,34,12);"><rect x="-150" y="-140" width="72" height="280"/><rect x="-12" y="-140" width="72" height="280"/></g></g>
+</svg>
