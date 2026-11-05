@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Xcode user-specific data (window positions, breakpoints, etc.)
+xcuserdata/
+
+# Xcode build output
+DerivedData/
+
+# Swift Package Manager dependencies (re-downloaded on build)
+.build/
+.swiftpm/
+
+# Local build and archive output
+build/
+
+# Code coverage data, written to the working folder when a coverage build runs outside Xcode
+*.profraw
+
+# Editor settings
+.idea/
+
+# Local signing and release config (secrets stay in the Keychain or environment)
+.env
+*.local.xcconfig
