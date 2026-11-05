@@ -1,6 +1,6 @@
-# I1. App icons
+# A3. App icons
 
-**Phase I — Open source release** · UI, 1 session, needs you
+**Phase A — Foundations** · UI, 1 session, needs you
 
 References like §1 point to [00-Info.md](00-Info.md).
 

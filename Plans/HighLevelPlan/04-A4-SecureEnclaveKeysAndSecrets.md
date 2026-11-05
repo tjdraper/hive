@@ -1,4 +1,4 @@
-# A3. Secure Enclave keys and secrets
+# A4. Secure Enclave keys and secrets
 
 **Phase A — Foundations** · Engine, 1 session, installed build, needs you
 

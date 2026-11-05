@@ -5,7 +5,7 @@
 References like §8 point to [00-Info.md](00-Info.md). Look at `../site-backups/src/Backup/Config` and `../site-backups/config/Dependencies/BackupConfigBindings.php` for what the PHP version stores.
 
 - **The configuration in Hive's store** (§8): servers, backup jobs, their directories, databases and times, retention tiers and server quotas, with migrations from B2's schema.
-- **Secrets stored encrypted** (A3). Database passwords are the first.
+- **Secrets stored encrypted** (A4). Database passwords are the first.
 - **The API,** with HiveKit types, to list, add, change and remove each of them. Secrets are write-only: a response says whether one is set, never what it is (§7).
 - **Checks before saving,** with messages Beekeeper can show: absolute paths on the server; folder names that are unique in the job, relative, and free of `..` and empty parts, so `images/galleries` is fine; valid times; sensible tiers and quotas.
 - **Changing a server's host, port or SSH user** clears its jobs' database passwords and its confirmed host key, so both are entered and confirmed again (§7). D4 adds the confirmation.

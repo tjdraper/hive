@@ -14,58 +14,58 @@ Check off a slice here when its "done when" is true.
 
 - [x] [A1. Project setup and scripts](01-A1-ProjectSetupAndScripts.md) — Engine, 1 session
 - [x] [A2. Installing the daemon](02-A2-InstallingTheDaemon.md) — Mixed, 1–2 sessions, installed build, needs you
-- [ ] [A3. Secure Enclave keys and secrets](03-A3-SecureEnclaveKeysAndSecrets.md) — Engine, 1 session, installed build, needs you
+- [ ] [A3. App icons](03-A3-AppIcons.md) — UI, 1 session, needs you
+- [ ] [A4. Secure Enclave keys and secrets](04-A4-SecureEnclaveKeysAndSecrets.md) — Engine, 1 session, installed build, needs you
 
 ### Phase B — Connecting Beekeeper on the Mac
 
-- [ ] [B1. The TLS server](04-B1-TheTLSServer.md) — Engine, 1 session, installed build
-- [ ] [B2. Pairing on the Hive Mac and signing in](05-B2-PairingOnTheHiveMacAndSigningIn.md) — Engine, 1–2 sessions, installed build
-- [ ] [B3. Beekeeper's window, devices and settings](06-B3-BeekeepersWindowDevicesAndSettings.md) — Mixed, 1–2 sessions, installed build
+- [ ] [B1. The TLS server](05-B1-TheTLSServer.md) — Engine, 1 session, installed build
+- [ ] [B2. Pairing on the Hive Mac and signing in](06-B2-PairingOnTheHiveMacAndSigningIn.md) — Engine, 1–2 sessions, installed build
+- [ ] [B3. Beekeeper's window, devices and settings](07-B3-BeekeepersWindowDevicesAndSettings.md) — Mixed, 1–2 sessions, installed build
 
 ### Phase C — Backups in Hive
 
-- [ ] [C1. Servers and backup jobs](07-C1-ServersAndBackupJobs.md) — Engine, 1 session
-- [ ] [C2. SSH keys, host keys and the test server](08-C2-SSHKeysHostKeysAndTheTestServer.md) — Engine, 1 session
-- [ ] [C3. Directory snapshots](09-C3-DirectorySnapshots.md) — Engine, 1–2 sessions, installed build
-- [ ] [C4. Database dumps](10-C4-DatabaseDumps.md) — Engine, 1 session
-- [ ] [C5. Scheduling, the job queue and the job log](11-C5-SchedulingTheJobQueueAndTheJobLog.md) — Engine, 1 session
-- [ ] [C6. Retention and quotas](12-C6-RetentionAndQuotas.md) — Engine, 1–2 sessions
+- [ ] [C1. Servers and backup jobs](08-C1-ServersAndBackupJobs.md) — Engine, 1 session
+- [ ] [C2. SSH keys, host keys and the test server](09-C2-SSHKeysHostKeysAndTheTestServer.md) — Engine, 1 session
+- [ ] [C3. Directory snapshots](10-C3-DirectorySnapshots.md) — Engine, 1–2 sessions, installed build
+- [ ] [C4. Database dumps](11-C4-DatabaseDumps.md) — Engine, 1 session
+- [ ] [C5. Scheduling, the job queue and the job log](12-C5-SchedulingTheJobQueueAndTheJobLog.md) — Engine, 1 session
+- [ ] [C6. Retention and quotas](13-C6-RetentionAndQuotas.md) — Engine, 1–2 sessions
 
 ### Phase D — Managing backups in Beekeeper (Mac)
 
-- [ ] [D1. Servers in Beekeeper](13-D1-ServersInBeekeeper.md) — UI, 1 session
-- [ ] [D2. Editing backup jobs](14-D2-EditingBackupJobs.md) — UI, 1 session
-- [ ] [D3. Progress, snapshots and logs](15-D3-ProgressSnapshotsAndLogs.md) — Mixed, 1–2 sessions
-- [ ] [D4. Confirming destructive actions](16-D4-ConfirmingDestructiveActions.md) — Mixed, 1–2 sessions, installed build
+- [ ] [D1. Servers in Beekeeper](14-D1-ServersInBeekeeper.md) — UI, 1 session
+- [ ] [D2. Editing backup jobs](15-D2-EditingBackupJobs.md) — UI, 1 session
+- [ ] [D3. Progress, snapshots and logs](16-D3-ProgressSnapshotsAndLogs.md) — Mixed, 1–2 sessions
+- [ ] [D4. Confirming destructive actions](17-D4-ConfirmingDestructiveActions.md) — Mixed, 1–2 sessions, installed build
 
 ### Phase E — Email
 
-- [ ] [E1. Sending email](17-E1-SendingEmail.md) — Mixed, 1 session
-- [ ] [E2. Alerts](18-E2-Alerts.md) — Engine, 1 session
+- [ ] [E1. Sending email](18-E1-SendingEmail.md) — Mixed, 1 session
+- [ ] [E2. Alerts](19-E2-Alerts.md) — Engine, 1 session
 
 ### Phase F — Recovery
 
-- [ ] [F1. Recovery key and recovery files](19-F1-RecoveryKeyAndRecoveryFiles.md) — Mixed, 1–2 sessions
-- [ ] [F2. Recovery file copies in Beekeeper](20-F2-RecoveryFileCopiesInBeekeeper.md) — Mixed, 1 session
-- [ ] [F3. Restoring Hive on a new Mac](21-F3-RestoringHiveOnANewMac.md) — Mixed, 2 sessions, installed build, needs you
+- [ ] [F1. Recovery key and recovery files](20-F1-RecoveryKeyAndRecoveryFiles.md) — Mixed, 1–2 sessions
+- [ ] [F2. Recovery file copies in Beekeeper](21-F2-RecoveryFileCopiesInBeekeeper.md) — Mixed, 1 session
+- [ ] [F3. Restoring Hive on a new Mac](22-F3-RestoringHiveOnANewMac.md) — Mixed, 2 sessions, installed build, needs you
 
 ### Phase G — Replacing site-backups
 
-- [ ] [G1. Pairing more devices](22-G1-PairingMoreDevices.md) — Mixed, 1–2 sessions, installed build, needs you
-- [ ] [G2. Mac release script and updates](23-G2-MacReleaseScriptAndUpdates.md) — Engine, 1–2 sessions, installed build, needs you
-- [ ] [G3. Moving off site-backups](24-G3-MovingOffSiteBackups.md) — Mixed, 1 session, needs you
+- [ ] [G1. Pairing more devices](23-G1-PairingMoreDevices.md) — Mixed, 1–2 sessions, installed build, needs you
+- [ ] [G2. Mac release script and updates](24-G2-MacReleaseScriptAndUpdates.md) — Engine, 1–2 sessions, installed build, needs you
+- [ ] [G3. Moving off site-backups](25-G3-MovingOffSiteBackups.md) — Mixed, 1 session, needs you
 
 ### Phase H — iPhone and iPad
 
-- [ ] [H1. iOS release script and first TestFlight build](25-H1-IOSReleaseScriptAndFirstTestFlightBuild.md) — Engine, 1 session, needs you
-- [ ] [H2. Beekeeper on iPad](26-H2-BeekeeperOnIPad.md) — Mixed, 1–2 sessions, TestFlight
-- [ ] [H3. Beekeeper on iPhone](27-H3-BeekeeperOnIPhone.md) — UI, 1–2 sessions, TestFlight
-- [ ] [H4. Build expiry warnings](28-H4-BuildExpiryWarnings.md) — Engine, 1 session, TestFlight
+- [ ] [H1. iOS release script and first TestFlight build](26-H1-IOSReleaseScriptAndFirstTestFlightBuild.md) — Engine, 1 session, needs you
+- [ ] [H2. Beekeeper on iPad](27-H2-BeekeeperOnIPad.md) — Mixed, 1–2 sessions, TestFlight
+- [ ] [H3. Beekeeper on iPhone](28-H3-BeekeeperOnIPhone.md) — UI, 1–2 sessions, TestFlight
+- [ ] [H4. Build expiry warnings](29-H4-BuildExpiryWarnings.md) — Engine, 1 session, TestFlight
 
 ### Phase I — Open source release
 
-- [ ] [I1. App icons](29-I1-AppIcons.md) — UI, 1 session, needs you
-- [ ] [I2. README and public release](30-I2-READMEAndPublicRelease.md) — Mixed, 1 session, needs you
+- [ ] [I1. README and public release](30-I1-READMEAndPublicRelease.md) — Mixed, 1 session, needs you
 
 ---
 
@@ -73,13 +73,13 @@ Check off a slice here when its "done when" is true.
 
 | Milestone | What you can do | Slices |
 | --- | --- | --- |
-| M1. Hive runs | Install Hive on the Mac, approve it once, and have it start at boot as your user, with its keys in the Secure Enclave | A1–A3 |
+| M1. Hive runs | Install Hive on the Mac, approve it once, and have it start at boot as your user, with its keys in the Secure Enclave | A1–A4 |
 | M2. Beekeeper connects | Open Beekeeper on the Hive Mac, have it pair itself, and see the Hive, its devices and its settings | B1–B3 |
 | M3. Backups run | Set up servers and backup jobs in Beekeeper on the Mac, and have Hive back them up on schedule into hard-link snapshots, with retention, quotas, live progress and logs | C1–C6, D1–D4 |
 | M4. Safe to rely on | Email alerts when something goes wrong, and a way to bring Hive back on a new Mac | E1–E2, F1–F3 |
 | M5. site-backups retired | Manage the Hive from another Mac, with signed, updatable builds backing up your real servers, and the PHP version turned off | G1–G3 |
 | M6. iPhone and iPad | Beekeeper on iPhone and iPad, and warnings before their builds expire | H1–H4 |
-| M7. Open source | Icons, a README and published builds | I1–I2 |
+| M7. Open source | A README and published builds | I1 |
 
 ---
 
@@ -175,7 +175,7 @@ Read the brainstorm's "Secrets and keys at rest".
 - **Secrets are** SSH private keys, database passwords, the SMTP password and any future credentials. They're write-only through the API.
 - **A secret is never sent somewhere new without being entered again.** Changing a server's host, port or user clears its jobs' database passwords, and changing the SMTP host clears the SMTP password. Otherwise a stolen session could point Hive at another machine and collect them.
 - **A copy of the data directory is useless on any other machine.** Bringing Hive back goes through a recovery file (§14).
-- **Checked first** (A3): Secure Enclave keys work from the daemon after it switches user, outside any login session. Everything here depends on it.
+- **Checked first** (A4): Secure Enclave keys work from the daemon after it switches user, outside any login session. Everything here depends on it.
 
 ## §8. Servers and backup jobs
 
@@ -218,7 +218,7 @@ Configuration is data, edited in Beekeeper. The PHP configuration (`../site-back
 ## §11. Running backups
 
 - **`ssh` and `rsync` run as child processes,** as in the PHP version, through `Runner` types (`Architecture/README.md`).
-- **Hive bundles rsync 3.x,** built from source at a fixed version by a script, and signed and notarized inside `Hive.app`. macOS's `openrsync` exits with only 0, 1 or 2, so a file that vanished mid-run can't be told from a real failure, and it has no `--fake-super`. rsync is GPLv3, shipped as a separate program with its source available (I2).
+- **Hive bundles rsync 3.x,** built from source at a fixed version by a script, and signed and notarized inside `Hive.app`. macOS's `openrsync` exits with only 0, 1 or 2, so a file that vanished mid-run can't be told from a real failure, and it has no `--fake-super`. rsync is GPLv3, shipped as a separate program with its source available (I1).
 - **Hive generates its own Ed25519 SSH keys,** stored as secrets (§7) and handed to `ssh` at run time, never written in plain text to `~/.ssh`. Beekeeper shows the public key to add to the server's `authorized_keys`, with a `from=` restriction to the Hive Mac's addresses offered.
 - **Host keys** are recorded when a server is added, after you confirm the fingerprint in Beekeeper. Hive keeps its own `known_hosts` file and connects with `StrictHostKeyChecking=yes`. When a key changes, that server's backups fail and Hive emails right away, then daily until the new key is confirmed in Beekeeper or the original one comes back (§13).
 - **Stalls end runs:** rsync's `--timeout` and SSH's `ServerAliveInterval`, so a hung transfer fails instead of blocking the queue.
@@ -300,7 +300,7 @@ Each gets its own plan once this one is done. Until then, features not in Part 1
 
 ## §19. Open questions
 
-- [ ] Do CryptoKit's Secure Enclave keys work from the daemon after it switches user, outside any login session? (A3) Everything in §7 depends on it.
+- [ ] Do CryptoKit's Secure Enclave keys work from the daemon after it switches user, outside any login session? (A4) Everything in §7 depends on it.
 - [x] Channel binding: dropped. SwiftNIO's TLS doesn't expose the TLS exporter (its BoringSSL has one, but not publicly), and `URLSession` doesn't either. Keeping it would mean forking the server's TLS and writing Beekeeper's own HTTP client (§6).
 - [ ] Where Beekeeper keeps its device keys on the Mac, so that other programs running as you can't use them (B2)
 - [ ] The default port (B1)
@@ -312,7 +312,7 @@ Each gets its own plan once this one is done. Until then, features not in Part 1
 - [ ] Default retention tiers and quota (C6)
 - [ ] An SMTP library, or a small client of Hive's own over SwiftNIO (E1)
 - [ ] How Hive updates itself (G2). `Hive.app` isn't running most of the time, and the daemon has to restart from the new bundle.
-- [ ] The license (I2). The other open-source Locus apps use MIT.
+- [ ] The license (I1). The other open-source Locus apps use MIT.
 
 ---
 

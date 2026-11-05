@@ -1,4 +1,4 @@
-# I2. README and public release
+# I1. README and public release
 
 **Phase I — Open source release** · Mixed, 1 session, needs you
 
