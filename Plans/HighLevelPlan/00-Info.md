@@ -15,7 +15,7 @@ Check off a slice here when its "done when" is true.
 - [x] [A1. Project setup and scripts](01-A1-ProjectSetupAndScripts.md) — Engine, 1 session
 - [x] [A2. Installing the daemon](02-A2-InstallingTheDaemon.md) — Mixed, 1–2 sessions, installed build, needs you
 - [x] [A3. App icons](03-A3-AppIcons.md) — UI, 1 session, needs you
-- [ ] [A4. Secure Enclave keys and secrets](04-A4-SecureEnclaveKeysAndSecrets.md) — Engine, 1 session, installed build, needs you
+- [x] [A4. Secure Enclave keys and secrets](04-A4-SecureEnclaveKeysAndSecrets.md) — Engine, 1 session, installed build, needs you
 
 ### Phase B — Connecting Beekeeper on the Mac
 
@@ -171,11 +171,12 @@ Read the brainstorm's "Authentication: a key per device, with no passwords" and 
 Read the brainstorm's "Secrets and keys at rest".
 
 - **Two Secure Enclave keys:** the identity key (P-256 signing, for TLS) and the storage key (P-256 key agreement, for secrets). Their `dataRepresentation` blobs, which only this Mac's Secure Enclave can use, are stored as `0600` files in the data directory. No keychain.
-- **Each secret is encrypted on its own:** a temporary key, ECDH with the storage key, HKDF, then AES-GCM. Only the result is written to disk, and secrets are decrypted in memory when needed.
+- **Each secret is encrypted on its own** with HPKE (RFC 9180, CryptoKit's `P256_SHA256_AES_GCM_256`): a temporary key, ECDH with the storage key, HKDF, then AES-GCM. Only the result is written to disk, behind a format version byte, and secrets are decrypted in memory when needed.
+- **A saved key that won't load is never replaced.** The daemon exits and launchd tries again, since a new storage key would leave every secret unreadable and a new identity key would unpair every device.
 - **Secrets are** SSH private keys, database passwords, the SMTP password and any future credentials. They're write-only through the API.
 - **A secret is never sent somewhere new without being entered again.** Changing a server's host, port or user clears its jobs' database passwords, and changing the SMTP host clears the SMTP password. Otherwise a stolen session could point Hive at another machine and collect them.
 - **A copy of the data directory is useless on any other machine.** Bringing Hive back goes through a recovery file (§14).
-- **Checked first** (A4): Secure Enclave keys work from the daemon after it switches user, outside any login session. Everything here depends on it.
+- **Checked** (A4): Secure Enclave keys work from the daemon after it switches user, with nobody logged in, created with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and `.privateKeyUsage`. No entitlement or provisioning profile is needed. On every start the daemon signs with the identity key and opens a secret sealed on an earlier start, before anything relies on them.
 
 ## §8. Servers and backup jobs
 
@@ -300,7 +301,7 @@ Each gets its own plan once this one is done. Until then, features not in Part 1
 
 ## §19. Open questions
 
-- [ ] Do CryptoKit's Secure Enclave keys work from the daemon after it switches user, outside any login session? (A4) Everything in §7 depends on it.
+- [x] Do CryptoKit's Secure Enclave keys work from the daemon after it switches user, outside any login session? Yes, created and used at the login window with nobody logged in, and loaded again after a restart (A4).
 - [x] Channel binding: dropped. SwiftNIO's TLS doesn't expose the TLS exporter (its BoringSSL has one, but not publicly), and `URLSession` doesn't either. Keeping it would mean forking the server's TLS and writing Beekeeper's own HTTP client (§6).
 - [ ] Where Beekeeper keeps its device keys on the Mac, so that other programs running as you can't use them (B2)
 - [ ] The default port (B1)

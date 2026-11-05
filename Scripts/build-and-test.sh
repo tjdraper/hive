@@ -42,9 +42,11 @@ run_step() {
         > "$log" 2>&1
     local status=$?
 
-    # Xcode logs this for every target that doesn't link App Intents. It isn't about our code.
+    # Diagnostics start a line or follow a location or tool name. Matching only those skips log
+    # messages the tests print, such as a logged "underlyingCoreCryptoError(error: -1)".
+    # Xcode logs the App Intents line for every target that doesn't link it. It isn't about our code.
     local problems
-    problems=$(grep -E '(warning|error): ' "$log" \
+    problems=$(grep -E '(^|[[:space:]]|: )(warning|error): ' "$log" \
         | grep -v 'Metadata extraction skipped, no AppIntents.framework dependency found' \
         | sort -u)
 

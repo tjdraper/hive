@@ -8,7 +8,9 @@ enum DaemonStart {
 
     static func run(mode: DaemonLaunchMode) -> Never {
         do {
-            _ = try DaemonStartupWorkflow(mode: mode).run()
+            let started = try DaemonStartupWorkflow(mode: mode).run()
+            let keys = try HiveKeyStore(directory: started.dataDirectory).loadOrCreate()
+            try HiveKeyCheck(directory: started.dataDirectory).run(keys)
         } catch DaemonStartupError.nobodyLoggedIn {
             // launchd starts the daemon again shortly, until someone logs in.
             logger.notice("Nobody is logged in at the screen to record as Hive's user, exiting")

@@ -15,6 +15,8 @@ Two things that may get in the way:
 
 If it still fails, stop and decide with you how §7 changes before going further. It may change A2's design too.
 
+**Result (2026-11-05):** it works, with no entitlement or provisioning profile. Even an ad-hoc signed command-line tool can create CryptoKit Secure Enclave keys that aren't stored in the keychain. In the installed build, the daemon, after giving up root, created both keys with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and `.privateKeyUsage`, signed and sealed a secret, all at the login window with nobody logged in. After a second restart with nobody logged in, it loaded both keys, signed and opened that secret.
+
 ## Then
 
 - **The identity key and the storage key** (§7), created on the first start after switching user, and stored as `0600` files in the data directory. B1 uses the identity key.

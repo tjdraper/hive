@@ -19,6 +19,7 @@ Good boundaries usually look like:
 In Hive:
 
 - `DaemonStartup/`
+- `HiveKeys/`
 - `TLSIdentity/`
 - `Pairing/`
 - `Authentication/`
