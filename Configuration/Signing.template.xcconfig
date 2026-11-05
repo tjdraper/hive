@@ -1,0 +1,8 @@
+// Copy this file to Signing.local.xcconfig in this folder and fill in both values. Git ignores the copy.
+
+// Your Apple Developer team ID, shown under Membership details at developer.apple.com/account.
+DEVELOPMENT_TEAM =
+
+// The start of every bundle ID, such as com.example. Hive's is <prefix>.Hive and Beekeeper's is
+// <prefix>.HiveBeekeeper.
+BUNDLE_ID_PREFIX =

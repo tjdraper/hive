@@ -1,0 +1,2 @@
+# The SwiftLint plugin only looks for a configuration inside the package.
+parent_config: ../.swiftlint.yml

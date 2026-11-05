@@ -1,0 +1,3 @@
+// The team ID and bundle ID prefix stay out of the repository. Copy Signing.template.xcconfig to
+// Signing.local.xcconfig, which git ignores, and fill it in.
+#include "Signing.local.xcconfig"

@@ -1,0 +1,60 @@
+included:
+  - Hive
+  - HiveDaemon
+  - Beekeeper
+  - HiveKit/Sources
+  - HiveKit/Tests
+  - HiveCore/Sources
+  - HiveCore/Tests
+
+excluded:
+  - HiveKit/.build
+  - HiveCore/.build
+
+disabled_rules:
+  - todo
+  - trailing_comma
+
+opt_in_rules:
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - empty_count
+  - explicit_init
+  - fatal_error_message
+  - force_unwrapping
+  - no_empty_block
+  - prefer_key_path
+  - private_swiftui_state
+  - redundant_nil_coalescing
+  - sorted_imports
+  - unused_parameter
+  - vertical_parameter_alignment_on_call
+
+analyzer_rules:
+  - unused_import
+
+custom_rules:
+  nonisolated_unsafe:
+    name: "Nonisolated Unsafe"
+    regex: 'nonisolated\(unsafe\)'
+    message: "Each use of nonisolated(unsafe) must be explicitly justified. Add // swiftlint:disable:next nonisolated_unsafe with a comment explaining why the safety claim holds."
+    severity: warning
+  core_ui_framework_import:
+    name: "Core UI Framework Import"
+    included: '^.*/(HiveKit|HiveCore|HiveDaemon)/.*\.swift$'
+    regex: '^\s*(@\w+\s+)*import\s+(AppKit|UIKit|SwiftUI|Cocoa)\b'
+    message: "HiveKit, HiveCore and the daemon have no interface. Keep AppKit, UIKit and SwiftUI in Hive.app and Beekeeper."
+    severity: error
+
+identifier_name:
+  excluded:
+    - id
+    - x
+    - y
+    - z
+
+line_length:
+  warning: 140
+  error: 180
+
+reporter: "xcode"

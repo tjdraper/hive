@@ -23,3 +23,7 @@ build/
 # Local signing and release config (secrets stay in the Keychain or environment)
 .env
 *.local.xcconfig
+
+# The project's Package.resolved pins what the local packages depend on
+/HiveKit/Package.resolved
+/HiveCore/Package.resolved

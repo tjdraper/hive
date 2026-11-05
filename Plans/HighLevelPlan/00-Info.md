@@ -12,7 +12,7 @@ Check off a slice here when its "done when" is true.
 
 ### Phase A — Foundations
 
-- [ ] [A1. Project setup and scripts](01-A1-ProjectSetupAndScripts.md) — Engine, 1 session
+- [x] [A1. Project setup and scripts](01-A1-ProjectSetupAndScripts.md) — Engine, 1 session
 - [ ] [A2. Installing the daemon](02-A2-InstallingTheDaemon.md) — Mixed, 1–2 sessions, installed build, needs you
 - [ ] [A3. Secure Enclave keys and secrets](03-A3-SecureEnclaveKeysAndSecrets.md) — Engine, 1 session, installed build, needs you
 

@@ -4,7 +4,7 @@
 
 References like §4 point to [00-Info.md](00-Info.md). Read the brainstorm's "How Hive runs".
 
-- **The launchd plist** in `Hive.app/Contents/Library/LaunchDaemons/`, using `BundleProgram`, a Mach service for B2's pairing, and `AssociatedBundleIdentifiers` so Login Items shows Hive by name. The labels and service name come from the bundle ID prefix.
+- **The launchd plist** in `Hive.app/Contents/Library/LaunchDaemons/`, using `BundleProgram` (A1 embeds the daemon at `Contents/MacOS/HiveDaemon`, with the bundle ID `<prefix>.Hive.Daemon`), a Mach service for B2's pairing, and `AssociatedBundleIdentifiers` so Login Items shows Hive by name. The labels and service name come from the bundle ID prefix.
 - **`Hive.app`'s window** (§4): registers the daemon with `SMAppService.daemon`, shows whether it's waiting for approval or running, and has buttons to the Login Items settings, the Full Disk Access settings and Beekeeper. A button to remove Hive unregisters the daemon and leaves its data in place.
 - **Starting as root and switching user** (§4):
   - On the first start, the daemon records the user logged in at the screen in a root-owned file under `/Library/Application Support/Hive/`. If nobody is logged in, it logs why and exits, and launchd tries again.
@@ -14,7 +14,7 @@ References like §4 point to [00-Info.md](00-Info.md). Read the brainstorm's "Ho
 - **The data directory,** `~/Library/Application Support/Hive/`, created `0700`.
 - **Full Disk Access:** the daemon checks whether it has it at start and logs the result. B3 shows it in Beekeeper.
 - **The reset command:** run with `sudo` on the Hive Mac, it clears the recorded user so the next start records the one logged in at the screen.
-- **A daemon for development:** `install-test-build.sh --mac` runs a Debug daemon through launchd as a user agent, with its own label, Mach service name and data directory, so it never mixes with an installed Hive. A Mach service only exists for a process launchd starts, so the daemon is never run straight from Xcode. An agent starts as you, so it skips the user switch. Everything else, TLS and signing in included, is the same (AGENTS.md).
+- **A daemon for development:** `install-test-build.sh --mac` runs a Debug daemon through launchd as a user agent, with its own label, Mach service name and data directory, so it never mixes with an installed Hive. A Mach service only exists for a process launchd starts, so the daemon is never run straight from Xcode. An agent starts as you, so it skips the user switch. Everything else, TLS and signing in included, is the same (AGENTS.md). The Debug apps A1 builds are named `Hive (Debug).app` and `Beekeeper (Debug).app`, so they're never mistaken for the installed copies.
 - **`install-test-build.sh --mac-installed`** restarts the daemon after replacing `Hive.app`, which asks for an administrator password. Ask before running it while a daemon is installed (AGENTS.md).
 - **Logging** at each step of startup: which user was recorded or read, whether root was dropped, and whether Full Disk Access is there. Log account names only as `<private>`.
 
