@@ -9,8 +9,14 @@ struct BeekeeperApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Color.clear
-                .frame(minWidth: 480, minHeight: 320)
+            Group {
+                #if os(macOS)
+                LocalHiveView()
+                #else
+                Color.clear
+                #endif
+            }
+            .frame(minWidth: 480, minHeight: 320)
         }
     }
 }

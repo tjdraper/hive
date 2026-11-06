@@ -3,7 +3,7 @@ import Foundation
 
 /// What a device keeps of a Hive's identity: the SHA-256 hash of its identity key's X9.63 form. It names
 /// the key, not the certificate, so Hive can reissue its certificate without unpairing anyone.
-public struct PublicKeyPin: Hashable, Sendable {
+public struct PublicKeyPin: Hashable, Codable, Sendable {
     public let sha256: Data
 
     public init(sha256: Data) {

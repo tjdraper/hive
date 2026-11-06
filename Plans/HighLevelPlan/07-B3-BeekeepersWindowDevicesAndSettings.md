@@ -21,6 +21,7 @@ Built with you:
 - **The audit log,** newest first
 - **The Hive's settings**
 - **Beekeeper's store** (§3), so the list of Hives survives a relaunch
+- **Signing in again** without asking when a session runs out, after 15 minutes, or a request gets 401 (B2)
 - **A Developer window,** in Debug and `TEST_BUILD` builds only, that sends any API request as the signed-in device and shows the response. Phase C's checks go through it before Phase D's screens exist. It signs in like everything else and gets no extra access (AGENTS.md).
 
 **Done when:** in the installed builds, Beekeeper shows this Mac's Hive after a relaunch; renaming it and changing its listen address work and show in the audit log; Hive's health check answers from another machine on the tailnet only after its interface is added; a revoked device can't sign in again; the warning shows when Full Disk Access is turned off; and the Developer window can call the settings routes.

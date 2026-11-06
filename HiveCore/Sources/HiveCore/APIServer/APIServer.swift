@@ -1,3 +1,4 @@
+import Foundation
 import HiveKit
 import Hummingbird
 import HummingbirdTLS
@@ -13,9 +14,9 @@ public struct APIServer: Sendable {
 
     private let application: any ApplicationProtocol
 
-    public init(port: Int, identity: TLSIdentity) throws {
+    public init(port: Int, identity: TLSIdentity, signIn: SignInWorkflow) throws {
         application = Application(
-            responder: Self.responder(),
+            responder: Self.responder(signIn: signIn),
             server: try .tls(
                 .http1(configuration: .init(idleTimeout: Self.idleTimeout)),
                 tlsConfiguration: try identity.serverConfiguration()
@@ -40,11 +41,16 @@ public struct APIServer: Sendable {
         try await application.runService()
     }
 
-    static func responder() -> some HTTPResponder<BasicRequestContext> {
-        let router = Router()
+    static func router(signIn: SignInWorkflow) -> Router<HiveRequestContext> {
+        let router = Router(context: HiveRequestContext.self)
         router.get(RouterPath(HiveEndpoint.health)) { _, _ in
             HTTPResponse.Status.noContent
         }
-        return RequestGate(next: router.buildResponder())
+        SignInRoutes.add(to: router, workflow: signIn)
+        return router
+    }
+
+    static func responder(signIn: SignInWorkflow) -> some HTTPResponder<HiveRequestContext> {
+        RequestGate(next: router(signIn: signIn).buildResponder(), sessions: signIn.sessions, now: signIn.now)
     }
 }

@@ -2,11 +2,13 @@ import AppKit
 
 @MainActor
 struct BeekeeperLauncher {
-    /// Beekeeper's bundle ID is built from the same prefix as Hive's (Configuration/Signing.xcconfig).
+    /// Beekeeper's bundle ID is built from the same prefix as Hive's (Configuration/Signing.xcconfig), and
+    /// a Debug build's ends in `.Debug` like Hive's.
     private static var beekeeperBundleID: String? {
         guard let hiveBundleID = Bundle.main.bundleIdentifier else { return nil }
-        for suffix in [".Hive", ".Hive.Debug"] where hiveBundleID.hasSuffix(suffix) {
-            return hiveBundleID.dropLast(suffix.count) + ".HiveBeekeeper"
+        let suffixes = [(hive: ".Hive.Debug", beekeeper: ".HiveBeekeeper.Debug"), (hive: ".Hive", beekeeper: ".HiveBeekeeper")]
+        for suffix in suffixes where hiveBundleID.hasSuffix(suffix.hive) {
+            return hiveBundleID.dropLast(suffix.hive.count) + suffix.beekeeper
         }
         return nil
     }

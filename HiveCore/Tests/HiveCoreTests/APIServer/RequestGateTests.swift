@@ -1,3 +1,4 @@
+import Foundation
 @testable import HiveCore
 import HiveKit
 import Hummingbird
@@ -5,8 +6,22 @@ import HummingbirdTesting
 import Testing
 
 struct RequestGateTests {
+    private static let protectedPath = "/protected"
+
+    private let fixture: SignInFixture
+
+    init() throws {
+        fixture = try SignInFixture()
+    }
+
+    /// The real routes, plus one that needs signing in and answers with the device that's signed in.
     private var application: some ApplicationProtocol {
-        Application(responder: APIServer.responder())
+        let router = APIServer.router(signIn: fixture.workflow)
+        router.get(RouterPath(Self.protectedPath)) { _, context in
+            context.signedInDeviceID?.uuidString ?? "none"
+        }
+        let gate = RequestGate(next: router.buildResponder(), sessions: fixture.sessions, now: fixture.workflow.now)
+        return Application(responder: gate)
     }
 
     @Test("The health check answers without signing in, with nothing in the body")
@@ -26,6 +41,7 @@ struct RequestGateTests {
         arguments: [
             "/",
             "/devices",
+            protectedPath,
             "/health/",
             "/Health",
             "/health/extra",
@@ -33,6 +49,9 @@ struct RequestGateTests {
             "/%68ealth",
             "/v1/health",
             "/../health",
+            "/sign-in/",
+            "/sign-in/challenge/",
+            "/sign-in/session",
         ]
     )
     func otherPathsAreRefused(path: String) async throws {
@@ -46,11 +65,22 @@ struct RequestGateTests {
         }
     }
 
-    @Test("The health check's path is refused for any other method", arguments: [HTTPRequest.Method.post, .put, .delete, .head])
-    func otherMethodsAreRefused(method: HTTPRequest.Method) async throws {
+    @Test(
+        "An open route's path is refused for any other method",
+        arguments: [
+            (HiveEndpoint.health, HTTPRequest.Method.post),
+            (HiveEndpoint.health, .put),
+            (HiveEndpoint.health, .delete),
+            (HiveEndpoint.health, .head),
+            (HiveEndpoint.signInChallenge, .get),
+            (HiveEndpoint.signIn, .get),
+            (HiveEndpoint.signIn, .put),
+        ]
+    )
+    func otherMethodsAreRefused(path: String, method: HTTPRequest.Method) async throws {
         // Act
         try await application.test(.router) { client in
-            try await client.execute(uri: HiveEndpoint.health, method: method, body: ByteBuffer(string: "{}")) { response in
+            try await client.execute(uri: path, method: method, body: ByteBuffer(string: "{}")) { response in
                 // Assert
                 #expect(response.status == .unauthorized)
             }
@@ -64,7 +94,54 @@ struct RequestGateTests {
 
         // Act
         try await application.test(.router) { client in
-            try await client.execute(uri: "/devices", method: .get, headers: headers) { response in
+            try await client.execute(uri: Self.protectedPath, method: .get, headers: headers) { response in
+                // Assert
+                #expect(response.status == .unauthorized)
+            }
+        }
+    }
+
+    @Test("A signed-in device's token reaches the route, which knows which device it is")
+    func sessionTokenPasses() async throws {
+        // Arrange
+        let token = try #require(fixture.workflow.signIn(try fixture.request(), from: ClientAddress(key: "local")).token)
+        let headers: HTTPFields = [.authorization: "Bearer \(token)"]
+
+        // Act
+        try await application.test(.router) { client in
+            try await client.execute(uri: Self.protectedPath, method: .get, headers: headers) { response in
+                // Assert
+                #expect(response.status == .ok)
+                #expect(String(buffer: response.body) == fixture.device.id.uuidString)
+            }
+        }
+    }
+
+    @Test("An expired session token is refused")
+    func expiredTokenIsRefused() async throws {
+        // Arrange
+        let token = try #require(fixture.workflow.signIn(try fixture.request(), from: ClientAddress(key: "local")).token)
+        fixture.clock.advance(by: SessionStore.lifetime)
+        let headers: HTTPFields = [.authorization: "Bearer \(token)"]
+
+        // Act
+        try await application.test(.router) { client in
+            try await client.execute(uri: Self.protectedPath, method: .get, headers: headers) { response in
+                // Assert
+                #expect(response.status == .unauthorized)
+            }
+        }
+    }
+
+    @Test("A token sent some other way than as a bearer token is refused")
+    func tokenMustBeBearer() async throws {
+        // Arrange
+        let token = try #require(fixture.workflow.signIn(try fixture.request(), from: ClientAddress(key: "local")).token)
+        let headers: HTTPFields = [.authorization: "Basic \(token)", .cookie: "token=\(token)"]
+
+        // Act
+        try await application.test(.router) { client in
+            try await client.execute(uri: Self.protectedPath, method: .get, headers: headers) { response in
                 // Assert
                 #expect(response.status == .unauthorized)
             }

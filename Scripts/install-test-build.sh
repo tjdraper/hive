@@ -145,6 +145,7 @@ run_on_mac() {
             -configuration Debug \
             -destination "platform=macOS,arch=$(uname -m)" \
             -derivedDataPath "$derived_data" \
+            -allowProvisioningUpdates \
             -quiet
     done
 

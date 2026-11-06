@@ -20,7 +20,7 @@ Check off a slice here when its "done when" is true.
 ### Phase B — Connecting Beekeeper on the Mac
 
 - [x] [B1. The TLS server](05-B1-TheTLSServer.md) — Engine, 1 session, installed build
-- [ ] [B2. Pairing on the Hive Mac and signing in](06-B2-PairingOnTheHiveMacAndSigningIn.md) — Engine, 1–2 sessions, installed build
+- [x] [B2. Pairing on the Hive Mac and signing in](06-B2-PairingOnTheHiveMacAndSigningIn.md) — Engine, 1–2 sessions, installed build
 - [ ] [B3. Beekeeper's window, devices and settings](07-B3-BeekeepersWindowDevicesAndSettings.md) — Mixed, 1–2 sessions, installed build
 
 ### Phase C — Backups in Hive
@@ -117,7 +117,9 @@ Check off a slice here when its "done when" is true.
   - **`HiveCore`:** a Swift package with everything Hive does that can be tested without running the daemon: the store, the HTTP routes, signing in, the backup engine, retention and scheduling. macOS only. The daemon's executable connects it to the real Secure Enclave, network and processes.
 - **The server is Hummingbird 2** on SwiftNIO, for TLS, routing and WebSockets. Routes are tested with Hummingbird's test client, which never opens a port.
 - **Hive's store is SQLite through GRDB.** It works from a daemon off the main actor, its migrations are explicit, and nothing about it needs syncing. It holds the configuration, the job queue, the catalog of snapshots, the job log and the audit log.
-- **Beekeeper's store is a small file on each device,** never synced: the list of Hives and, for each, its addresses and pinned key hash. This device's keys for each Hive are kept where only Beekeeper can use them (B2). Each device pairs on its own.
+- **Beekeeper's store is a small file on each device,** never synced: the list of Hives and, for each, its addresses and pinned key hash. Each device pairs on its own.
+- **Beekeeper's key for each Hive** is a Secure Enclave key whose saved form, with the device ID Hive gave it, is kept in the data protection keychain under Beekeeper's own access group, never synced (B2). Any program on the Mac can use a Secure Enclave key's saved form, so it can't be in a file. `keychain-access-groups` is a restricted entitlement on macOS: macOS kills a program that claims Beekeeper's group without a provisioning profile Apple issued to Beekeeper's team, so Beekeeper's Mac builds carry one. Debug builds can be attached to with a debugger, so this protection is for installed builds.
+- **Debug builds have their own bundle IDs:** `<prefix>.Hive.Debug` and `<prefix>.HiveBeekeeper.Debug`, so TCC, the keychain and the XPC check never treat them as the installed apps. A Debug Beekeeper pairs only with the development daemon.
 - **The API is HTTPS with JSON** for commands, plus a **WebSocket** for live progress and logs.
 - **Concurrency:** Hive and both packages are nonisolated by default, and Beekeeper is main-actor by default (AGENTS.md).
 - **Names:** bundle IDs are built from the prefix in the gitignored `.xcconfig` (§17). The log subsystems are fixed in code: `com.buzzingpixel.Hive` and `com.buzzingpixel.HiveBeekeeper`.
@@ -303,7 +305,7 @@ Each gets its own plan once this one is done. Until then, features not in Part 1
 
 - [x] Do CryptoKit's Secure Enclave keys work from the daemon after it switches user, outside any login session? Yes, created and used at the login window with nobody logged in, and loaded again after a restart (A4).
 - [x] Channel binding: dropped. SwiftNIO's TLS doesn't expose the TLS exporter (its BoringSSL has one, but not publicly), and `URLSession` doesn't either. Keeping it would mean forking the server's TLS and writing Beekeeper's own HTTP client (§6).
-- [ ] Where Beekeeper keeps its device keys on the Mac, so that other programs running as you can't use them (B2)
+- [x] Where Beekeeper keeps its device keys on the Mac: in the keychain, under Beekeeper's access group, which needs a provisioning profile (§3, B2)
 - [x] The default port: 4483, which IANA hasn't assigned. The development daemon uses 4484, so it runs beside an installed Hive (B1).
 - [ ] How Hive hands decrypted SSH keys to `ssh`: a short-lived file in a `0700` folder, deleted right after use, or an `ssh-agent` run by Hive (C2)
 - [ ] One SSH key per server, or one for the whole Hive (C2)

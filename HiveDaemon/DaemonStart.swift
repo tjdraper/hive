@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import HiveCore
+import HiveKit
 import os
 
 enum DaemonStart {
@@ -8,13 +9,32 @@ enum DaemonStart {
 
     static func run(mode: DaemonLaunchMode) -> Never {
         let server: APIServer
+        let pairing: LocalPairingListener
         do {
+            let info = try DaemonInfo.read()
             let started = try DaemonStartupWorkflow(mode: mode).run()
             let keys = try HiveKeyStore(directory: started.dataDirectory).loadOrCreate()
             try HiveKeyCheck(directory: started.dataDirectory).run(keys)
             let certificate = try IdentityCertificateStore(directory: started.dataDirectory).loadOrIssue(for: keys.identity)
             let identity = TLSIdentity(key: keys.identity, certificate: certificate)
-            server = try APIServer(port: APIServer.defaultPort(for: mode), identity: identity)
+
+            let database = try HiveDatabase.open(in: started.dataDirectory)
+            let hiveID = try database.hiveID()
+            let devices = DeviceStore(database: database)
+            let port = APIServer.defaultPort(for: mode)
+
+            let signIn = SignInWorkflow(hiveID: hiveID, devices: devices, sessions: SessionStore())
+            server = try APIServer(port: port, identity: identity, signIn: signIn)
+            pairing = try LocalPairingListener(
+                machService: info.pairingMachService,
+                beekeeperSigningIdentifier: info.beekeeperSigningIdentifier,
+                workflow: LocalPairingWorkflow(
+                    hiveID: hiveID,
+                    pin: PublicKeyPin(publicKey: keys.identity.publicKey),
+                    port: port,
+                    devices: devices
+                )
+            )
         } catch DaemonStartupError.nobodyLoggedIn {
             // launchd starts the daemon again shortly, until someone logs in.
             logger.notice("Nobody is logged in at the screen to record as Hive's user, exiting")
@@ -26,7 +46,9 @@ enum DaemonStart {
 
         logger.notice("Startup finished")
         serve(server)
-        dispatchMain()
+        withExtendedLifetime(pairing) {
+            dispatchMain()
+        }
     }
 
     /// Runs until launchd sends SIGTERM. A server that can't start, such as when its port is taken, ends
