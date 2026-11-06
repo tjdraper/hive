@@ -21,7 +21,7 @@ Check off a slice here when its "done when" is true.
 
 - [x] [B1. The TLS server](05-B1-TheTLSServer.md) — Engine, 1 session, installed build
 - [x] [B2. Pairing on the Hive Mac and signing in](06-B2-PairingOnTheHiveMacAndSigningIn.md) — Engine, 1–2 sessions, installed build
-- [ ] [B3. Beekeeper's window, devices and settings](07-B3-BeekeepersWindowDevicesAndSettings.md) — Mixed, 1–2 sessions, installed build
+- [x] [B3. Beekeeper's window, devices and settings](07-B3-BeekeepersWindowDevicesAndSettings.md) — Mixed, 1–2 sessions, installed build
 
 ### Phase C — Backups in Hive
 
@@ -117,8 +117,8 @@ Check off a slice here when its "done when" is true.
   - **`HiveCore`:** a Swift package with everything Hive does that can be tested without running the daemon: the store, the HTTP routes, signing in, the backup engine, retention and scheduling. macOS only. The daemon's executable connects it to the real Secure Enclave, network and processes.
 - **The server is Hummingbird 2** on SwiftNIO, for TLS, routing and WebSockets. Routes are tested with Hummingbird's test client, which never opens a port.
 - **Hive's store is SQLite through GRDB.** It works from a daemon off the main actor, its migrations are explicit, and nothing about it needs syncing. It holds the configuration, the job queue, the catalog of snapshots, the job log and the audit log.
-- **Beekeeper's store is a small file on each device,** never synced: the list of Hives and, for each, its addresses and pinned key hash. Each device pairs on its own.
-- **Beekeeper's key for each Hive** is a Secure Enclave key whose saved form, with the device ID Hive gave it, is kept in the data protection keychain under Beekeeper's own access group, never synced (B2). Any program on the Mac can use a Secure Enclave key's saved form, so it can't be in a file. `keychain-access-groups` is a restricted entitlement on macOS: macOS kills a program that claims Beekeeper's group without a provisioning profile Apple issued to Beekeeper's team, so Beekeeper's Mac builds carry one. Debug builds can be attached to with a debugger, so this protection is for installed builds.
+- **Beekeeper's store is a small file on each device,** never synced: the list of Hives and, for each, its name and addresses. Each device pairs on its own. The pinned key hash isn't in the file: any program running as you could change it to point Beekeeper at its own key and pass the sign-in on to the real Hive (B3).
+- **Beekeeper's key for each Hive** is a Secure Enclave key whose saved form, with the device ID Hive gave it and the Hive's pinned key hash, is kept in the data protection keychain under Beekeeper's own access group, never synced (B2). Any program on the Mac can use a Secure Enclave key's saved form, so it can't be in a file. `keychain-access-groups` is a restricted entitlement on macOS: macOS kills a program that claims Beekeeper's group without a provisioning profile Apple issued to Beekeeper's team, so Beekeeper's Mac builds carry one. Debug builds can be attached to with a debugger, so this protection is for installed builds.
 - **Debug builds have their own bundle IDs:** `<prefix>.Hive.Debug` and `<prefix>.HiveBeekeeper.Debug`, so TCC, the keychain and the XPC check never treat them as the installed apps. A Debug Beekeeper pairs only with the development daemon.
 - **The API is HTTPS with JSON** for commands, plus a **WebSocket** for live progress and logs.
 - **Concurrency:** Hive and both packages are nonisolated by default, and Beekeeper is main-actor by default (AGENTS.md).
@@ -146,7 +146,7 @@ Read the brainstorm's "Guiding principle", "Encryption: always TLS" and "Hardeni
 - **Always TLS 1.3, with no plain HTTP mode.** The certificate is self-signed for a P-256 identity key in the Secure Enclave, made with `swift-certificates` and valid for 10 years. SwiftNIO's TLS signs through `NIOSSLCustomPrivateKey`, so the private key never exists as a file.
 - **Beekeeper pins the public key's hash,** SHA-256 of its X9.63 form, and ignores the chain, hostname and expiry. Hive can reissue the certificate for the same key without breaking any device.
 - **Regenerate identity** creates a new key. Every device has to pair again.
-- **Listen address:** Hive always listens on `127.0.0.1`, for Beekeeper on the Hive Mac. The setting adds one interface, such as Tailscale's, or all of them, and adds none by default. An interface that appears after Hive starts, such as Tailscale's after login, is picked up when it appears. The port is configurable, and 4483 by default.
+- **Listen address:** Hive always listens on `127.0.0.1`, for Beekeeper on the Hive Mac. The setting adds one of the Mac's addresses, such as its Tailscale address, or all of them, and adds none by default. It keeps the address rather than the interface's name, since Tailscale's `utun` number changes between restarts and its address doesn't (B3). An address that appears after Hive starts, such as Tailscale's after login, is picked up within a few seconds. The port is configurable, and 4483 by default. Changes take effect without restarting the daemon.
 - **Exposing Hive to the internet** means forwarding the port or using a tunnel that passes TCP through. TLS always ends at Hive.
 - **Unauthenticated requests reach only** the challenge endpoint, the pairing endpoint while a pairing window is open, and a minimal health check. Everything else is refused before routing or parsing.
 - **Rate limiting and lockout** for failed sign-ins and pairing attempts, per address and per device. Never for everyone at once, which would let anyone on the internet lock you out.

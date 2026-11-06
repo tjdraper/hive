@@ -6,7 +6,7 @@ References like §15 point to [00-Info.md](00-Info.md).
 
 Built with you:
 
-- **Servers under each Hive** in the sidebar, with each one's status once D3 adds it
+- **Servers under each Hive** in the sidebar, with each one's status once D3 adds it. B3 gives each Hive a sidebar section with four pages, which gets long with several Hives: decide here between collapsible sections and one row per Hive with its pages in the detail.
 - **Adding a server,** as one flow:
   1. name, host, port and SSH user
   2. Hive's public key, with the `authorized_keys` line ready to copy, and the `from=` restriction offered (§11)

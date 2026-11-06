@@ -1,5 +1,6 @@
 import Foundation
 import HiveKit
+import NIOCore
 import os
 import ServiceLifecycle
 
@@ -127,11 +128,11 @@ public actor ListenerCoordinator: ListenerControl {
                 failing.remove(address)
             } catch where address.isLoopback {
                 for listener in started.values { await listener.stop() }
-                Self.logger.error("Couldn't listen on 127.0.0.1: \(String(describing: error), privacy: .public)")
+                Self.logger.error("Couldn't listen on 127.0.0.1: \(Self.kind(of: error), privacy: .public)")
                 throw ListenerCoordinatorError.loopbackUnavailable
             } catch {
                 if failing.insert(address).inserted {
-                    Self.logger.error("Couldn't listen on a chosen address: \(String(describing: error), privacy: .public)")
+                    Self.logger.error("Couldn't listen on a chosen address: \(Self.kind(of: error), privacy: .public)")
                 }
             }
         }
@@ -151,7 +152,13 @@ public actor ListenerCoordinator: ListenerControl {
         Self.logger.notice("Stopped listening")
     }
 
-    private static func describe(_ access: HiveKit.NetworkAccess) -> String {
+    /// Some binding errors' descriptions name the address, which stays out of the system log.
+    private static func kind(of error: any Error) -> String {
+        if let error = error as? IOError { return "\(type(of: error)) errno \(error.errnoCode)" }
+        return String(describing: type(of: error))
+    }
+
+        private static func describe(_ access: HiveKit.NetworkAccess) -> String {
         switch access {
         case .thisMacOnly: "on this Mac only"
         case .address: "on this Mac and one chosen address"

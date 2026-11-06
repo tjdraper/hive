@@ -20,6 +20,7 @@ Built with you:
 - **Pair a Device** in the Hive's settings, showing the QR code and a pairing code to copy, with the time left. The code is long because it carries the key hash. Making it short enough to type would mean trusting the network for the key (§5).
 - **Add a Hive** in Beekeeper, by pasting a pairing code. H2 adds scanning the QR code.
 - **Connecting to whichever address answers,** trying them in order
+- **A port changed from another device:** B3's Beekeeper updates its saved port only for changes it makes itself, so every other device loses the Hive until its port is fixed. Address options should carry the port, and Beekeeper should pick up a new one.
 
 ## Tests
 

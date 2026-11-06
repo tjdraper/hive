@@ -118,6 +118,16 @@ final class HiveLink {
             "The Hive turned the request down (\(refused.status))."
         case HiveConnectionError.wrongKey:
             "The Hive didn't show the key it paired with."
+        case HiveConnectionError.signInRefused:
+            "The Hive turned down the sign-in. This device may have been revoked."
+        case HiveConnectionError.lockedOut:
+            "Too many failed sign-ins. Try again in 15 minutes."
+        case HiveConnectionError.incompatible(update: .hive):
+            "Update Hive to work with this Beekeeper."
+        case HiveConnectionError.incompatible(update: .beekeeper):
+            "Update Beekeeper to work with this Hive."
+        case HiveLinkError.notPaired:
+            "This device isn't paired with the Hive."
         case is URLError:
             "Couldn't reach the Hive."
         default:

@@ -79,7 +79,7 @@ final class HiveListStore {
             links[hive.id] = HiveLink(hive: hive, keychain: keychain)
         }
         file.save(hives)
-        Self.logger.notice("Added this Mac's Hive to the list")
+        Self.logger.notice("Saved this Mac's Hive in the list")
 
         if let link = links[pairing.hiveID] {
             await link.refresh()
