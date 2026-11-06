@@ -13,6 +13,9 @@ enum ConfigurationSamples {
         quotaBytes: 500_000_000_000
     )
 
+    /// Any Ed25519 public key reads as a host key.
+    static let hostKey = SSHKeyPair().publicKey
+
     static let database = DatabaseSettings(kind: .mysql, location: .container(serviceName: "site_db"), user: "site", name: "site")
 
     static func job(name: String = "Main site", password: String? = password) -> BackupJobDraft {
@@ -42,11 +45,13 @@ extension APIFixture {
         return try answer.decoded(as: BackupJob.self)
     }
 
-    /// Stands in for a device confirming the server's host key, which has no route yet.
-    func confirmHostKey(of server: Server) throws {
-        try signIn.database.writer.write { database in
-            try database.execute(sql: "UPDATE server SET hostKey = 'ssh-ed25519 AAAA' WHERE id = ?", arguments: [server.id])
-        }
+    /// Scans `key` as the server's host key and confirms it, as a device would.
+    func confirmHostKey(of server: Server, key: OpenSSHPublicKey = ConfigurationSamples.hostKey) async throws {
+        ssh.setScan(.found(key))
+        _ = try await send(.post, HiveEndpoint.hostKeyScan(onServer: server.id))
+        let confirmation = HostKeyConfirmation(fingerprint: key.fingerprint)
+        let answer = try await send(.put, HiveEndpoint.hostKey(onServer: server.id), json: confirmation)
+        guard answer.status == .ok else { throw APIFixtureError.unexpectedStatus(answer.status) }
     }
 
     var servers: ServerStore {

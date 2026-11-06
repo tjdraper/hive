@@ -38,9 +38,11 @@ struct ServerRoutesTests {
             name: "Studio Web",
             connection: ServerConnection(host: "web.example.com", port: 22, user: "backup"),
             quotaBytes: 500_000_000_000,
-            hasConfirmedHostKey: false
+            confirmedHostKey: nil,
+            sshKeyFingerprint: added.sshKeyFingerprint
         )
         #expect(added == expected)
+        #expect(added.sshKeyFingerprint?.hasPrefix("SHA256:") == true)
         #expect(try await fixture.send(.get, HiveEndpoint.server(added.id)).decoded(as: Server.self) == expected)
         #expect(try await fixture.send(.get, HiveEndpoint.servers).decoded(as: [Server].self) == [expected])
         #expect(try fixture.auditEvents().first == .server(
@@ -231,7 +233,7 @@ struct ServerRoutesTests {
         // Arrange
         let server = try await fixture.addServer()
         let job = try await fixture.addJob(to: server)
-        try fixture.confirmHostKey(of: server)
+        try await fixture.confirmHostKey(of: server)
         var draft = server.draft
         draft.connection = connection
 
@@ -240,7 +242,9 @@ struct ServerRoutesTests {
 
         // Assert
         #expect(answer.status == .ok)
-        #expect(try answer.decoded(as: Server.self).hasConfirmedHostKey == false)
+        let changed = try answer.decoded(as: Server.self)
+        #expect(changed.confirmedHostKey == nil)
+        #expect(changed.sshKeyFingerprint == server.sshKeyFingerprint)
         #expect(try fixture.jobs.job(id: job.id)?.databases.map(\.hasPassword) == [false])
     }
 
@@ -249,7 +253,7 @@ struct ServerRoutesTests {
         // Arrange
         let server = try await fixture.addServer()
         let job = try await fixture.addJob(to: server)
-        try fixture.confirmHostKey(of: server)
+        try await fixture.confirmHostKey(of: server)
         var other = ConfigurationSamples.server
         other.name = "Mail"
         let otherServer = try await fixture.addServer(other)
@@ -265,7 +269,7 @@ struct ServerRoutesTests {
         _ = try await fixture.send(.put, HiveEndpoint.server(otherServer.id), json: otherDraft)
 
         // Assert
-        #expect(try fixture.servers.server(id: server.id)?.hasConfirmedHostKey == true)
+        #expect(try fixture.servers.server(id: server.id)?.confirmedHostKey == ConfigurationSamples.hostKey.hostKeyFingerprint)
         #expect(try fixture.jobs.job(id: job.id)?.databases.map(\.hasPassword) == [true])
         #expect(try fixture.jobs.job(id: otherJob.id)?.databases.map(\.hasPassword) == [false])
     }

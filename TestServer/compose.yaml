@@ -1,0 +1,22 @@
+# The test server for developing Hive. Use Scripts/test-server.sh rather than running this directly.
+name: hive-test-server
+
+services:
+  ssh:
+    build: .
+    hostname: hive-test-server
+    ports:
+      # Only this Mac can reach it.
+      - "127.0.0.1:2222:22"
+    volumes:
+      - ssh-keys:/etc/ssh/keys
+      - root-ssh:/root/.ssh
+      - sites:/srv
+      # So `docker exec` reaches neighboring containers, as on a real server.
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  ssh-keys:
+  root-ssh:
+  sites:

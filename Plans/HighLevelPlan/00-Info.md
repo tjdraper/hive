@@ -26,7 +26,7 @@ Check off a slice here when its "done when" is true.
 ### Phase C — Backups in Hive
 
 - [x] [C1. Servers and backup jobs](08-C1-ServersAndBackupJobs.md) — Engine, 1 session
-- [ ] [C2. SSH keys, host keys and the test server](09-C2-SSHKeysHostKeysAndTheTestServer.md) — Engine, 1 session
+- [x] [C2. SSH keys, host keys and the test server](09-C2-SSHKeysHostKeysAndTheTestServer.md) — Engine, 1 session
 - [ ] [C3. Directory snapshots](10-C3-DirectorySnapshots.md) — Engine, 1–2 sessions, installed build
 - [ ] [C4. Database dumps](11-C4-DatabaseDumps.md) — Engine, 1 session
 - [ ] [C5. Scheduling, the job queue and the job log](12-C5-SchedulingTheJobQueueAndTheJobLog.md) — Engine, 1 session
@@ -222,8 +222,9 @@ Configuration is data, edited in Beekeeper. The PHP configuration (`../site-back
 
 - **`ssh` and `rsync` run as child processes,** as in the PHP version, through `Runner` types (`Architecture/README.md`).
 - **Hive bundles rsync 3.x,** built from source at a fixed version by a script, and signed and notarized inside `Hive.app`. macOS's `openrsync` exits with only 0, 1 or 2, so a file that vanished mid-run can't be told from a real failure, and it has no `--fake-super`. rsync is GPLv3, shipped as a separate program with its source available (I1).
-- **Hive generates its own Ed25519 SSH keys,** stored as secrets (§7) and handed to `ssh` at run time, never written in plain text to `~/.ssh`. Beekeeper shows the public key to add to the server's `authorized_keys`, with a `from=` restriction to the Hive Mac's addresses offered.
-- **Host keys** are recorded when a server is added, after you confirm the fingerprint in Beekeeper. Hive keeps its own `known_hosts` file and connects with `StrictHostKeyChecking=yes`. When a key changes, that server's backups fail and Hive emails right away, then daily until the new key is confirmed in Beekeeper or the original one comes back (§13).
+- **Hive generates an Ed25519 SSH key for each server,** stored as a secret (§7), so a server removed from Hive is left accepting a key nobody has. Beekeeper shows the public key to add to the server's `authorized_keys`, with `restrict`, and a `from=` restriction to the Hive Mac's addresses offered.
+- **The key reaches `ssh` through an `ssh-agent` of Hive's own,** started for each connection on a socket in a `0700` folder and stopped afterward. The key goes to it through `ssh-add`'s standard input, so it's never written to disk, and other programs running as you can't read it out of the agent. It leaves the agent after two minutes even if Hive dies without stopping it (C2).
+- **Host keys** are recorded when a server is added, after you confirm the fingerprint in Beekeeper. For each connection Hive writes a `known_hosts` holding only that server's confirmed key, filed under the server's ID, and connects with `StrictHostKeyChecking=yes`. When a key changes, that server's backups fail and Hive emails right away, then daily until the new key is confirmed in Beekeeper or the original one comes back (§13).
 - **Stalls end runs:** rsync's `--timeout` and SSH's `ServerAliveInterval`, so a hung transfer fails instead of blocking the queue.
 - **Database containers are found by their Swarm or Compose service name,** and exactly one must match. Your servers run Docker Swarm, which names containers like `buzzingpixel_db.1.<id>`.
 - **Database passwords never appear on a command line,** on either machine. The PHP version puts them there.
@@ -307,8 +308,8 @@ Each gets its own plan once this one is done. Until then, features not in Part 1
 - [x] Channel binding: dropped. SwiftNIO's TLS doesn't expose the TLS exporter (its BoringSSL has one, but not publicly), and `URLSession` doesn't either. Keeping it would mean forking the server's TLS and writing Beekeeper's own HTTP client (§6).
 - [x] Where Beekeeper keeps its device keys on the Mac: in the keychain, under Beekeeper's access group, which needs a provisioning profile (§3, B2)
 - [x] The default port: 4483, which IANA hasn't assigned. The development daemon uses 4484, so it runs beside an installed Hive (B1).
-- [ ] How Hive hands decrypted SSH keys to `ssh`: a short-lived file in a `0700` folder, deleted right after use, or an `ssh-agent` run by Hive (C2)
-- [ ] One SSH key per server, or one for the whole Hive (C2)
+- [x] How Hive hands decrypted SSH keys to `ssh`: an `ssh-agent` run by Hive for each connection, so the key is never on disk (§11, C2)
+- [x] One SSH key per server, or one for the whole Hive: one per server (§11, C2)
 - [x] Bundling rsync: yes, rsync 3.x, for its exit codes and `--fake-super` (§11)
 - [x] Owners and groups of backed-up files: kept with rsync's `--fake-super` (§9)
 - [ ] How long the job log is kept (C5)

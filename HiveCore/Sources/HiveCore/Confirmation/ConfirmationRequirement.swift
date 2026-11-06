@@ -8,6 +8,8 @@ enum ConfirmationReason: String, CaseIterable, Sendable {
     case quotaLowered
     case retentionLowered
     case passwordReplaced
+    case hostKeyReplaced
+    case sshKeyReplaced
 }
 
 enum ConfirmationRequirement {
@@ -30,6 +32,17 @@ enum ConfirmationRequirement {
             reasons.insert(.passwordReplaced)
         }
         return reasons
+    }
+
+    /// Recording a server's first host key needs nothing, but replacing one could let Hive connect to
+    /// another machine.
+    static func reasons(replacingHostKey old: OpenSSHPublicKey?, with new: OpenSSHPublicKey) -> Set<ConfirmationReason> {
+        old == nil || old == new ? [] : [.hostKeyReplaced]
+    }
+
+    /// A server's first key replaces nothing.
+    static func reasons(replacingSSHKey old: OpenSSHPublicKey?) -> Set<ConfirmationReason> {
+        old == nil ? [] : [.sshKeyReplaced]
     }
 
     /// For the system log, which holds kinds but never values.

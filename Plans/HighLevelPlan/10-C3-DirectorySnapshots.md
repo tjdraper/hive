@@ -14,7 +14,7 @@ References like §9 point to [00-Info.md](00-Info.md). Look at `../site-backups/
 ## rsync
 
 - **Bundled rsync 3.x** (§11): a script that builds it from source at a fixed version, checks the download's checksum, and builds it with extended attribute support. It's embedded in `Hive.app`, signed with the hardened runtime, and used by tests too. Its license and source location go in the repository for I1.
-- **An `RsyncRunner`** that pulls each directory with `--archive --delete --fake-super`, `--link-dest` pointing at the job's last complete snapshot, and `--timeout`, over `ssh` built by C2's runner. Never `--inplace` or `--append` (§9). Exit code 24, files that vanished mid-run, is a warning in the job log, not a failure.
+- **An `RsyncRunner`** that pulls each directory with `--archive --delete --fake-super`, `--link-dest` pointing at the job's last complete snapshot, and `--timeout`, over `ssh` built by C2's runner. Never `--inplace` or `--append` (§9). Run it inside C2's `SSHSession.with`, passing `SSHCommand.options` as `-e`; rsync splits `-e` on spaces, which the run folder's path in the user's temporary folder doesn't have, so check that rather than assume it. `ChildProcess` lives in `SSH/` until rsync needs it too. The agent drops the key after two minutes, which is fine since `ssh` signs in once at the start. Exit code 24, files that vanished mid-run, is a warning in the job log, not a failure.
 - **A missing or empty source folder fails the run** (§9). Settle how to tell an empty folder from an unreachable one.
 
 ## Snapshots

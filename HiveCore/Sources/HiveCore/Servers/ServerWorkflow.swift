@@ -7,10 +7,12 @@ struct ServerWorkflow: Sendable {
     private static let logger = Logger(subsystem: HiveLog.subsystem, category: "Configuration")
 
     let store: ServerStore
+    let sealer: SecretSealer
     let now: @Sendable () -> Date
 
     func add(_ draft: ServerDraft, by deviceID: UUID) throws -> Server {
-        let server = try store.add(ServerDraftCheck.validated(draft), by: deviceID, at: now())
+        let draft = try ServerDraftCheck.validated(draft)
+        let server = try store.add(draft, sshKey: SealedSSHKey(SSHKeyPair(), sealer: sealer), by: deviceID, at: now())
         Self.logger.notice("Added a server")
         return server
     }

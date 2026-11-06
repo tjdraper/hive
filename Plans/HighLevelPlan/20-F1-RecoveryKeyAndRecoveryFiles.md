@@ -7,7 +7,7 @@ References like §14 point to [00-Info.md](00-Info.md). Read the brainstorm's "R
 ## Engine
 
 - **The recovery key** (§14): an HPKE key pair. Hive keeps only the public half. The private half is shown once, as a code in readable groups with a check digit so a mistyped one is caught.
-- **Recovery files** in a versioned format, encrypted to the recovery key: the Hive ID, the whole configuration, every secret, Hive's SSH keys and its `known_hosts`. Devices aren't included, since every device pairs again after a restore.
+- **Recovery files** in a versioned format, encrypted to the recovery key: the Hive ID, the whole configuration, every secret, Hive's SSH key for each server and each server's confirmed host key (C2 keeps no separate `known_hosts`). Devices aren't included, since every device pairs again after a restore.
 - **Written** shortly after any configuration change and once a day, in Hive's data directory
 - **A new recovery key** (needs confirmation, §6): new recovery files use it. Older files still open with the old key (§14), so Hive removes the old files in its data directory and suggests rotating SSH keys and changing credentials when the old key may have leaked.
 

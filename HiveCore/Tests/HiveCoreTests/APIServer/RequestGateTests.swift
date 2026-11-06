@@ -63,6 +63,7 @@ struct RequestGateTests {
             HiveEndpoint.jobs,
             HiveEndpoint.jobs(onServer: UUID()),
             HiveEndpoint.job(UUID()),
+            HiveEndpoint.sshKey(onServer: UUID()),
         ]
     )
     func otherPathsAreRefused(path: String) async throws {
@@ -156,6 +157,38 @@ struct RequestGateTests {
         #expect(try api.servers.all() == [server])
         #expect(try api.jobs.all() == [job])
         #expect(try api.auditEvents() == before)
+    }
+
+    @Test("SSH keys and host keys can't be made, scanned, confirmed or used without signing in")
+    func sshRoutesAreRefused() async throws {
+        // Arrange
+        let server = try await api.addServer()
+        api.ssh.setScan(.found(ConfigurationSamples.hostKey))
+        let before = try api.auditEvents()
+        let requests: [(String, HTTPRequest.Method)] = [
+            (HiveEndpoint.sshKey(onServer: server.id), .post),
+            (HiveEndpoint.hostKeyScan(onServer: server.id), .post),
+            (HiveEndpoint.hostKey(onServer: server.id), .put),
+            (HiveEndpoint.connectionTest(onServer: server.id), .post),
+        ]
+        let body = ByteBuffer(bytes: try JSONEncoder().encode(HostKeyConfirmation(fingerprint: ConfigurationSamples.hostKey.fingerprint)))
+
+        for (path, method) in requests {
+            // Act
+            try await application.test(.router) { client in
+                try await client.execute(uri: path, method: method, body: body) { response in
+                    // Assert
+                    #expect(response.status == .unauthorized)
+                    #expect(response.body.readableBytes == 0)
+                }
+            }
+        }
+
+        // Assert
+        #expect(try api.servers.all() == [server])
+        #expect(try api.auditEvents() == before)
+        #expect(api.ssh.scanned.isEmpty)
+        #expect(api.ssh.ran.isEmpty)
     }
 
     @Test("A made-up session token gets no further than no token at all")

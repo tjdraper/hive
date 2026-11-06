@@ -44,6 +44,61 @@ final class FakeFullDiskAccess: Sendable {
     }
 }
 
+/// Stands in for `ssh` and `ssh-keyscan`, answering what it's told and recording what it was asked.
+final class FakeSSH: SSHRunning, HostKeyScanning {
+    struct State {
+        var scan = HostKeyScanOutcome.failed(.unreachable)
+        var result = ChildProcess.Result(status: 0, standardOutput: Data(), standardError: Data())
+        var scanned: [ServerConnection] = []
+        var ran: [(command: String, target: SSHTarget)] = []
+    }
+
+    private let state = Mutex(State())
+
+    var scanned: [ServerConnection] {
+        state.withLock { $0.scanned }
+    }
+
+    var ran: [(command: String, target: SSHTarget)] {
+        state.withLock { $0.ran }
+    }
+
+    func setScan(_ outcome: HostKeyScanOutcome) {
+        state.withLock { $0.scan = outcome }
+    }
+
+    func setResult(status: Int32, standardError: String = "") {
+        state.withLock { $0.result = ChildProcess.Result(status: status, standardOutput: Data(), standardError: Data(standardError.utf8)) }
+    }
+
+    func scan(_ connection: ServerConnection) async throws -> HostKeyScanOutcome {
+        state.withLock { state in
+            state.scanned.append(connection)
+            return state.scan
+        }
+    }
+
+    func run(_ remoteCommand: String, on target: SSHTarget) async throws -> ChildProcess.Result {
+        state.withLock { state in
+            state.ran.append((remoteCommand, target))
+            return state.result
+        }
+    }
+}
+
+/// The Mac's addresses, as the fixture's Hive sees them.
+final class FakeMacAddresses: Sendable {
+    private let addresses = Mutex(["100.64.0.7", "192.168.1.20"])
+
+    var current: [String] {
+        addresses.withLock { $0 }
+    }
+
+    func set(_ new: [String]) {
+        addresses.withLock { $0 = new }
+    }
+}
+
 /// The whole API over an in-memory Hive with one signed-in device.
 struct APIFixture {
     static let defaultPort = 4483
@@ -55,6 +110,8 @@ struct APIFixture {
     let api: HiveAPI
     let fullDiskAccess = FakeFullDiskAccess()
     let sealer = SecretSealer(key: P256.KeyAgreement.PrivateKey())
+    let ssh = FakeSSH()
+    let addresses = FakeMacAddresses()
 
     init(signIn: SignInFixture? = nil) throws {
         self.signIn = try signIn ?? SignInFixture()
@@ -70,6 +127,9 @@ struct APIFixture {
             listeners: listeners,
             sealer: sealer,
             fullDiskAccess: { [fullDiskAccess] in FullDiskAccessProbe { _ in fullDiskAccess.openResult }.check() },
+            ssh: ssh,
+            hostKeyScanner: ssh,
+            addresses: { [addresses] in addresses.current },
             now: { clock.now }
         )
     }

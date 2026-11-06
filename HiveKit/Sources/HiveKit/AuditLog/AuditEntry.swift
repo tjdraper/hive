@@ -37,6 +37,10 @@ public enum ServerChange: Codable, Hashable, Sendable {
     /// Also cleared its jobs' database passwords and its confirmed host key.
     case connection(old: ServerConnection, new: ServerConnection)
     case quota(old: Int64?, new: Int64?)
+    /// Fingerprints. A device confirmed the key a scan found.
+    case hostKeyConfirmed(old: HostKeyFingerprint?, new: HostKeyFingerprint)
+    /// Fingerprints of Hive's SSH key for the server. The server needs the new one in `authorized_keys`.
+    case newSSHKey(old: String?, new: String)
     /// Its configuration only. Its snapshots stay on the backup drive.
     case removed
 }

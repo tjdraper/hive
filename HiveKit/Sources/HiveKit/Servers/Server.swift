@@ -8,14 +8,24 @@ public struct Server: Codable, Hashable, Identifiable, Sendable {
     /// The most space its jobs' snapshots may take on the backup drive, in bytes. Nil for no limit.
     public let quotaBytes: Int64?
     /// Hive connects only once a device has confirmed the server's host key. Changing the connection clears it.
-    public let hasConfirmedHostKey: Bool
+    public let confirmedHostKey: HostKeyFingerprint?
+    /// The fingerprint of Hive's SSH key for this server. Nil for a server added before Hive made keys.
+    public let sshKeyFingerprint: String?
 
-    public init(id: UUID, name: String, connection: ServerConnection, quotaBytes: Int64?, hasConfirmedHostKey: Bool) {
+    public init(
+        id: UUID,
+        name: String,
+        connection: ServerConnection,
+        quotaBytes: Int64?,
+        confirmedHostKey: HostKeyFingerprint?,
+        sshKeyFingerprint: String?
+    ) {
         self.id = id
         self.name = name
         self.connection = connection
         self.quotaBytes = quotaBytes
-        self.hasConfirmedHostKey = hasConfirmedHostKey
+        self.confirmedHostKey = confirmedHostKey
+        self.sshKeyFingerprint = sshKeyFingerprint
     }
 
     /// The server as it would be sent back unchanged, to start an edit from.

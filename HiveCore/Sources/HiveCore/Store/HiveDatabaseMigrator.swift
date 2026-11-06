@@ -50,6 +50,13 @@ enum HiveDatabaseMigrator {
 
         migrator.registerMigration("Add servers and backup jobs", migrate: addServersAndJobs)
 
+        migrator.registerMigration("Add Hive's SSH key for each server") { database in
+            try database.alter(table: "server") { table in
+                table.add(column: "sealedSSHKey", .blob)
+                table.add(column: "sshPublicKey", .text)
+            }
+        }
+
         return migrator
     }
 

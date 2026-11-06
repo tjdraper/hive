@@ -80,6 +80,28 @@ struct HiveDatabaseTests {
         #expect(try BackupJobStore(database: database).all().isEmpty)
     }
 
+    @Test("A store from before SSH keys keeps its servers, which have no key until one is made")
+    func migratesFromServersSchema() throws {
+        // Arrange
+        let writer = try HiveDatabase.inMemory(migratedUpTo: "Add servers and backup jobs")
+        let serverID = UUID()
+        try writer.write { database in
+            try database.execute(
+                sql: "INSERT INTO server (id, name, host, port, user, createdAt) VALUES (?, 'Web', 'web.example.com', 22, 'root', ?)",
+                arguments: [serverID, Date()]
+            )
+        }
+
+        // Act
+        let database = try HiveDatabase.migrate(writer, defaultHiveName: "Ignored")
+
+        // Assert
+        let server = try #require(try ServerStore(database: database).server(id: serverID))
+        #expect(server.name == "Web")
+        #expect(server.sshKeyFingerprint == nil)
+        #expect(server.confirmedHostKey == nil)
+    }
+
     @Test("A Mac name that isn't a valid name gives a Hive named Hive")
     func invalidMacNameFallsBack() throws {
         // Arrange

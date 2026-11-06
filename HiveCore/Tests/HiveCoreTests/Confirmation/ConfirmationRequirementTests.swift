@@ -10,7 +10,7 @@ struct ConfirmationRequirementTests {
     private static let newUser = ServerConnection(host: "web.example.com", user: "root")
 
     private static func server(connection: ServerConnection = connection, quotaBytes: Int64?) -> Server {
-        Server(id: UUID(), name: "Web", connection: connection, quotaBytes: quotaBytes, hasConfirmedHostKey: true)
+        Server(id: UUID(), name: "Web", connection: connection, quotaBytes: quotaBytes, confirmedHostKey: nil, sshKeyFingerprint: nil)
     }
 
     private static func job(
@@ -79,5 +79,19 @@ struct ConfirmationRequirementTests {
         #expect(ConfirmationRequirement.reasons(from: old, to: new, passwordsEnteredAt: [2]) == [.passwordReplaced])
         #expect(ConfirmationRequirement.reasons(from: old, to: new, passwordsEnteredAt: [0, 1]).isEmpty)
         #expect(ConfirmationRequirement.reasons(from: old, to: new, passwordsEnteredAt: []).isEmpty)
+    }
+
+    @Test("Replacing a host key or Hive's SSH key needs confirmation, while a server's first doesn't")
+    func keyReasons() {
+        // Arrange
+        let first = SSHKeyPair().publicKey
+        let second = SSHKeyPair().publicKey
+
+        // Act / Assert
+        #expect(ConfirmationRequirement.reasons(replacingHostKey: nil, with: first).isEmpty)
+        #expect(ConfirmationRequirement.reasons(replacingHostKey: first, with: first).isEmpty)
+        #expect(ConfirmationRequirement.reasons(replacingHostKey: first, with: second) == [.hostKeyReplaced])
+        #expect(ConfirmationRequirement.reasons(replacingSSHKey: nil).isEmpty)
+        #expect(ConfirmationRequirement.reasons(replacingSSHKey: first) == [.sshKeyReplaced])
     }
 }

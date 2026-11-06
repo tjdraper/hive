@@ -51,6 +51,9 @@ public struct APIServer: Sendable {
         AuditLogRoutes.add(to: router, auditLog: api.auditLog)
         ServerRoutes.add(to: router, workflow: api.servers)
         BackupJobRoutes.add(to: router, workflow: api.jobs)
+        SSHKeyRoutes.add(to: router, workflow: api.sshKeys)
+        HostKeyRoutes.add(to: router, workflow: api.hostKeys)
+        ConnectionTestRoutes.add(to: router, workflow: api.connectionTest)
         return router
     }
 

@@ -7,7 +7,7 @@ References like §9 point to [00-Info.md](00-Info.md). Look at `../site-backups/
 - **MySQL and MariaDB:** `mariadb-dump` or `mysqldump`, whichever the container or host has, with `--single-transaction`, `--routines` and `--events`, and `--no-tablespaces` so a user without extra privileges can dump on MySQL 8. Compressed with gzip on the Hive Mac.
 - **Postgres:** `pg_dump` in its custom format
 - **In a Docker container or on the host** (§8). A container is found by its Swarm or Compose service name, and exactly one running container must match (§11). The PHP version's `docker ps -f name=` also matches names that only contain it.
-- **Streamed over SSH** straight into the snapshot's `databases/` folder, with no file left on the server or in the container (§9)
+- **Streamed over SSH** straight into the snapshot's `databases/` folder, with no file left on the server or in the container (§9). C2's `SSHSession.ssh(_:)` hands its command to the server's shell, so anything in it from the configuration has to be quoted.
 - **Passwords never on a command line** (§11): not in the `ssh` command, not in `docker exec` arguments or its `-e`, and not in the dump command. They're passed through standard input. Decide the exact way for each database kind.
 - **Dump file names** come from the database's name, which C1 keeps unique in its job and to letters, digits, `_`, `$` and `-`.
 - **A failed dump fails its step:** a non-zero exit anywhere in the pipeline, an empty dump, or a MySQL dump without its closing "Dump completed" line

@@ -10,7 +10,7 @@ References like §14 point to [00-Info.md](00-Info.md). Read the brainstorm's "R
 - **Choosing the backup drive again** (§14), since a restored drive has a new volume UUID. Hive checks its `Hive/` marker carries the same Hive ID.
 - **Rebuilding the catalog from manifests** (§9): Hive scans the drive's `Hive/` folder and takes over every snapshot whose manifest carries its Hive ID. This also works when Hive's store is lost.
 - **Retention and quotas wait** until you confirm in Beekeeper (§10). A drive restored from a Mac backup may have lost its hard links.
-- **Rotating SSH keys** (needs confirmation, §6): for each server, Hive adds a new key to `authorized_keys` using the old one, checks the new one works, then removes exactly the old key's line. A server that fails keeps its old key and is reported.
+- **Rotating SSH keys** (needs confirmation, §6): for each server, Hive adds a new key to `authorized_keys` using the old one, checks the new one works, then removes exactly the old key's line. A server that fails keeps its old key and is reported. C2's `POST /servers/<id>/ssh-key` replaces the stored key at once, so rotation has to hold the new key beside the old one until the new one is checked.
 
 ## UI
 

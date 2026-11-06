@@ -1,0 +1,12 @@
+# Keys only, as Hive expects of a real server.
+Port 22
+HostKey /etc/ssh/keys/ssh_host_ed25519_key
+HostKey /etc/ssh/keys/ssh_host_ecdsa_key
+HostKey /etc/ssh/keys/ssh_host_rsa_key
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+UsePAM no
+AuthorizedKeysFile .ssh/authorized_keys
+Subsystem sftp /usr/lib/openssh/sftp-server

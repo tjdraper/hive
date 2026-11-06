@@ -11,6 +11,9 @@ public struct HiveAPI: Sendable {
     let auditLog: AuditLog
     let servers: ServerWorkflow
     let jobs: BackupJobWorkflow
+    let sshKeys: ServerSSHKeyWorkflow
+    let hostKeys: HostKeyWorkflow
+    let connectionTest: ConnectionTestWorkflow
     /// Checked on every request, since it can be turned off while Hive runs.
     let fullDiskAccess: @Sendable () -> FullDiskAccess
 
@@ -30,6 +33,9 @@ public struct HiveAPI: Sendable {
             listeners: listeners,
             sealer: sealer,
             fullDiskAccess: { FullDiskAccessProbe().check() },
+            ssh: SSHRunner(),
+            hostKeyScanner: HostKeyScanner(),
+            addresses: { NetworkInterfaceList.presentAddresses().sorted() },
             now: Date.init
         )
     }
@@ -42,6 +48,9 @@ public struct HiveAPI: Sendable {
         listeners: any ListenerControl,
         sealer: SecretSealer,
         fullDiskAccess: @escaping @Sendable () -> FullDiskAccess,
+        ssh: any SSHRunning,
+        hostKeyScanner: any HostKeyScanning,
+        addresses: @escaping @Sendable () -> [String],
         now: @escaping @Sendable () -> Date
     ) {
         self.hiveID = hiveID
@@ -51,8 +60,24 @@ public struct HiveAPI: Sendable {
         self.settingsStore = settingsStore
         settings = HiveSettingsWorkflow(store: settingsStore, listeners: listeners, now: now)
         auditLog = AuditLog(database: database)
-        servers = ServerWorkflow(store: ServerStore(database: database), now: now)
+        let servers = ServerStore(database: database)
+        self.servers = ServerWorkflow(store: servers, sealer: sealer, now: now)
         jobs = BackupJobWorkflow(store: BackupJobStore(database: database), sealer: sealer, now: now)
+        sshKeys = ServerSSHKeyWorkflow(
+            store: ServerSSHKeyStore(database: database),
+            sealer: sealer,
+            settings: settingsStore,
+            addresses: addresses,
+            now: now
+        )
+        hostKeys = HostKeyWorkflow(
+            store: HostKeyStore(database: database),
+            servers: servers,
+            scanner: hostKeyScanner,
+            pending: PendingHostKeyScans(),
+            now: now
+        )
+        connectionTest = ConnectionTestWorkflow(targets: SSHTargetLoader(database: database, sealer: sealer), ssh: ssh)
         self.fullDiskAccess = fullDiskAccess
     }
 }

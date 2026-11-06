@@ -22,6 +22,26 @@ public enum HiveEndpoint {
         "\(servers)/\(id.uuidString)"
     }
 
+    /// `GET` reads Hive's SSH key for the server, and `POST` makes a new one.
+    public static func sshKey(onServer id: UUID) -> String {
+        "\(server(id))/ssh-key"
+    }
+
+    /// `POST` scans the server's host key without recording it.
+    public static func hostKeyScan(onServer id: UUID) -> String {
+        "\(hostKey(onServer: id))/scan"
+    }
+
+    /// `PUT` records the key the last scan found.
+    public static func hostKey(onServer id: UUID) -> String {
+        "\(server(id))/host-key"
+    }
+
+    /// `POST` connects with Hive's key and runs a command that changes nothing.
+    public static func connectionTest(onServer id: UUID) -> String {
+        "\(server(id))/connection-test"
+    }
+
     public static func jobs(onServer id: UUID) -> String {
         "\(server(id))\(jobs)"
     }

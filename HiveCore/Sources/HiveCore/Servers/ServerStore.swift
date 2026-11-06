@@ -20,10 +20,10 @@ struct ServerStore: Sendable {
     }
 
     /// `draft` has passed `ServerDraftCheck`.
-    func add(_ draft: ServerDraft, by deviceID: UUID, at date: Date) throws -> Server {
+    func add(_ draft: ServerDraft, sshKey: SealedSSHKey, by deviceID: UUID, at date: Date) throws -> Server {
         try database.writer.write { database in
             try Self.checkNameIsFree(draft.name, except: nil, in: database)
-            let record = ServerRecord(id: UUID(), draft: draft, createdAt: date)
+            let record = ServerRecord(id: UUID(), draft: draft, sshKey: sshKey, createdAt: date)
             try record.insert(database)
             let event = AuditEvent.server(serverID: record.id, serverName: record.name, change: .added(connection: record.connection))
             try AuditLog.record(event, by: deviceID, at: date, in: database)
@@ -32,7 +32,8 @@ struct ServerStore: Sendable {
     }
 
     /// Changing where Hive connects clears the server's host key and its jobs' database passwords, so
-    /// they have to be confirmed and entered again before anything is sent there. Returns nil when no
+    /// they have to be confirmed and entered again before anything is sent there. Hive's SSH key stays,
+    /// since only its public half is ever sent. Returns nil when no
     /// server has that ID.
     func change(id: UUID, to draft: ServerDraft, by deviceID: UUID, at date: Date) throws -> (old: Server, new: Server)? {
         try database.writer.write { database in
