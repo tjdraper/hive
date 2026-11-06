@@ -9,14 +9,16 @@ struct RequestGateTests {
     private static let protectedPath = "/protected"
 
     private let fixture: SignInFixture
+    private let api: APIFixture
 
     init() throws {
-        fixture = try SignInFixture()
+        api = try APIFixture()
+        fixture = api.signIn
     }
 
     /// The real routes, plus one that needs signing in and answers with the device that's signed in.
     private var application: some ApplicationProtocol {
-        let router = APIServer.router(signIn: fixture.workflow)
+        let router = APIServer.router(api: api.api)
         router.get(RouterPath(Self.protectedPath)) { _, context in
             context.signedInDeviceID?.uuidString ?? "none"
         }
@@ -52,6 +54,10 @@ struct RequestGateTests {
             "/sign-in/",
             "/sign-in/challenge/",
             "/sign-in/session",
+            HiveEndpoint.overview,
+            HiveEndpoint.devices,
+            HiveEndpoint.settings,
+            HiveEndpoint.auditLog,
         ]
     )
     func otherPathsAreRefused(path: String) async throws {
@@ -85,6 +91,33 @@ struct RequestGateTests {
                 #expect(response.status == .unauthorized)
             }
         }
+    }
+
+    @Test(
+        "Changes are refused without signing in, and change nothing",
+        arguments: [
+            (HiveEndpoint.settings, HTTPRequest.Method.put),
+            (HiveEndpoint.device(UUID()), .delete),
+            (HiveEndpoint.devices, .delete),
+        ]
+    )
+    func changesAreRefused(path: String, method: HTTPRequest.Method) async throws {
+        // Arrange
+        let settings = HiveSettings(name: "Taken Over", networkAccess: .allAddresses, port: 5000)
+        let body = ByteBuffer(bytes: try JSONEncoder().encode(settings))
+
+        // Act
+        try await application.test(.router) { client in
+            try await client.execute(uri: path, method: method, body: body) { response in
+                // Assert
+                #expect(response.status == .unauthorized)
+            }
+        }
+
+        // Assert
+        #expect(try api.settings.settings().name == "Test Hive")
+        #expect(api.listeners.applied.isEmpty)
+        #expect(try fixture.devices.device(id: fixture.device.id) != nil)
     }
 
     @Test("A made-up session token gets no further than no token at all")

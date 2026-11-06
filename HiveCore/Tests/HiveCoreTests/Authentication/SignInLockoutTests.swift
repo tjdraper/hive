@@ -91,7 +91,12 @@ struct SignInLockoutTests {
             _ = fixture.workflow.signIn(wrongKey, from: ClientAddress(key: "203.0.113.\(index)"))
         }
         let otherKey = P256.Signing.PrivateKey()
-        let otherDevice = try fixture.devices.add(name: "Other", publicKey: otherKey.publicKey.x963Representation, at: fixture.clock.now)
+        let otherDevice = try fixture.devices.add(
+            name: "Other",
+            publicKey: otherKey.publicKey.x963Representation,
+            at: fixture.clock.now,
+            auditedAs: .pairedOnHiveMac
+        )
 
         // Act
         let lockedOut = fixture.workflow.signIn(try fixture.request(), from: elsewhere)

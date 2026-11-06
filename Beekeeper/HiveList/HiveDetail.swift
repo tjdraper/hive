@@ -1,0 +1,125 @@
+import HiveKit
+import SwiftUI
+
+struct HiveDetail: View {
+    let hive: KnownHive
+    let link: HiveLink
+    let page: HivePage
+
+    var body: some View {
+        content
+            .navigationTitle(hive.name)
+        #if os(macOS)
+            .navigationSubtitle(page.title)
+        #endif
+    }
+
+    @ViewBuilder private var content: some View {
+        switch link.status {
+        case .connected:
+            switch page {
+            case .overview: HiveOverviewView(hive: hive, link: link)
+            case .devices: DeviceListView(hive: hive, link: link)
+            case .auditLog: AuditLogView(link: link)
+            case .settings: HiveSettingsView(hive: hive, link: link)
+            }
+        case .connecting:
+            ProgressView("Connecting…")
+                .task { await link.refresh() }
+        default:
+            HiveProblemView(hive: hive, link: link)
+        }
+    }
+}
+
+/// Why Beekeeper isn't showing the Hive, and what can be done about it.
+private struct HiveProblemView: View {
+    let hive: KnownHive
+    let link: HiveLink
+
+    @Environment(HiveListStore.self) private var store
+    @State private var isConfirmingRemoval = false
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(title, systemImage: systemImage)
+        } description: {
+            Text(explanation)
+        } actions: {
+            actions
+        }
+        .confirmationDialog("Remove \(hive.name) from Beekeeper?", isPresented: $isConfirmingRemoval) {
+            Button("Remove", role: .destructive) { store.remove(hive.id) }
+        } message: {
+            Text("This device is no longer paired with it, so Beekeeper can't manage it until it pairs again.")
+        }
+    }
+
+    @ViewBuilder private var actions: some View {
+        switch link.status {
+        case .offline, .lockedOut, .failed:
+            Button("Try Again") { Task { await link.refresh() } }
+        case .identityChanged, .notRecognized, .notPaired:
+            #if os(macOS)
+            if hive.isOnThisMac {
+                PairWithThisMacButton(title: "Pair Again") { _ in
+                    // The link reconnects, and the page shows once it's signed in.
+                }
+            }
+            #endif
+            if link.status != .identityChanged {
+                Button("Remove from Beekeeper…") { isConfirmingRemoval = true }
+            }
+        case .connecting, .connected, .needsUpdate:
+            EmptyView()
+        }
+    }
+
+    private var title: String {
+        switch link.status {
+        case .offline: "Can't Reach This Hive"
+        case .identityChanged: "This Hive's Identity Has Changed"
+        case .notRecognized: "This Hive Doesn't Recognize This Device"
+        case .notPaired: "Not Paired"
+        case .lockedOut: "Too Many Failed Sign-Ins"
+        case .needsUpdate(.hive): "Update Hive"
+        case .needsUpdate(.beekeeper): "Update Beekeeper"
+        case .failed: "Something Went Wrong"
+        case .connecting, .connected: ""
+        }
+    }
+
+    private var systemImage: String {
+        switch link.status {
+        case .offline: "wifi.slash"
+        case .identityChanged: "exclamationmark.shield"
+        case .notRecognized, .notPaired: "person.crop.circle.badge.questionmark"
+        case .lockedOut: "lock"
+        case .needsUpdate: "arrow.down.circle"
+        case .failed, .connecting, .connected: "exclamationmark.triangle"
+        }
+    }
+
+    private var explanation: String {
+        switch link.status {
+        case .offline:
+            "Check that the Hive's Mac is on and Hive is running."
+        case .identityChanged:
+            "It showed a different key from the one this device paired with. Beekeeper won't connect to it until you pair again."
+        case .notRecognized:
+            "This device may have been revoked from another one. Pair again to manage this Hive."
+        case .notPaired:
+            "This device isn't paired with this Hive any more."
+        case .lockedOut:
+            "The Hive is turning this device away for now. Try again in 15 minutes."
+        case .needsUpdate(.hive):
+            "This Hive is too old to work with this Beekeeper."
+        case .needsUpdate(.beekeeper):
+            "This Beekeeper is too old to work with this Hive."
+        case .failed(let message):
+            message
+        case .connecting, .connected:
+            ""
+        }
+    }
+}

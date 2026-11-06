@@ -7,13 +7,20 @@ import Testing
 struct LocalPairingWorkflowTests {
     private let hiveID = UUID()
     private let pin = PublicKeyPin(publicKey: P256.Signing.PrivateKey().publicKey)
+    private let database: HiveDatabase
     private let devices: DeviceStore
     private let workflow: LocalPairingWorkflow
     private let deviceKey = P256.Signing.PrivateKey().publicKey.x963Representation
 
     init() throws {
-        devices = DeviceStore(database: try HiveDatabase.inMemory())
-        workflow = LocalPairingWorkflow(hiveID: hiveID, pin: pin, port: 4483, devices: devices)
+        database = try HiveDatabase.inMemory()
+        devices = DeviceStore(database: database)
+        workflow = LocalPairingWorkflow(
+            hiveID: hiveID,
+            pin: pin,
+            settings: HiveSettingsStore(database: database, defaultPort: 4483),
+            devices: devices
+        )
     }
 
     @Test("Pairing records the device and answers with the Hive ID, its key's pin, the port and the device's ID")
@@ -32,6 +39,43 @@ struct LocalPairingWorkflowTests {
         let device = try #require(try devices.device(id: pairing.deviceID))
         #expect(device.name == "Studio Mac")
         #expect(device.publicKey == deviceKey)
+    }
+
+    @Test("Pairing is recorded in the audit log as made by the new device")
+    func pairingIsAudited() throws {
+        // Act
+        let result = workflow.pair(LocalPairingRequest(devicePublicKey: deviceKey, deviceName: "Studio Mac"))
+
+        // Assert
+        guard case .paired(let pairing) = result else {
+            Issue.record("Expected to pair, got \(result)")
+            return
+        }
+        let entries = try AuditLog(database: database).page(before: nil, limit: 10).entries
+        #expect(entries.map(\.event) == [.pairedOnHiveMac])
+        #expect(entries.first?.deviceID == pairing.deviceID)
+        #expect(entries.first?.deviceName == "Studio Mac")
+    }
+
+    @Test("Pairing answers with the port Hive listens on now, not the one it started with")
+    func pairingGivesCurrentPort() throws {
+        // Arrange
+        let settings = HiveSettingsStore(database: database, defaultPort: 4483)
+        let otherKey = P256.Signing.PrivateKey().publicKey.x963Representation
+        let device = try devices.add(name: "Other Mac", publicKey: otherKey, at: .now, auditedAs: .pairedOnHiveMac)
+        var changed = try settings.settings()
+        changed.port = 5000
+        try settings.save(changed, replacing: try settings.settings(), by: device.id, at: .now)
+
+        // Act
+        let result = workflow.pair(LocalPairingRequest(devicePublicKey: deviceKey, deviceName: "Studio Mac"))
+
+        // Assert
+        guard case .paired(let pairing) = result else {
+            Issue.record("Expected to pair, got \(result)")
+            return
+        }
+        #expect(pairing.port == 5000)
     }
 
     @Test(

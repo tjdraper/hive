@@ -18,11 +18,12 @@ struct LocalPairingListenerTests {
     )
 
     init() throws {
-        devices = DeviceStore(database: try HiveDatabase.inMemory())
+        let database = try HiveDatabase.inMemory()
+        devices = DeviceStore(database: database)
         workflow = LocalPairingWorkflow(
             hiveID: UUID(),
             pin: PublicKeyPin(publicKey: P256.Signing.PrivateKey().publicKey),
-            port: 4483,
+            settings: HiveSettingsStore(database: database, defaultPort: 4483),
             devices: devices
         )
     }

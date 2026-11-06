@@ -39,7 +39,12 @@ struct SignInFixture {
             apiVersions: apiVersions,
             now: { clock.now }
         )
-        device = try devices.add(name: "Test Mac", publicKey: deviceKey.publicKey.x963Representation, at: clock.now)
+        device = try devices.add(
+            name: "Test Mac",
+            publicKey: deviceKey.publicKey.x963Representation,
+            at: clock.now,
+            auditedAs: .pairedOnHiveMac
+        )
     }
 
     /// A sign-in request answering a fresh challenge, signed by `key`.

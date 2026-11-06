@@ -3,6 +3,7 @@ import Foundation
 import HiveCore
 import HiveKit
 import os
+import SystemConfiguration
 
 enum DaemonStart {
     private static let logger = Logger(subsystem: HiveLog.subsystem, category: "DaemonStartup")
@@ -18,21 +19,24 @@ enum DaemonStart {
             let certificate = try IdentityCertificateStore(directory: started.dataDirectory).loadOrIssue(for: keys.identity)
             let identity = TLSIdentity(key: keys.identity, certificate: certificate)
 
-            let database = try HiveDatabase.open(in: started.dataDirectory)
+            let database = try HiveDatabase.open(in: started.dataDirectory, defaultHiveName: defaultHiveName())
             let hiveID = try database.hiveID()
-            let devices = DeviceStore(database: database)
-            let port = APIServer.defaultPort(for: mode)
+            let settings = HiveSettingsStore(database: database, defaultPort: APIServer.defaultPort(for: mode))
+            let listeners = ListenerCoordinator(target: try settings.settings().listenTarget)
 
-            let signIn = SignInWorkflow(hiveID: hiveID, devices: devices, sessions: SessionStore())
-            server = try APIServer(port: port, identity: identity, signIn: signIn)
+            server = try APIServer(
+                api: HiveAPI(hiveID: hiveID, database: database, settings: settings, listeners: listeners),
+                identity: identity,
+                listeners: listeners
+            )
             pairing = try LocalPairingListener(
                 machService: info.pairingMachService,
                 beekeeperSigningIdentifier: info.beekeeperSigningIdentifier,
                 workflow: LocalPairingWorkflow(
                     hiveID: hiveID,
                     pin: PublicKeyPin(publicKey: keys.identity.publicKey),
-                    port: port,
-                    devices: devices
+                    settings: settings,
+                    devices: DeviceStore(database: database)
                 )
             )
         } catch DaemonStartupError.nobodyLoggedIn {
@@ -49,6 +53,11 @@ enum DaemonStart {
         withExtendedLifetime(pairing) {
             dispatchMain()
         }
+    }
+
+    /// The Mac's name, as set in System Settings › General › Sharing, so a new Hive is named for its Mac.
+    private static func defaultHiveName() -> String {
+        (SCDynamicStoreCopyComputerName(nil, nil) as String?) ?? "Hive"
     }
 
     /// Runs until launchd sends SIGTERM. A server that can't start, such as when its port is taken, ends

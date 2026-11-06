@@ -38,7 +38,12 @@ struct LocalPairingWorkflow {
             Self.logger.error("This Mac's Hive refused to pair: \(refusal.rawValue, privacy: .public)")
             throw LocalPairingError.refused(refusal)
         case .paired(let pairing):
-            try keychain.save(DeviceCredential(hiveID: pairing.hiveID, deviceID: pairing.deviceID, keyData: key.dataRepresentation))
+            try keychain.save(DeviceCredential(
+                hiveID: pairing.hiveID,
+                deviceID: pairing.deviceID,
+                pin: pairing.pin,
+                keyData: key.dataRepresentation
+            ))
             Self.logger.notice("Paired with this Mac's Hive")
             return pairing
         }

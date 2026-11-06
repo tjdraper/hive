@@ -74,7 +74,7 @@ public final class HiveConnection: Sendable {
         }
     }
 
-    private func decode<Value: Decodable>(_: Value.Type, from data: Data) throws -> Value {
+    func decode<Value: Decodable>(_: Value.Type, from data: Data) throws -> Value {
         do {
             return try JSONDecoder().decode(Value.self, from: data)
         } catch {
@@ -82,10 +82,13 @@ public final class HiveConnection: Sendable {
         }
     }
 
-    private func send(path: String, method: String, body: Data? = nil) async throws -> (Data, HTTPURLResponse) {
+    func send(path: String, method: String, body: Data? = nil, token: String? = nil) async throws -> (Data, HTTPURLResponse) {
         guard let url = address.url(path: path) else { throw HiveConnectionError.invalidAddress }
         var request = URLRequest(url: url)
         request.httpMethod = method
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         if let body {
             request.httpBody = body
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

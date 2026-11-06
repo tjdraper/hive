@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import HiveKit
 import Security
 
 enum DeviceKeyError: Error {
@@ -7,10 +8,13 @@ enum DeviceKeyError: Error {
     case couldNotSetAccessControl
 }
 
-/// What this device keeps to sign in to one Hive: the ID Hive gave it, and its Secure Enclave key.
+/// What this device keeps to sign in to one Hive: the ID Hive gave it, its Secure Enclave key, and the
+/// Hive's key pin. The pin is kept here with the key rather than in the list of Hives, which any program
+/// running as the user could change to point Beekeeper at its own key and pass the sign-in on.
 struct DeviceCredential: Codable {
     let hiveID: UUID
     let deviceID: UUID
+    let pin: PublicKeyPin
     /// The key's saved form, which only this device's Secure Enclave can use.
     let keyData: Data
 

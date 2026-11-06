@@ -1,31 +1,20 @@
 import Foundation
 import HiveKit
 import Hummingbird
-import HummingbirdTLS
-import NIOCore
-import os
+import NIOSSL
+import ServiceLifecycle
+import UnixSignals
 
-/// Hive's HTTPS API. It listens on `127.0.0.1` only, for Beekeeper on the Hive Mac.
+/// Hive's HTTPS API, on `127.0.0.1` and wherever else the settings say.
 public struct APIServer: Sendable {
-    /// Closes a connection that sends nothing for this long, including one that never finishes its TLS handshake.
-    static let idleTimeout = TimeAmount.seconds(30)
+    private let api: HiveAPI
+    private let listeners: ListenerCoordinator
+    private let tlsConfiguration: TLSConfiguration
 
-    private static let logger = Logger(subsystem: HiveLog.subsystem, category: "APIServer")
-
-    private let application: any ApplicationProtocol
-
-    public init(port: Int, identity: TLSIdentity, signIn: SignInWorkflow) throws {
-        application = Application(
-            responder: Self.responder(signIn: signIn),
-            server: try .tls(
-                .http1(configuration: .init(idleTimeout: Self.idleTimeout)),
-                tlsConfiguration: try identity.serverConfiguration()
-            ),
-            configuration: ApplicationConfiguration(address: .hostname("127.0.0.1", port: port)),
-            onServerRunning: { _ in
-                Self.logger.notice("Serving the API over TLS on 127.0.0.1, port \(port, privacy: .public)")
-            }
-        )
+    public init(api: HiveAPI, identity: TLSIdentity, listeners: ListenerCoordinator) throws {
+        self.api = api
+        self.listeners = listeners
+        tlsConfiguration = try identity.serverConfiguration()
     }
 
     /// 4483 isn't assigned to anything. The development agent takes the next port, so it can run beside an installed Hive.
@@ -36,21 +25,43 @@ public struct APIServer: Sendable {
         }
     }
 
-    /// Runs until the process is sent SIGTERM or SIGINT.
+    /// Runs until the process is sent SIGTERM or SIGINT. Throws when it can't listen on `127.0.0.1`.
     public func run() async throws {
-        try await application.runService()
+        let service = ListeningService(
+            listeners: listeners,
+            factory: TLSListenerFactory(responder: Self.responder(api: api), tlsConfiguration: tlsConfiguration)
+        )
+        let group = ServiceGroup(configuration: ServiceGroupConfiguration(
+            services: [service],
+            gracefulShutdownSignals: [.sigterm, .sigint],
+            logger: TLSListener.quietLogger
+        ))
+        try await group.run()
     }
 
-    static func router(signIn: SignInWorkflow) -> Router<HiveRequestContext> {
+    static func router(api: HiveAPI) -> Router<HiveRequestContext> {
         let router = Router(context: HiveRequestContext.self)
         router.get(RouterPath(HiveEndpoint.health)) { _, _ in
             HTTPResponse.Status.noContent
         }
-        SignInRoutes.add(to: router, workflow: signIn)
+        SignInRoutes.add(to: router, workflow: api.signIn)
+        OverviewRoutes.add(to: router, hiveID: api.hiveID, settings: api.settingsStore, fullDiskAccess: api.fullDiskAccess)
+        DeviceRoutes.add(to: router, devices: api.devices, revocation: api.revocation)
+        SettingsRoutes.add(to: router, workflow: api.settings)
+        AuditLogRoutes.add(to: router, auditLog: api.auditLog)
         return router
     }
 
-    static func responder(signIn: SignInWorkflow) -> some HTTPResponder<HiveRequestContext> {
-        RequestGate(next: router(signIn: signIn).buildResponder(), sessions: signIn.sessions, now: signIn.now)
+    static func responder(api: HiveAPI) -> some HTTPResponder<HiveRequestContext> {
+        RequestGate(next: router(api: api).buildResponder(), sessions: api.signIn.sessions, now: api.signIn.now)
+    }
+}
+
+private struct ListeningService: Service {
+    let listeners: ListenerCoordinator
+    let factory: any APIListenerFactory
+
+    func run() async throws {
+        try await listeners.run(with: factory)
     }
 }

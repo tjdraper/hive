@@ -150,7 +150,7 @@ struct SignInWorkflowTests {
     @Test("A revoked device's key can't sign in")
     func revokedDeviceIsRefused() throws {
         // Arrange
-        try fixture.devices.remove(id: fixture.device.id)
+        _ = try fixture.devices.remove(id: fixture.device.id, by: fixture.device.id, at: fixture.clock.now)
         let request = try fixture.request()
 
         // Act

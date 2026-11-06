@@ -8,13 +8,15 @@ import Testing
 
 struct SignInRoutesTests {
     private let fixture: SignInFixture
+    private let api: APIFixture
 
     init() throws {
-        fixture = try SignInFixture()
+        api = try APIFixture()
+        fixture = api.signIn
     }
 
     private var application: some ApplicationProtocol {
-        Application(responder: APIServer.responder(signIn: fixture.workflow))
+        api.application
     }
 
     private func signInBody(for challenge: SignInChallenge, key: P256.Signing.PrivateKey? = nil) throws -> ByteBuffer {
@@ -116,7 +118,7 @@ struct SignInRoutesTests {
     func incompatibleGets409() async throws {
         // Arrange
         let fixture = try SignInFixture(apiVersions: APIVersions(current: 2, oldestCompatible: 2))
-        let application = Application(responder: APIServer.responder(signIn: fixture.workflow))
+        let application = Application(responder: APIServer.responder(api: try APIFixture(signIn: fixture).api))
         let request = try fixture.request(apiVersions: APIVersions(current: 1, oldestCompatible: 1))
 
         // Act
