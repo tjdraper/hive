@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Runs an executable to completion, collecting what it writes, and stops it when the task running it
 /// is cancelled.
@@ -28,6 +29,11 @@ struct ChildProcess: Sendable {
     let environment: [String: String]
     /// Written to the process's standard input, which is then closed.
     var input: Data?
+    /// Takes standard output as it arrives instead of collecting it, so output of any size passes
+    /// through without being held in memory. It's called once at a time, and the process waits on a
+    /// full pipe meanwhile, so slow writing slows the process rather than filling memory. Throwing stops
+    /// the process, and running it then throws that error.
+    var standardOutputHandler: (@Sendable (Data) throws -> Void)?
 
     func run() async throws -> Result {
         var standardOutput = Data()
@@ -42,7 +48,7 @@ struct ChildProcess: Sendable {
                 return Result(status: status, standardOutput: standardOutput, standardError: standardError)
             }
         }
-        // The stream only ends without an exit when the task was cancelled.
+        // The stream only ends without an exit, or an error from the output handler, when the task was cancelled.
         throw CancellationError()
     }
 
@@ -66,6 +72,7 @@ struct ChildProcess: Sendable {
             let finished = DispatchGroup()
             finished.enter()
             process.terminationHandler = { _ in finished.leave() }
+            let handlerFailure = OSAllocatedUnfairLock<(any Error)?>(initialState: nil)
 
             do {
                 try process.run()
@@ -79,11 +86,19 @@ struct ChildProcess: Sendable {
             }
 
             finished.enter()
-            Self.forward(standardOutput, as: { .standardOutput($0) }, to: continuation, then: finished)
+            if let handler = standardOutputHandler {
+                Self.forward(standardOutput, then: finished, receive: Self.handing(to: handler, failure: handlerFailure, stopping: process))
+            } else {
+                Self.forward(standardOutput, then: finished) { continuation.yield(.standardOutput($0)) }
+            }
             finished.enter()
-            Self.forward(standardError, as: { .standardError($0) }, to: continuation, then: finished)
+            Self.forward(standardError, then: finished) { continuation.yield(.standardError($0)) }
 
             finished.notify(queue: .global()) {
+                if let error = handlerFailure.withLock({ $0 }) {
+                    continuation.finish(throwing: error)
+                    return
+                }
                 continuation.yield(.exited(status: process.terminationStatus))
                 continuation.finish()
             }
@@ -99,12 +114,26 @@ struct ChildProcess: Sendable {
         }
     }
 
-    private static func forward(
-        _ pipe: Pipe,
-        as event: @escaping @Sendable (Data) -> Event,
-        to continuation: AsyncThrowingStream<Event, any Error>.Continuation,
-        then finished: DispatchGroup
-    ) {
+    /// Passes output to `handler` until it throws, then records why, stops the process, and drops the
+    /// rest while it ends.
+    private static func handing(
+        to handler: @escaping @Sendable (Data) throws -> Void,
+        failure: OSAllocatedUnfairLock<(any Error)?>,
+        stopping process: Process
+    ) -> @Sendable (Data) -> Void {
+        { data in
+            guard failure.withLock({ $0 == nil }) else { return }
+            do {
+                try handler(data)
+            } catch {
+                failure.withLock { $0 = error }
+                stop(process)
+            }
+        }
+    }
+
+    /// `receive` is called on the handle's own queue, one call at a time.
+    private static func forward(_ pipe: Pipe, then finished: DispatchGroup, receive: @escaping @Sendable (Data) -> Void) {
         pipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
             guard !data.isEmpty else {
@@ -112,7 +141,7 @@ struct ChildProcess: Sendable {
                 finished.leave()
                 return
             }
-            continuation.yield(event(data))
+            receive(data)
         }
     }
 

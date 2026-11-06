@@ -1,9 +1,11 @@
 import Foundation
+import HiveKit
 
 /// `manifest.json` in each snapshot: whose it is, what it holds and whether it completed, so Hive's
 /// catalog can be rebuilt from the drive (§9, F3). A partial snapshot has one too, marked incomplete.
 struct SnapshotManifest: Codable, Equatable {
     static let fileName = "manifest.json"
+    static let databasesFolder = "databases"
     /// Raised whenever a field changes meaning or goes away, so a reader can tell a manifest it doesn't understand.
     static let currentFormat = 1
 
@@ -21,6 +23,13 @@ struct SnapshotManifest: Codable, Equatable {
         let vanishedFiles: Bool
     }
 
+    struct Database: Codable, Equatable {
+        let name: String
+        let kind: DatabaseKind
+        /// Its dump's file within `databases/`.
+        let file: String
+    }
+
     let format: Int
     let hiveID: UUID
     let snapshotID: UUID
@@ -31,6 +40,8 @@ struct SnapshotManifest: Codable, Equatable {
     let complete: Bool
     /// The directories copied so far, all of them once it's complete.
     let directories: [Directory]
+    /// The databases dumped so far, all of them once it's complete.
+    let databases: [Database]
 
     func encoded() throws -> Data {
         let encoder = JSONEncoder()

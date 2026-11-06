@@ -131,7 +131,9 @@ struct APIFixture {
     let addresses = FakeMacAddresses()
     let volumes = FakeVolumes()
 
-    init(signIn: SignInFixture? = nil) throws {
+    /// `dumpSearchPath` is where database dumps find `docker` and the dump tools, which tests stand in
+    /// for with scripts.
+    init(signIn: SignInFixture? = nil, dumpSearchPath: String = "/usr/bin:/bin") throws {
         self.signIn = try signIn ?? SignInFixture()
         let signIn = self.signIn
         settings = HiveSettingsStore(database: signIn.database, defaultPort: Self.defaultPort)
@@ -150,7 +152,8 @@ struct APIFixture {
             addresses: { [addresses] in addresses.current },
             volumes: volumes,
             rsync: RsyncRunner(rsync: TestRsync.url),
-            // Directories are read from folders the tests make on this Mac, never over `ssh`.
+            dumps: DatabaseDumpRunner(localSearchPath: dumpSearchPath),
+            // Directories and dumps are read from folders and scripts the tests make on this Mac, never over `ssh`.
             origin: { _ in .thisMac },
             now: { clock.now }
         )

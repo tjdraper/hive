@@ -12,7 +12,7 @@ struct DirectoryPull: Sendable {
     /// `previous` is the same directory's folder in the job's last complete snapshot, when it has one.
     func pull(
         _ directory: BackupDirectory,
-        from origin: RsyncOrigin,
+        from origin: BackupOrigin,
         into destination: URL,
         linkingTo previous: URL?
     ) async throws -> DirectoryRun {

@@ -10,6 +10,7 @@ References like §12 point to [00-Info.md](00-Info.md).
 - **Snapshots through the API:** each job's snapshots with their date, whether complete, and how much removing each would free (C6), plus each server's total against its quota
 
 - **From C3:** the catalog is the `snapshot` table, and `GET /jobs/<id>/run` gives the latest run until C5's job log.
+- **From C4:** a run reports each database's dump with its time, bytes dumped and stored, and failure. The database failures each need words in Beekeeper, such as "the database turned down the password" for `databaseLoginRefused`.
 
 ## UI
 

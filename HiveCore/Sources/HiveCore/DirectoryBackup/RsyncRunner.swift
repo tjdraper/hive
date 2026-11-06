@@ -1,13 +1,6 @@
 import Foundation
 import HiveKit
 
-/// Where rsync reads a directory from.
-enum RsyncOrigin: Sendable {
-    case server(SSHTarget)
-    /// A folder on this Mac. Tests use it, since they never run `ssh`.
-    case thisMac
-}
-
 /// Runs Hive's bundled rsync, over `ssh` built by `SSHCommand` when it reads from a server.
 struct RsyncRunner: Sendable {
     /// Beside the daemon in Hive.app, which only root can change (§4).
@@ -15,20 +8,20 @@ struct RsyncRunner: Sendable {
     var sshTools = SSHTools()
 
     /// Lists the top of `path` on the origin.
-    func list(_ path: String, from origin: RsyncOrigin) async throws -> ChildProcess.Result {
+    func list(_ path: String, from origin: BackupOrigin) async throws -> ChildProcess.Result {
         try await run(RsyncCommand.list(), path: path, destination: nil, from: origin)
     }
 
     func pull(
         _ path: String,
-        from origin: RsyncOrigin,
+        from origin: BackupOrigin,
         into destination: URL,
         linkingTo previous: URL?
     ) async throws -> ChildProcess.Result {
         try await run(RsyncCommand.pull(linkingTo: previous), path: path, destination: destination, from: origin)
     }
 
-    private func run(_ options: [String], path: String, destination: URL?, from origin: RsyncOrigin) async throws -> ChildProcess.Result {
+    private func run(_ options: [String], path: String, destination: URL?, from origin: BackupOrigin) async throws -> ChildProcess.Result {
         let destination = destination.map { [RsyncCommand.contentsPath($0.fileSystemPath)] } ?? []
         switch origin {
         case .thisMac:

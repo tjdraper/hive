@@ -11,7 +11,7 @@ struct SourceCheck: Sendable {
     let rsync: RsyncRunner
 
     /// Nil when every directory exists and holds something.
-    func problem(with directories: [BackupDirectory], from origin: RsyncOrigin) async throws -> BackupFailure? {
+    func problem(with directories: [BackupDirectory], from origin: BackupOrigin) async throws -> BackupFailure? {
         for (index, directory) in directories.enumerated() {
             let started = ContinuousClock.now
             let listing = try await RsyncResultReader.listing(in: rsync.list(directory.path, from: origin))

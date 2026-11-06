@@ -1,5 +1,7 @@
 #!/bin/bash
-# Keeps the host keys, authorized_keys and sample files in volumes, so they survive a rebuild.
+# Keeps the host keys, authorized_keys and sample files in volumes, so they survive a rebuild. The
+# MariaDB running on the server itself, for backing up a database on the host, keeps its data only
+# until the container is rebuilt.
 set -euo pipefail
 
 mkdir -p /etc/ssh/keys /root/.ssh
@@ -14,5 +16,7 @@ fi
 if [[ ! -d /srv/sites ]]; then
     /usr/local/bin/seed-files.sh
 fi
+
+/usr/local/bin/start-database.sh
 
 exec /usr/sbin/sshd -D -e

@@ -15,8 +15,71 @@ services:
       # So `docker exec` reaches neighboring containers, as on a real server.
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "--silent"]
+      interval: 2s
+      retries: 30
+
+  # The real servers run their databases as Swarm services. This Mac's Docker isn't in Swarm mode,
+  # so these carry the container names and service labels a Swarm stack named `hive-test` would
+  # give them. Their data is seeded when each first starts and kept until `reset`.
+  mariadb:
+    image: mariadb:11
+    container_name: hive-test_mariadb.1.mz4k7q2xj8w1vhn0c3b5d6e9f
+    labels:
+      com.docker.swarm.service.name: hive-test_mariadb
+    environment:
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    volumes:
+      - ./databases/mysql-seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+      - mariadb-data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      # Over TCP, which the server only listens on once the seed has run.
+      test: ["CMD", "healthcheck.sh", "--connect"]
+      interval: 2s
+      retries: 60
+
+  mysql:
+    image: mysql:8.4
+    container_name: hive-test_mysql.1.p8r2n6w0t4y7u1i5o9a3s6d2f
+    labels:
+      com.docker.swarm.service.name: hive-test_mysql
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - ./databases/mysql-seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+      - mysql-data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "--host=127.0.0.1", "--silent"]
+      interval: 2s
+      retries: 60
+
+  postgres:
+    image: postgres:18
+    container_name: hive-test_postgres.1.c5v8b1n4m7q0w3e6r9t2y5u8i
+    labels:
+      com.docker.swarm.service.name: hive-test_postgres
+    environment:
+      # A test value. The sample database has its own user and password.
+      POSTGRES_PASSWORD: hive-test-superuser
+      # The image trusts any connection from 127.0.0.1 by default, which would let a dump with a wrong
+      # password through. The sample data is still loaded over the local socket, which stays trusted.
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=trust
+    volumes:
+      - ./databases/postgres-seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+      - postgres-data:/var/lib/postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "--host=127.0.0.1", "--username=postgres"]
+      interval: 2s
+      retries: 60
 
 volumes:
   ssh-keys:
   root-ssh:
   sites:
+  mariadb-data:
+  mysql-data:
+  postgres-data:

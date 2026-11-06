@@ -41,6 +41,7 @@ public struct HiveAPI: Sendable {
             addresses: { NetworkInterfaceList.presentAddresses().sorted() },
             volumes: MountedVolumeList(),
             rsync: RsyncRunner(rsync: rsync),
+            dumps: DatabaseDumpRunner(),
             origin: { .server($0) },
             now: Date.init
         )
@@ -59,7 +60,8 @@ public struct HiveAPI: Sendable {
         addresses: @escaping @Sendable () -> [String],
         volumes: any VolumeListing,
         rsync: RsyncRunner,
-        origin: @escaping @Sendable (SSHTarget) -> RsyncOrigin,
+        dumps: DatabaseDumpRunner,
+        origin: @escaping @Sendable (SSHTarget) -> BackupOrigin,
         now: @escaping @Sendable () -> Date
     ) {
         self.hiveID = hiveID
@@ -96,6 +98,8 @@ public struct HiveAPI: Sendable {
             drives: BackupDriveLocator(store: driveStore, volumes: volumes, hiveID: hiveID),
             targets: targets,
             rsync: rsync,
+            dumps: dumps,
+            passwords: DatabasePasswordLoader(database: database, sealer: sealer),
             origin: origin,
             now: now
         ))

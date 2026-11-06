@@ -10,13 +10,23 @@ public struct BackupRun: Codable, Hashable, Sendable {
     public let failure: BackupFailure?
     /// The directories it pulled, in the job's order. One that failed is the last.
     public let directories: [DirectoryRun]
+    /// The databases it dumped after the directories, in the job's order. One that failed is the last.
+    public let databases: [DatabaseRun]
 
-    public init(jobID: UUID, startedAt: Date, finishedAt: Date?, failure: BackupFailure?, directories: [DirectoryRun]) {
+    public init(
+        jobID: UUID,
+        startedAt: Date,
+        finishedAt: Date?,
+        failure: BackupFailure?,
+        directories: [DirectoryRun],
+        databases: [DatabaseRun]
+    ) {
         self.jobID = jobID
         self.startedAt = startedAt
         self.finishedAt = finishedAt
         self.failure = failure
         self.directories = directories
+        self.databases = databases
     }
 }
 
@@ -53,6 +63,25 @@ public struct DirectoryRun: Codable, Hashable, Sendable {
     }
 }
 
+public struct DatabaseRun: Codable, Hashable, Sendable {
+    /// The database's name, which is unique within its job.
+    public let name: String
+    public let seconds: Double
+    /// The dump as the database wrote it.
+    public let bytesDumped: Int64
+    /// Its file in the snapshot, which for MySQL and MariaDB is compressed.
+    public let bytesStored: Int64
+    public let failure: BackupFailure?
+
+    public init(name: String, seconds: Double, bytesDumped: Int64, bytesStored: Int64, failure: BackupFailure?) {
+        self.name = name
+        self.seconds = seconds
+        self.bytesDumped = bytesDumped
+        self.bytesStored = bytesStored
+        self.failure = failure
+    }
+}
+
 public enum BackupFailure: String, Codable, Hashable, Sendable {
     /// No backup drive has been chosen.
     case driveNotChosen
@@ -80,6 +109,30 @@ public enum BackupFailure: String, Codable, Hashable, Sendable {
     case sourceUnreadable
     /// rsync couldn't copy some files or their attributes.
     case someFilesNotTransferred
+    /// No password is stored for a database.
+    case databasePasswordMissing
+    /// Hive couldn't list the server's Docker containers.
+    case dockerUnavailable
+    /// No running container has a database's service name.
+    case databaseContainerNotFound
+    /// More than one running container has a database's service name, so Hive can't tell which to dump.
+    case databaseContainerNotUnique
+    /// Where a database runs has no `mariadb-dump` or `mysqldump`, or no `pg_dump`.
+    case databaseDumpToolMissing
+    /// The dump couldn't reach the database server.
+    case databaseUnreachable
+    /// The database server turned down the user and password.
+    case databaseLoginRefused
+    /// No database has the name.
+    case databaseMissing
+    /// The user lacks a privilege the dump needs, such as to read a routine another user owns.
+    case databaseNotPermitted
+    /// The dump finished without writing anything.
+    case databaseDumpEmpty
+    /// The dump ended without what a complete one ends with.
+    case databaseDumpIncomplete
+    /// The dump failed for another reason.
+    case databaseDumpFailed
     /// Hive couldn't write the snapshot to the backup drive.
     case couldNotWriteSnapshot
     case cancelled

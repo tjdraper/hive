@@ -23,17 +23,13 @@ actor BackupRunCoordinator {
         guard current == nil else { return .busy }
         guard try recordStart(of: jobID, by: deviceID) else { return .unknownJob }
 
-        let run = BackupRun(jobID: jobID, startedAt: workflow.now(), finishedAt: nil, failure: nil, directories: [])
+        let run = BackupRun(jobID: jobID, startedAt: workflow.now(), finishedAt: nil, failure: nil, directories: [], databases: [])
         latest[jobID] = run
         current = Task { [workflow] in
-            let finished: BackupRun
-            do {
-                finished = try await workflow.run(jobID: jobID) { await self.update($0) }
-                    ?? BackupRun(jobID: jobID, startedAt: run.startedAt, finishedAt: workflow.now(), failure: .failed, directories: [])
-            } catch {
-                finished = BackupRun(jobID: jobID, startedAt: run.startedAt, finishedAt: workflow.now(), failure: .failed, directories: [])
-            }
-            self.finish(finished)
+            let finished = try? await workflow.run(jobID: jobID) { await self.update($0) }
+            self.finish(finished ?? BackupRun(
+                jobID: jobID, startedAt: run.startedAt, finishedAt: workflow.now(), failure: .failed, directories: [], databases: []
+            ))
         }
         return .started(run)
     }

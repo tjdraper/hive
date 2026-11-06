@@ -19,10 +19,12 @@ enum TestRsync {
     }()
 }
 
-/// An API fixture with a backup drive, and a server whose directories are folders on this Mac.
+/// An API fixture with a backup drive, and a server whose directories are folders on this Mac and whose
+/// `docker` and dump tools are scripts.
 struct BackupRunFixture {
     static let volumeUUID = UUID()
 
+    let databaseServer: FakeDatabaseServer
     let api: APIFixture
     let temporary: TemporaryDirectory
     /// Stands in for the drive's mount point.
@@ -33,8 +35,13 @@ struct BackupRunFixture {
     let job: BackupJob
 
     /// `directories` maps each folder within the snapshot to a folder under `server`, made empty.
-    init(directories: [(folder: String, source: String)] = [("site", "srv/site")], chooseDrive: Bool = true) async throws {
-        api = try APIFixture()
+    init(
+        directories: [(folder: String, source: String)] = [("site", "srv/site")],
+        databases: [BackupDatabaseDraft] = [],
+        chooseDrive: Bool = true
+    ) async throws {
+        databaseServer = try FakeDatabaseServer()
+        api = try APIFixture(dumpSearchPath: databaseServer.searchPath)
         temporary = try TemporaryDirectory()
         volume = temporary.url.appending(path: "Volume", directoryHint: .isDirectory)
         server = temporary.url.appending(path: "Server", directoryHint: .isDirectory)
@@ -47,7 +54,7 @@ struct BackupRunFixture {
         try await api.confirmHostKey(of: serverRecord)
         let server = server
         var draft = ConfigurationSamples.job(password: nil)
-        draft.databases = []
+        draft.databases = databases
         draft.directories = directories.map {
             BackupDirectory(path: server.appending(path: $0.source).fileSystemPath, folder: $0.folder)
         }

@@ -28,7 +28,7 @@ Check off a slice here when its "done when" is true.
 - [x] [C1. Servers and backup jobs](08-C1-ServersAndBackupJobs.md) — Engine, 1 session
 - [x] [C2. SSH keys, host keys and the test server](09-C2-SSHKeysHostKeysAndTheTestServer.md) — Engine, 1 session
 - [x] [C3. Directory snapshots](10-C3-DirectorySnapshots.md) — Engine, 1–2 sessions, installed build
-- [ ] [C4. Database dumps](11-C4-DatabaseDumps.md) — Engine, 1 session
+- [x] [C4. Database dumps](11-C4-DatabaseDumps.md) — Engine, 1 session
 - [ ] [C5. Scheduling, the job queue and the job log](12-C5-SchedulingTheJobQueueAndTheJobLog.md) — Engine, 1 session
 - [ ] [C6. Retention and quotas](13-C6-RetentionAndQuotas.md) — Engine, 1–2 sessions
 
@@ -227,7 +227,7 @@ Configuration is data, edited in Beekeeper. The PHP configuration (`../site-back
 - **Host keys** are recorded when a server is added, after you confirm the fingerprint in Beekeeper. For each connection Hive writes a `known_hosts` holding only that server's confirmed key, filed under the server's ID, and connects with `StrictHostKeyChecking=yes`. When a key changes, that server's backups fail and Hive emails right away, then daily until the new key is confirmed in Beekeeper or the original one comes back (§13).
 - **Stalls end runs:** rsync's `--timeout` and SSH's `ServerAliveInterval`, so a hung transfer fails instead of blocking the queue.
 - **Database containers are found by their Swarm or Compose service name,** and exactly one must match. Your servers run Docker Swarm, which names containers like `buzzingpixel_db.1.<id>`.
-- **Database passwords never appear on a command line,** on either machine. The PHP version puts them there.
+- **Database passwords never appear on a command line,** on either machine. The PHP version puts them there. They reach the dump through standard input (C4).
 - **Scheduling:** each job runs at its times, in the Hive Mac's local time. If Hive was off or the Mac was asleep at a scheduled time, the job runs once when Hive is back. Hive warns when the Mac is set to sleep. Jobs run one at a time from a queue kept in the store, so it survives restarts. Beekeeper can start and cancel runs.
 
 ## §12. Logs

@@ -26,6 +26,15 @@ struct PartialSnapshot {
         try manifest.encoded().write(to: url.appending(path: SnapshotManifest.fileName, directoryHint: .notDirectory), options: .atomic)
     }
 
+    /// Removes the `databases/` folder a failed run left. Every run dumps each database whole, and the
+    /// job may no longer have some of them.
+    func removeDatabasesFolder() throws {
+        let folder = url.appending(path: SnapshotManifest.databasesFolder, directoryHint: .isDirectory)
+        var info = stat()
+        // Removing a link removes only the link.
+        if lstat(folder.fileSystemPath, &info) == 0 { try FileManager.default.removeItem(at: folder) }
+    }
+
     /// Renames it to its final name, refusing to replace anything already there. Returns the name.
     func complete(at date: Date) throws -> String {
         let name = SnapshotFolderName.snapshot(at: date)

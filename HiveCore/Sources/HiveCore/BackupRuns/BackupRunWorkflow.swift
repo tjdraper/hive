@@ -3,8 +3,8 @@ import HiveKit
 import os
 
 /// One run of a backup job (§9): find the drive, check the server's directories, pull each into a
-/// partial snapshot, then write its manifest and complete it. A run that fails leaves its partial
-/// snapshot for the next run to pick up. Directories only, until C4 adds database dumps.
+/// partial snapshot, dump each database into it, then write its manifest and complete it. A run that
+/// fails leaves its partial snapshot for the next run to pick up.
 struct BackupRunWorkflow: Sendable {
     private static let logger = Logger(subsystem: HiveLog.subsystem, category: "Backup")
 
@@ -13,21 +13,34 @@ struct BackupRunWorkflow: Sendable {
         let failure: BackupFailure
     }
 
+    private enum Step {
+        case pulled(DirectoryRun)
+        case dumped(DatabaseRun)
+    }
+
+    /// What a partial snapshot holds so far, for its manifest.
+    private struct SnapshotContents {
+        var directories: [SnapshotManifest.Directory] = []
+        var databases: [SnapshotManifest.Database] = []
+    }
+
     let hiveID: UUID
     let database: HiveDatabase
     let drives: BackupDriveLocator
     let targets: SSHTargetLoader
     let rsync: RsyncRunner
-    /// The server for each run, or in tests, folders on this Mac.
-    let origin: @Sendable (SSHTarget) -> RsyncOrigin
+    let dumps: DatabaseDumpRunner
+    let passwords: DatabasePasswordLoader
+    /// The server for each run, or in tests, folders and scripts on this Mac.
+    let origin: @Sendable (SSHTarget) -> BackupOrigin
     let now: @Sendable () -> Date
 
     private var catalog: SnapshotCatalog {
         SnapshotCatalog(database: database)
     }
 
-    /// Nil when no job has that ID. `progress` gets the run as each directory finishes. Off the caller's
-    /// actor, since a run takes minutes.
+    /// Nil when no job has that ID. `progress` gets the run as each directory and database finishes. Off
+    /// the caller's actor, since a run takes minutes.
     @concurrent func run(jobID: UUID, progress: @Sendable (BackupRun) async -> Void) async throws -> BackupRun? {
         guard let job = try BackupJobStore(database: database).job(id: jobID),
               let server = try ServerStore(database: database).server(id: job.serverID)
@@ -35,14 +48,23 @@ struct BackupRunWorkflow: Sendable {
 
         let startedAt = now()
         let clock = ContinuousClock.now
-        Self.logger.notice("Started a run with \(job.directories.count, privacy: .public) directories")
+        let (directoryCount, databaseCount) = (job.directories.count, job.databases.count)
+        Self.logger.notice("""
+        Started a run with \(directoryCount, privacy: .public) directories and \(databaseCount, privacy: .public) databases
+        """)
 
         var directories: [DirectoryRun] = []
+        var databases: [DatabaseRun] = []
         var failure: BackupFailure?
         do {
-            try await perform(job, on: server, startedAt: startedAt) { directory in
-                directories.append(directory)
-                await progress(BackupRun(jobID: jobID, startedAt: startedAt, finishedAt: nil, failure: nil, directories: directories))
+            try await perform(job, on: server, startedAt: startedAt) { step in
+                switch step {
+                case .pulled(let directory): directories.append(directory)
+                case .dumped(let database): databases.append(database)
+                }
+                await progress(BackupRun(
+                    jobID: jobID, startedAt: startedAt, finishedAt: nil, failure: nil, directories: directories, databases: databases
+                ))
             }
         } catch let stop as Stop {
             failure = stop.failure
@@ -59,14 +81,16 @@ struct BackupRunWorkflow: Sendable {
         } else {
             Self.logger.notice("The run completed its snapshot in \(seconds, privacy: .public)s")
         }
-        return BackupRun(jobID: jobID, startedAt: startedAt, finishedAt: now(), failure: failure, directories: directories)
+        return BackupRun(
+            jobID: jobID, startedAt: startedAt, finishedAt: now(), failure: failure, directories: directories, databases: databases
+        )
     }
 
     private func perform(
         _ job: BackupJob,
         on server: Server,
         startedAt: Date,
-        pulled: (DirectoryRun) async -> Void
+        completed: (Step) async -> Void
     ) async throws {
         let drive = try locateDrive()
         let origin = try origin(for: server)
@@ -88,25 +112,56 @@ struct BackupRunWorkflow: Sendable {
         Self.logger.notice("\(start, privacy: .public)")
         let previous = try previousSnapshot(of: job, on: drive, folder: partial.jobFolder)
 
-        var copied: [SnapshotManifest.Directory] = []
-        try onDrive { try partial.write(manifest(job, server: server, partial: partial, directories: copied, completedAt: nil)) }
+        var contents = SnapshotContents()
+        try onDrive {
+            try partial.removeDatabasesFolder()
+            try partial.write(manifest(job, server: server, partial: partial, contents: contents, completedAt: nil))
+        }
 
         let pull = DirectoryPull(rsync: rsync)
         for (directory, destination) in zip(job.directories, partial.destinations) {
             let parts = ["files"] + directory.folder.split(separator: "/").map(String.init)
             let linkTo = previous.flatMap { RealFolder.existing(parts, under: $0) }
             let report = try await pull.pull(directory, from: origin, into: destination, linkingTo: linkTo)
-            await pulled(report)
+            await completed(.pulled(report))
             if let failure = report.failure { throw Stop(failure: failure) }
-            copied.append(SnapshotManifest.Directory(path: directory.path, folder: directory.folder, vanishedFiles: report.vanishedFiles))
-            try onDrive { try partial.write(manifest(job, server: server, partial: partial, directories: copied, completedAt: nil)) }
+            contents.directories.append(
+                SnapshotManifest.Directory(path: directory.path, folder: directory.folder, vanishedFiles: report.vanishedFiles)
+            )
+            try onDrive { try partial.write(manifest(job, server: server, partial: partial, contents: contents, completedAt: nil)) }
+        }
+
+        try await dumpDatabases(of: job, from: origin, into: partial, completed: completed) { database in
+            contents.databases.append(database)
+            try onDrive { try partial.write(manifest(job, server: server, partial: partial, contents: contents, completedAt: nil)) }
         }
 
         let completedAt = now()
         try onDrive {
-            try partial.write(manifest(job, server: server, partial: partial, directories: copied, completedAt: completedAt))
+            try partial.write(manifest(job, server: server, partial: partial, contents: contents, completedAt: completedAt))
             let name = try partial.complete(at: completedAt)
             try catalog.markComplete(partial.record.id, folder: name, at: completedAt)
+        }
+    }
+
+    /// After the directories, into `databases/`. `stored` gets each dump that worked.
+    private func dumpDatabases(
+        of job: BackupJob,
+        from origin: BackupOrigin,
+        into partial: PartialSnapshot,
+        completed: (Step) async -> Void,
+        stored: (SnapshotManifest.Database) throws -> Void
+    ) async throws {
+        guard !job.databases.isEmpty else { return }
+        let folder = try onDrive { try RealFolder.make([SnapshotManifest.databasesFolder], under: partial.url) }
+        let dump = DatabaseDump(runner: dumps)
+        for database in job.databases {
+            let password = try passwords.password(forDatabase: database.id)
+            let report = try await dump.dump(database, password: password, from: origin, into: folder)
+            await completed(.dumped(report))
+            if let failure = report.failure { throw Stop(failure: failure) }
+            let settings = database.settings
+            try stored(SnapshotManifest.Database(name: settings.name, kind: settings.kind, file: DumpCommand.fileName(for: settings)))
         }
     }
 
@@ -119,7 +174,7 @@ struct BackupRunWorkflow: Sendable {
         }
     }
 
-    private func origin(for server: Server) throws -> RsyncOrigin {
+    private func origin(for server: Server) throws -> BackupOrigin {
         switch try targets.target(forServer: server.id) {
         case .ready(let target):
             return origin(target)
@@ -140,7 +195,7 @@ struct BackupRunWorkflow: Sendable {
         _ job: BackupJob,
         server: Server,
         partial: PartialSnapshot,
-        directories: [SnapshotManifest.Directory],
+        contents: SnapshotContents,
         completedAt: Date?
     ) -> SnapshotManifest {
         SnapshotManifest(
@@ -152,7 +207,8 @@ struct BackupRunWorkflow: Sendable {
             startedAt: partial.record.startedAt,
             completedAt: completedAt,
             complete: completedAt != nil,
-            directories: directories
+            directories: contents.directories,
+            databases: contents.databases
         )
     }
 
