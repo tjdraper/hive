@@ -10,6 +10,7 @@ References like §6 point to [00-Info.md](00-Info.md). Read the brainstorm's "Au
 - **Pairing over XPC:** Beekeeper creates a Secure Enclave key for this Hive and sends its public key and device name. Hive records the device and answers with its Hive ID, key hash and port. The messages are HiveKit types.
 - **Where Beekeeper keeps its keys** (§19): a Secure Enclave key's `dataRepresentation` works for any program on the Mac, so a file readable by your user isn't enough. Keep it in the keychain, limited to Beekeeper's access group, or somewhere equally out of other programs' reach. Record the decision in §3.
 - **Signing in** (§6): a challenge with a nonce and an expiry, signed by the device's key, and answered with a short-lived session token. The token works for HTTP requests and the WebSocket. A device signs in again when it expires.
+- **The gate** (B1) lets the challenge and pairing endpoints through unauthenticated, beside the health check, and checks the session token on everything else.
 - **An API version** exchanged at sign-in, so a Beekeeper and a Hive that can't work together say which one to update instead of failing in odd ways
 - **Rate limiting and lockout** for failed sign-ins, per address and per device (§5)
 - **Beekeeper on the Mac,** for now: a button to pair with this Mac's Hive and a line showing that it's signed in. B3 builds the real window.

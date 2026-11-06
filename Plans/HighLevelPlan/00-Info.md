@@ -19,7 +19,7 @@ Check off a slice here when its "done when" is true.
 
 ### Phase B — Connecting Beekeeper on the Mac
 
-- [ ] [B1. The TLS server](05-B1-TheTLSServer.md) — Engine, 1 session, installed build
+- [x] [B1. The TLS server](05-B1-TheTLSServer.md) — Engine, 1 session, installed build
 - [ ] [B2. Pairing on the Hive Mac and signing in](06-B2-PairingOnTheHiveMacAndSigningIn.md) — Engine, 1–2 sessions, installed build
 - [ ] [B3. Beekeeper's window, devices and settings](07-B3-BeekeepersWindowDevicesAndSettings.md) — Mixed, 1–2 sessions, installed build
 
@@ -141,10 +141,10 @@ Check off a slice here when its "done when" is true.
 Read the brainstorm's "Guiding principle", "Encryption: always TLS" and "Hardening for internet exposure".
 
 - **Hive gives the network no trust.** The tailnet is treated exactly like the open internet.
-- **Always TLS, with no plain HTTP mode.** The certificate is self-signed for a P-256 identity key in the Secure Enclave, made with `swift-certificates` and valid for 10 years. SwiftNIO's TLS signs through `NIOSSLCustomPrivateKey`, so the private key never exists as a file.
-- **Beekeeper pins the public key's hash,** and ignores the chain, hostname and expiry. Hive can reissue the certificate for the same key without breaking any device.
+- **Always TLS 1.3, with no plain HTTP mode.** The certificate is self-signed for a P-256 identity key in the Secure Enclave, made with `swift-certificates` and valid for 10 years. SwiftNIO's TLS signs through `NIOSSLCustomPrivateKey`, so the private key never exists as a file.
+- **Beekeeper pins the public key's hash,** SHA-256 of its X9.63 form, and ignores the chain, hostname and expiry. Hive can reissue the certificate for the same key without breaking any device.
 - **Regenerate identity** creates a new key. Every device has to pair again.
-- **Listen address:** Hive always listens on `127.0.0.1`, for Beekeeper on the Hive Mac. The setting adds one interface, such as Tailscale's, or all of them, and adds none by default. An interface that appears after Hive starts, such as Tailscale's after login, is picked up when it appears. The port is configurable.
+- **Listen address:** Hive always listens on `127.0.0.1`, for Beekeeper on the Hive Mac. The setting adds one interface, such as Tailscale's, or all of them, and adds none by default. An interface that appears after Hive starts, such as Tailscale's after login, is picked up when it appears. The port is configurable, and 4483 by default.
 - **Exposing Hive to the internet** means forwarding the port or using a tunnel that passes TCP through. TLS always ends at Hive.
 - **Unauthenticated requests reach only** the challenge endpoint, the pairing endpoint while a pairing window is open, and a minimal health check. Everything else is refused before routing or parsing.
 - **Rate limiting and lockout** for failed sign-ins and pairing attempts, per address and per device. Never for everyone at once, which would let anyone on the internet lock you out.
@@ -304,7 +304,7 @@ Each gets its own plan once this one is done. Until then, features not in Part 1
 - [x] Do CryptoKit's Secure Enclave keys work from the daemon after it switches user, outside any login session? Yes, created and used at the login window with nobody logged in, and loaded again after a restart (A4).
 - [x] Channel binding: dropped. SwiftNIO's TLS doesn't expose the TLS exporter (its BoringSSL has one, but not publicly), and `URLSession` doesn't either. Keeping it would mean forking the server's TLS and writing Beekeeper's own HTTP client (§6).
 - [ ] Where Beekeeper keeps its device keys on the Mac, so that other programs running as you can't use them (B2)
-- [ ] The default port (B1)
+- [x] The default port: 4483, which IANA hasn't assigned. The development daemon uses 4484, so it runs beside an installed Hive (B1).
 - [ ] How Hive hands decrypted SSH keys to `ssh`: a short-lived file in a `0700` folder, deleted right after use, or an `ssh-agent` run by Hive (C2)
 - [ ] One SSH key per server, or one for the whole Hive (C2)
 - [x] Bundling rsync: yes, rsync 3.x, for its exit codes and `--fake-super` (§11)

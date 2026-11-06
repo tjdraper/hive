@@ -19,12 +19,18 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", exact: "0.63.2"),
+        .package(url: "https://github.com/apple/swift-asn1", from: "1.7.4"),
+        .package(url: "https://github.com/apple/swift-certificates", from: "1.21.1"),
     ],
     targets: [
         .target(name: "HiveKit", swiftSettings: swiftSettings, plugins: [swiftLint]),
         .testTarget(
             name: "HiveKitTests",
-            dependencies: ["HiveKit"],
+            dependencies: [
+                "HiveKit",
+                .product(name: "SwiftASN1", package: "swift-asn1"),
+                .product(name: "X509", package: "swift-certificates"),
+            ],
             swiftSettings: swiftSettings,
             plugins: [swiftLint]
         ),

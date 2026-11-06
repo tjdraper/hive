@@ -1,8 +1,13 @@
 import CryptoKit
 import Foundation
 @testable import HiveCore
+import X509
 
-extension P256.Signing.PrivateKey: IdentitySigningKey {}
+extension P256.Signing.PrivateKey: IdentitySigningKey {
+    public var certificateIssuer: Certificate.PrivateKey {
+        Certificate.PrivateKey(self)
+    }
+}
 
 /// Software keys in place of the Secure Enclave, which tests never use. The saved form is the raw private key.
 struct SoftwareKeyFactory: HiveKeyFactory {

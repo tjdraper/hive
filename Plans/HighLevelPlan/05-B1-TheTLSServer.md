@@ -15,4 +15,6 @@ References like §5 point to [00-Info.md](00-Info.md). Read the brainstorm's "En
 - The gate refuses every path not on its list, without authentication, through Hummingbird's test client
 - A certificate with the pinned key passes even when expired or for another hostname, and one with a different key fails
 
+**Result (2026-11-05):** in the installed build, the daemon issued its certificate on first start and serves TLS 1.3 only on `127.0.0.1:4483`, signing handshakes with the Secure Enclave identity key. TLS 1.2 and plain HTTP get no answer. `/health` answers 204 with no body, and every other path and method gets 401. HiveKit's `HiveConnection` reached the health check with the pin and got `wrongKey` with another. The pin is SHA-256 of the key's X9.63 form. The gate lets only the health check through until B2 adds its endpoints. The data directory holds the certificate, the two Secure Enclave key blobs and the sealed check secret, and none of them is a usable private key.
+
 **Done when:** the installed daemon serves TLS on `127.0.0.1`; HiveKit's client reaches the health check with the right pin and refuses a wrong one; no file in the data directory holds a usable private key; and the tests pass.

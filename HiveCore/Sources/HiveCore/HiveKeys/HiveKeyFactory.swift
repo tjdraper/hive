@@ -1,15 +1,22 @@
 import CryptoKit
 import Foundation
 import Security
+import X509
 
 /// The key TLS identifies Hive with. Its public key's hash is what every paired device pins.
 public protocol IdentitySigningKey: Sendable {
     var publicKey: P256.Signing.PublicKey { get }
+    /// The same key, in the form swift-certificates signs Hive's certificate with.
+    var certificateIssuer: Certificate.PrivateKey { get }
 
     func signature<D: DataProtocol>(for data: D) throws -> P256.Signing.ECDSASignature
 }
 
-extension SecureEnclave.P256.Signing.PrivateKey: IdentitySigningKey {}
+extension SecureEnclave.P256.Signing.PrivateKey: IdentitySigningKey {
+    public var certificateIssuer: Certificate.PrivateKey {
+        Certificate.PrivateKey(self)
+    }
+}
 
 /// A new key, with the saved form that recreates it.
 public struct CreatedKey<Key: Sendable>: Sendable {

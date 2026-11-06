@@ -3,6 +3,7 @@ import Darwin
 import Foundation
 @testable import HiveCore
 import Testing
+import X509
 
 struct HiveKeyCheckTests {
     private let temporary: TemporaryDirectory
@@ -74,6 +75,7 @@ struct HiveKeyCheckTests {
 
 private struct MismatchedIdentityKey: IdentitySigningKey {
     let publicKey = P256.Signing.PrivateKey().publicKey
+    let certificateIssuer = Certificate.PrivateKey(P256.Signing.PrivateKey())
 
     func signature<D: DataProtocol>(for data: D) throws -> P256.Signing.ECDSASignature {
         try P256.Signing.PrivateKey().signature(for: data)

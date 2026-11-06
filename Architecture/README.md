@@ -21,6 +21,7 @@ In Hive:
 - `DaemonStartup/`
 - `HiveKeys/`
 - `TLSIdentity/`
+- `APIServer/`
 - `Pairing/`
 - `Authentication/`
 - `SecretStorage/`

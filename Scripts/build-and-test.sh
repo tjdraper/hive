@@ -34,10 +34,14 @@ run_step() {
 
     # Treating compiler warnings as errors stops a warning from passing once its file is cached
     # by an incremental build. SwiftLint reruns every build, so the log search catches its warnings.
+    # Xcode compiles remote packages with SWIFT_SUPPRESS_WARNINGS, and the compiler refuses that
+    # together with warnings as errors, so only targets whose warnings aren't suppressed get it.
     xcodebuild "$@" \
         -project "$project" \
         -derivedDataPath "$derived_data" \
-        SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+        'SWIFT_TREAT_WARNINGS_AS_ERRORS=$(WARNINGS_AS_ERRORS_WHEN_SUPPRESSED_$(SWIFT_SUPPRESS_WARNINGS:default=NO))' \
+        WARNINGS_AS_ERRORS_WHEN_SUPPRESSED_NO=YES \
+        WARNINGS_AS_ERRORS_WHEN_SUPPRESSED_YES=NO \
         GCC_TREAT_WARNINGS_AS_ERRORS=YES \
         > "$log" 2>&1
     local status=$?
