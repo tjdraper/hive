@@ -14,6 +14,8 @@ public struct HiveAPI: Sendable {
     let sshKeys: ServerSSHKeyWorkflow
     let hostKeys: HostKeyWorkflow
     let connectionTest: ConnectionTestWorkflow
+    let backupDrive: BackupDriveWorkflow
+    let runs: BackupRunCoordinator
     /// Checked on every request, since it can be turned off while Hive runs.
     let fullDiskAccess: @Sendable () -> FullDiskAccess
 
@@ -22,7 +24,8 @@ public struct HiveAPI: Sendable {
         database: HiveDatabase,
         settings: HiveSettingsStore,
         listeners: ListenerCoordinator,
-        sealer: SecretSealer
+        sealer: SecretSealer,
+        rsync: URL
     ) {
         let devices = DeviceStore(database: database)
         self.init(
@@ -36,6 +39,9 @@ public struct HiveAPI: Sendable {
             ssh: SSHRunner(),
             hostKeyScanner: HostKeyScanner(),
             addresses: { NetworkInterfaceList.presentAddresses().sorted() },
+            volumes: MountedVolumeList(),
+            rsync: RsyncRunner(rsync: rsync),
+            origin: { .server($0) },
             now: Date.init
         )
     }
@@ -51,6 +57,9 @@ public struct HiveAPI: Sendable {
         ssh: any SSHRunning,
         hostKeyScanner: any HostKeyScanning,
         addresses: @escaping @Sendable () -> [String],
+        volumes: any VolumeListing,
+        rsync: RsyncRunner,
+        origin: @escaping @Sendable (SSHTarget) -> RsyncOrigin,
         now: @escaping @Sendable () -> Date
     ) {
         self.hiveID = hiveID
@@ -77,7 +86,19 @@ public struct HiveAPI: Sendable {
             pending: PendingHostKeyScans(),
             now: now
         )
-        connectionTest = ConnectionTestWorkflow(targets: SSHTargetLoader(database: database, sealer: sealer), ssh: ssh)
+        let targets = SSHTargetLoader(database: database, sealer: sealer)
+        connectionTest = ConnectionTestWorkflow(targets: targets, ssh: ssh)
+        let driveStore = BackupDriveStore(database: database)
+        backupDrive = BackupDriveWorkflow(store: driveStore, volumes: volumes, hiveID: hiveID, now: now)
+        runs = BackupRunCoordinator(workflow: BackupRunWorkflow(
+            hiveID: hiveID,
+            database: database,
+            drives: BackupDriveLocator(store: driveStore, volumes: volumes, hiveID: hiveID),
+            targets: targets,
+            rsync: rsync,
+            origin: origin,
+            now: now
+        ))
         self.fullDiskAccess = fullDiskAccess
     }
 }

@@ -18,6 +18,12 @@ extension AuditEvent {
             change.summary(serverName: serverName)
         case .backupJob(_, let serverName, let jobName, let change):
             change.summary(job: "“\(jobName)” on “\(serverName)”")
+        case .backupDriveChosen(nil, let new):
+            "Chose “\(new.name)” as the backup drive"
+        case .backupDriveChosen(.some(let old), let new):
+            "Chose “\(new.name)” as the backup drive, replacing “\(old.name)”"
+        case .backupRunStarted(_, let serverName, let jobName):
+            "Started a run of “\(jobName)” on “\(serverName)”"
         }
     }
 }

@@ -102,6 +102,36 @@ struct HiveDatabaseTests {
         #expect(server.confirmedHostKey == nil)
     }
 
+    @Test("A store from before snapshots keeps its servers and jobs, with no drive chosen and no snapshots")
+    func migratesFromSSHKeysSchema() throws {
+        // Arrange
+        let writer = try HiveDatabase.inMemory(migratedUpTo: "Add Hive's SSH key for each server")
+        let serverID = UUID()
+        let jobID = UUID()
+        try writer.write { database in
+            try database.execute(
+                sql: "INSERT INTO server (id, name, host, port, user, createdAt) VALUES (?, 'Web', 'web.example.com', 22, 'root', ?)",
+                arguments: [serverID, Date()]
+            )
+            try database.execute(
+                sql: """
+                INSERT INTO backupJob (id, serverID, name, dailySnapshots, monthlySnapshots, createdAt)
+                VALUES (?, ?, 'Site', 14, 12, ?)
+                """,
+                arguments: [jobID, serverID, Date()]
+            )
+        }
+
+        // Act
+        let database = try HiveDatabase.migrate(writer, defaultHiveName: "Ignored")
+
+        // Assert
+        #expect(try ServerStore(database: database).server(id: serverID)?.name == "Web")
+        #expect(try BackupJobStore(database: database).job(id: jobID)?.name == "Site")
+        #expect(try BackupDriveStore(database: database).chosen() == nil)
+        #expect(try SnapshotCatalog(database: database).snapshots(ofJob: jobID, onDrive: UUID(), in: .complete).isEmpty)
+    }
+
     @Test("A Mac name that isn't a valid name gives a Hive named Hive")
     func invalidMacNameFallsBack() throws {
         // Arrange

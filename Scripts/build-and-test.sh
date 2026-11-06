@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# Builds Hive for macOS and Beekeeper for macOS and iOS, builds HiveKit for iOS, and runs the HiveKit
-# and HiveCore tests. Fails if any step fails or logs a single warning, SwiftLint's included.
+# Builds the bundled rsync if it isn't yet, Hive for macOS and Beekeeper for macOS and iOS, builds
+# HiveKit for iOS, and runs the HiveKit and HiveCore tests. Fails if any step fails or logs a single
+# warning, SwiftLint's included.
 #
 # Usage: Scripts/build-and-test.sh
 
@@ -22,6 +23,9 @@ if [[ ! -f Configuration/Signing.local.xcconfig ]]; then
 fi
 
 mkdir -p "$build_dir"
+
+# Hive.app embeds it and HiveCore's tests run it. Nothing is rebuilt once it's built.
+Scripts/build-rsync.sh > "$build_dir/rsync.log" 2>&1 || { tail -n 20 "$build_dir/rsync.log" >&2; exit 1; }
 
 failed=0
 

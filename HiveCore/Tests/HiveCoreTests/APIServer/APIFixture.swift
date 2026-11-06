@@ -99,6 +99,23 @@ final class FakeMacAddresses: Sendable {
     }
 }
 
+/// The Mac's mounted volumes, as the fixture's Hive sees them: folders the test makes.
+final class FakeVolumes: VolumeListing {
+    private let volumes = Mutex<[MountedVolume]>([])
+
+    var current: [MountedVolume] {
+        volumes.withLock { $0 }
+    }
+
+    func set(_ new: [MountedVolume]) {
+        volumes.withLock { $0 = new }
+    }
+
+    func mountedVolumes() -> [MountedVolume] {
+        current
+    }
+}
+
 /// The whole API over an in-memory Hive with one signed-in device.
 struct APIFixture {
     static let defaultPort = 4483
@@ -112,6 +129,7 @@ struct APIFixture {
     let sealer = SecretSealer(key: P256.KeyAgreement.PrivateKey())
     let ssh = FakeSSH()
     let addresses = FakeMacAddresses()
+    let volumes = FakeVolumes()
 
     init(signIn: SignInFixture? = nil) throws {
         self.signIn = try signIn ?? SignInFixture()
@@ -130,6 +148,10 @@ struct APIFixture {
             ssh: ssh,
             hostKeyScanner: ssh,
             addresses: { [addresses] in addresses.current },
+            volumes: volumes,
+            rsync: RsyncRunner(rsync: TestRsync.url),
+            // Directories are read from folders the tests make on this Mac, never over `ssh`.
+            origin: { _ in .thisMac },
             now: { clock.now }
         )
     }

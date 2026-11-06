@@ -30,6 +30,23 @@ struct SSHSession {
             environment: SSHTools.environment()
         )
     }
+
+    /// `ssh` with Hive's options as one line, for programs such as rsync that take it as `-e` and add
+    /// the host and command themselves. rsync splits the line on spaces, so a part holding anything but
+    /// plain characters, such as a run folder in a temporary folder whose path has a space, is refused
+    /// rather than quoted.
+    func remoteShell() throws -> String {
+        let parts = [tools.ssh.fileSystemPath] + SSHCommand.options(for: target, in: directory)
+        let plain = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-=:,@+")
+        guard parts.allSatisfy({ !$0.isEmpty && $0.unicodeScalars.allSatisfy(plain.contains) }) else {
+            throw SSHSessionError.remoteShellNotPlain
+        }
+        return parts.joined(separator: " ")
+    }
+}
+
+enum SSHSessionError: Error, Equatable {
+    case remoteShellNotPlain
 }
 
 /// Runs a command on a server over SSH. Tests stand in for it, since they never run `ssh`.

@@ -13,6 +13,8 @@ References like §9 point to [00-Info.md](00-Info.md). Look at `../site-backups/
 - **A failed dump fails its step:** a non-zero exit anywhere in the pipeline, an empty dump, or a MySQL dump without its closing "Dump completed" line
 - **The test server** gains MariaDB 11, MySQL 8 and Postgres running as Swarm services with sample data, including a stored routine, and a database on the SSH container itself for the host case.
 
+- **From C3:** `BackupRunWorkflow` (`BackupRuns/`) pulls only directories. Dumps go into the same partial snapshot after them, under `databases/`, with the manifest listing each. A job with no directories gets a partial made without the source check.
+
 ## Tests
 
 - No command built for any database kind or location contains the password

@@ -57,7 +57,40 @@ enum HiveDatabaseMigrator {
             }
         }
 
+        migrator.registerMigration("Add the backup drive and the snapshot catalog", migrate: addBackupDriveAndSnapshots)
+
         return migrator
+    }
+
+    private static func addBackupDriveAndSnapshots(_ database: Database) throws {
+        try database.alter(table: "hive") { table in
+            table.add(column: "backupDriveUUID", .text)
+            table.add(column: "backupDriveName", .text)
+        }
+
+        // Each is named the first time it's backed up, and never renamed (§9).
+        try database.alter(table: "server") { table in
+            table.add(column: "snapshotFolder", .text)
+        }
+        try database.alter(table: "backupJob") { table in
+            table.add(column: "snapshotFolder", .text)
+        }
+
+        try database.create(table: "snapshot") { table in
+            table.primaryKey("id", .blob)
+            // Not references to `backupJob` or `server`: removing either removes its configuration,
+            // and its snapshots stay on the drive (§10).
+            table.column("jobID", .blob).notNull().indexed()
+            table.column("serverID", .blob).notNull()
+            table.column("driveUUID", .text).notNull()
+            table.column("serverFolder", .text).notNull()
+            table.column("jobFolder", .text).notNull()
+            table.column("folder", .text).notNull()
+            table.column("state", .text).notNull()
+            table.column("startedAt", .datetime).notNull()
+            table.column("completedAt", .datetime)
+            table.uniqueKey(["driveUUID", "serverFolder", "jobFolder", "folder"])
+        }
     }
 
     private static func addServersAndJobs(_ database: Database) throws {

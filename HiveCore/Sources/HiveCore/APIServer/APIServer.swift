@@ -54,6 +54,8 @@ public struct APIServer: Sendable {
         SSHKeyRoutes.add(to: router, workflow: api.sshKeys)
         HostKeyRoutes.add(to: router, workflow: api.hostKeys)
         ConnectionTestRoutes.add(to: router, workflow: api.connectionTest)
+        BackupDriveRoutes.add(to: router, workflow: api.backupDrive)
+        BackupRunRoutes.add(to: router, coordinator: api.runs)
         return router
     }
 

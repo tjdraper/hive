@@ -14,6 +14,8 @@ References like §11 point to [00-Info.md](00-Info.md). Look at `../site-backups
 - **The job log** (§12): an entry for each run, with each directory and database, how long each took, how much was transferred and why anything failed. Through the API, with the newest first. Decide how long entries are kept (§19).
 - **Progress events** from each run, for D3's WebSocket
 
+- **From C3:** `BackupRunCoordinator` runs Run Now one at a time and keeps each job's latest `BackupRun` in memory, read with `GET /jobs/<id>/run`. The queue replaces it, and the job log keeps each `BackupRun` with its `DirectoryRun`s. Cancelling a task running `BackupRunWorkflow` already stops rsync and ends the run as `cancelled`, leaving its partial.
+
 ## Tests
 
 - Next run times across days, month ends and both daylight saving changes

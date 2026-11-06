@@ -16,6 +16,8 @@ Retention must never remove the wrong snapshot (AGENTS.md). This slice is mostly
 - **When it runs:** after each run, and once a day
 - **Logging and the job log:** what was removed and why, and how much space it freed
 
+- **From C3:** a partial can be left behind for good, besides a failed run's: when the job's directories changed since, the next run starts a new partial instead of picking it up. Snapshots are in the `snapshot` table with their drive UUID and folder names. A folder a server sent without write permission was writable on the drive in C3, since `--fake-super` keeps the server's mode in an attribute instead. Check files and deeper trees before relying on it.
+
 ## Tests
 
 - Tiers keep exactly the right snapshots across days, months, several runs a day and daylight saving changes

@@ -13,6 +13,8 @@ public enum HiveEndpoint {
     public static let servers = "/servers"
     /// Every server's jobs. A job is added under its server, with `jobs(onServer:)`.
     public static let jobs = "/jobs"
+    /// `GET` reads the chosen drive and the volumes mounted, and `PUT` chooses one.
+    public static let backupDrive = "/backup-drive"
 
     public static func device(_ id: UUID) -> String {
         "\(devices)/\(id.uuidString)"
@@ -48,5 +50,10 @@ public enum HiveEndpoint {
 
     public static func job(_ id: UUID) -> String {
         "\(jobs)/\(id.uuidString)"
+    }
+
+    /// `POST` starts a run, answering 409 while another is going, and `GET` reads the job's latest run.
+    public static func run(ofJob id: UUID) -> String {
+        "\(job(id))/run"
     }
 }

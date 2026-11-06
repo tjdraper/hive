@@ -26,7 +26,10 @@ In Hive:
 - `Authentication/`
 - `SecretStorage/`
 - `Recovery/`
+- `BackupDrive/`
+- `BackupRuns/`
 - `DirectoryBackup/`
+- `Snapshots/`
 - `DatabaseDumps/`
 - `Retention/`
 - `Scheduling/`

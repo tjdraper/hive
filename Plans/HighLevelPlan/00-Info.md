@@ -27,7 +27,7 @@ Check off a slice here when its "done when" is true.
 
 - [x] [C1. Servers and backup jobs](08-C1-ServersAndBackupJobs.md) — Engine, 1 session
 - [x] [C2. SSH keys, host keys and the test server](09-C2-SSHKeysHostKeysAndTheTestServer.md) — Engine, 1 session
-- [ ] [C3. Directory snapshots](10-C3-DirectorySnapshots.md) — Engine, 1–2 sessions, installed build
+- [x] [C3. Directory snapshots](10-C3-DirectorySnapshots.md) — Engine, 1–2 sessions, installed build
 - [ ] [C4. Database dumps](11-C4-DatabaseDumps.md) — Engine, 1 session
 - [ ] [C5. Scheduling, the job queue and the job log](12-C5-SchedulingTheJobQueueAndTheJobLog.md) — Engine, 1 session
 - [ ] [C6. Retention and quotas](13-C6-RetentionAndQuotas.md) — Engine, 1–2 sessions
@@ -199,7 +199,7 @@ Configuration is data, edited in Beekeeper. The PHP configuration (`../site-back
 - **Hive knows the drive by its volume UUID,** never by its path, and never writes while it isn't mounted. When a drive is missing, its mount point under `/Volumes` is just a folder on the startup disk.
 - **Hard-link snapshots.** Each run makes a new snapshot folder with `rsync --link-dest`, pointing at the job's last complete snapshot. Unchanged files are hard links and take no extra space. A changed file is stored whole. Every snapshot is an ordinary folder that can be browsed in Finder and copied out by hand.
 - **A file in a snapshot is shared with every other snapshot that links to it.** Editing one in place changes it in all of them, so files are copied out, never opened and saved where they are. For the same reason Hive never uses rsync's `--inplace` or `--append`.
-- **Layout:** `Hive/<server>/<job>/<date-time>/` on the drive, with each directory under `files/`, the dumps in `databases/`, and `manifest.json`. Server and job folders are named once, when created, from the name plus a short ID, and never renamed, so renaming in Beekeeper, two similar names, or a job re-added with an old name never share a folder.
+- **Layout:** `Hive/<server>/<job>/<date-time>/` on the drive, with each directory under `files/`, the dumps in `databases/`, and `manifest.json`. Server and job folders are named once, when first backed up, from the name plus a short ID, and never renamed, so renaming in Beekeeper, two similar names, or a job re-added with an old name never share a folder. `<date-time>` is when the snapshot completed, in UTC, such as `2026-11-06T182353Z` (C3).
 - **In progress:** a run writes into `<date-time>.partial` and renames it when complete. The next run picks up a failed run's partial folder, so files already transferred aren't transferred again.
 - **A missing or empty source folder fails the run,** instead of making an empty snapshot that looks like a success. A snapshot much smaller than the one before gets a warning (§13).
 - **Database dumps** are streamed over SSH straight into the snapshot, never written as a file on the server. MySQL and MariaDB dumps are compressed with gzip. Postgres dumps use its custom format, which is already compressed. Dumps are stored whole on every run.
@@ -352,7 +352,7 @@ Code is copied and adapted, not shared through a package. Each slice names what 
 ## Development servers and drives
 
 - **A test server in Docker,** from C2 on: `sshd` with the same rsync version as your real servers, MariaDB, MySQL and Postgres running as Swarm services so their containers are named as on your servers, sample data, and sample files, some of which change between runs. It lives in the repository and is started by a script. Development backs it up, never a real server.
-- **A test backup drive,** from C3 on: a case-sensitive APFS disk image mounted on the development Mac. Ejecting it is how the missing-drive case is checked.
+- **A test backup drive,** from C3 on: a case-sensitive APFS disk image mounted on the development Mac by `Scripts/test-drive.sh`. Ejecting it is how the missing-drive case is checked.
 - **Tests use neither.** They run against temporary folders and fakes. They may run `rsync` between local temporary folders, never `ssh`.
 
 ## Every slice ends with

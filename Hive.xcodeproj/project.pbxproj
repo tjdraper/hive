@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		A1010000000000000000000B /* HiveDaemon in Embed Daemon */ = {isa = PBXBuildFile; fileRef = A10200000000000000000002 /* HiveDaemon */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		A10100000000000000000013 /* rsync in Embed Daemon */ = {isa = PBXBuildFile; fileRef = A10100000000000000000012 /* rsync */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		A10100000000000000000015 /* COPYING in Embed rsync License */ = {isa = PBXBuildFile; fileRef = A10100000000000000000014 /* COPYING */; };
 		A1020000000000000000000B /* HiveCore in Frameworks */ = {isa = PBXBuildFile; productRef = A1020000000000000000000C /* HiveCore */; };
 		A1030000000000000000000B /* HiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1030000000000000000000C /* HiveKit */; };
 /* End PBXBuildFile section */
@@ -30,8 +32,20 @@
 			dstSubfolderSpec = 6;
 			files = (
 				A1010000000000000000000B /* HiveDaemon in Embed Daemon */,
+				A10100000000000000000013 /* rsync in Embed Daemon */,
 			);
 			name = "Embed Daemon";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10100000000000000000016 /* Embed rsync License */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = rsync;
+			dstSubfolderSpec = 7;
+			files = (
+				A10100000000000000000015 /* COPYING in Embed rsync License */,
+			);
+			name = "Embed rsync License";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -44,6 +58,8 @@
 		A1000000000000000000000F /* Signing.template.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.template.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000010 /* HiveKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = HiveKit; sourceTree = "<group>"; };
 		A10000000000000000000011 /* HiveCore */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = HiveCore; sourceTree = "<group>"; };
+		A10100000000000000000012 /* rsync */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = build/rsync/rsync; sourceTree = SOURCE_ROOT; };
+		A10100000000000000000014 /* COPYING */ = {isa = PBXFileReference; lastKnownFileType = text; path = COPYING; sourceTree = "<group>"; };
 		A10100000000000000000002 /* Hive (Debug).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hive (Debug).app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10200000000000000000002 /* HiveDaemon */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = HiveDaemon; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10300000000000000000002 /* Beekeeper (Debug).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Beekeeper (Debug).app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -103,6 +119,7 @@
 				A10000000000000000000010 /* HiveKit */,
 				A10000000000000000000011 /* HiveCore */,
 				A1000000000000000000000D /* Configuration */,
+				A10000000000000000000012 /* rsync */,
 				A10000000000000000000003 /* Products */,
 				A10000000000000000000007 /* .swiftlint.yml */,
 				A10000000000000000000008 /* .gitignore */,
@@ -129,6 +146,15 @@
 			path = Configuration;
 			sourceTree = "<group>";
 		};
+		A10000000000000000000012 /* rsync */ = {
+			isa = PBXGroup;
+			children = (
+				A10100000000000000000012 /* rsync */,
+				A10100000000000000000014 /* COPYING */,
+			);
+			path = ThirdParty/rsync;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -140,6 +166,7 @@
 				A10100000000000000000005 /* Frameworks */,
 				A10100000000000000000006 /* Resources */,
 				A10100000000000000000007 /* Embed Daemon */,
+				A10100000000000000000016 /* Embed rsync License */,
 				A10100000000000000000011 /* Write Launchd Plist */,
 			);
 			buildRules = (

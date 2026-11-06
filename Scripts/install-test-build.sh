@@ -348,6 +348,11 @@ done
 
 check_signing_config
 
+# Hive.app embeds it. Nothing is rebuilt once it's built.
+if [[ -n "$mac" ]]; then
+    "$REPO_ROOT/Scripts/build-rsync.sh"
+fi
+
 for simulator in ${simulators[@]+"${simulators[@]}"}; do
     install_on_simulator "$simulator"
 done

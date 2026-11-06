@@ -30,7 +30,8 @@ enum DaemonStart {
                     database: database,
                     settings: settings,
                     listeners: listeners,
-                    sealer: SecretSealer(key: keys.storage)
+                    sealer: SecretSealer(key: keys.storage),
+                    rsync: bundledRsync()
                 ),
                 identity: identity,
                 listeners: listeners
@@ -59,6 +60,15 @@ enum DaemonStart {
         withExtendedLifetime(pairing) {
             dispatchMain()
         }
+    }
+
+    /// Hive still starts without it, so Beekeeper can show the runs failing rather than a Hive that's offline.
+    private static func bundledRsync() -> URL {
+        let rsync = BundledRsync.url(besideExecutable: Bundle.main.executableURL ?? URL(filePath: CommandLine.arguments[0]))
+        if !BundledRsync.isPresent(at: rsync) {
+            logger.fault("The bundled rsync is missing from Hive.app, so every backup will fail")
+        }
+        return rsync
     }
 
     /// The Mac's name, as set in System Settings › General › Sharing, so a new Hive is named for its Mac.

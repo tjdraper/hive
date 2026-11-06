@@ -29,6 +29,8 @@ public enum AuditEvent: Codable, Hashable, Sendable {
     case server(serverID: UUID, serverName: String, change: ServerChange)
     /// The names as they were after the change.
     case backupJob(jobID: UUID, serverName: String, jobName: String, change: BackupJobChange)
+    case backupDriveChosen(old: BackupDriveIdentity?, new: BackupDriveIdentity)
+    case backupRunStarted(jobID: UUID, serverName: String, jobName: String)
 }
 
 public enum ServerChange: Codable, Hashable, Sendable {

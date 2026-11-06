@@ -9,6 +9,8 @@ References like §12 point to [00-Info.md](00-Info.md).
 - **The WebSocket** (§3): job states, progress and new job log entries, sent as they happen, after signing in with the session token. Beekeeper reconnects on its own, and keeps one for each connected Hive.
 - **Snapshots through the API:** each job's snapshots with their date, whether complete, and how much removing each would free (C6), plus each server's total against its quota
 
+- **From C3:** the catalog is the `snapshot` table, and `GET /jobs/<id>/run` gives the latest run until C5's job log.
+
 ## UI
 
 Built with you:

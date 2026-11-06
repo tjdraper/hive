@@ -13,6 +13,7 @@ Built with you:
   3. the host key's fingerprint, to check and confirm (§11)
   4. a test connection, with a clear reason when it fails
 - **Editing and removing servers.** Changing the host, port or user says it clears the database passwords and needs the host key confirmed again (C1). Removing one asks first, and says its snapshots stay on the drive.
+- **From C3:** a host of `localhost` failed the host key scan as unreachable against the test server, which listens only on `127.0.0.1`, while `127.0.0.1` worked. Check whether `ssh-keyscan` tries only the first address, and either try each or say so when adding a server.
 - **Choosing the backup drive** in the Hive's settings (C3), showing each volume's name, format and free space, explaining why only case-sensitive APFS is offered, and warning when the chosen one isn't mounted
 
 **Done when:** in the installed builds, the test server is added through Beekeeper from start to a passing test connection; the test drive is chosen as the backup drive; and ejecting it shows the warning.
