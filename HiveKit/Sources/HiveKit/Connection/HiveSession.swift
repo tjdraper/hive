@@ -48,6 +48,14 @@ public actor HiveSession {
         try await decoded(send(method: "PUT", path: path, body: JSONEncoder().encode(body)))
     }
 
+    public func post<Response: Decodable>(
+        _ path: String,
+        body: some Encodable,
+        as _: Response.Type = Response.self
+    ) async throws -> Response {
+        try await decoded(send(method: "POST", path: path, body: JSONEncoder().encode(body)))
+    }
+
     public func delete(_ path: String) async throws {
         _ = try await checked(send(method: "DELETE", path: path))
     }

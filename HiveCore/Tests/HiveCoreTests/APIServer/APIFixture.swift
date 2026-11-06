@@ -54,6 +54,7 @@ struct APIFixture {
     let auditLog: AuditLog
     let api: HiveAPI
     let fullDiskAccess = FakeFullDiskAccess()
+    let sealer = SecretSealer(key: P256.KeyAgreement.PrivateKey())
 
     init(signIn: SignInFixture? = nil) throws {
         self.signIn = try signIn ?? SignInFixture()
@@ -67,6 +68,7 @@ struct APIFixture {
             signIn: signIn.workflow,
             settingsStore: settings,
             listeners: listeners,
+            sealer: sealer,
             fullDiskAccess: { [fullDiskAccess] in FullDiskAccessProbe { _ in fullDiskAccess.openResult }.check() },
             now: { clock.now }
         )
@@ -92,10 +94,39 @@ struct APIFixture {
     func auditEvents() throws -> [AuditEvent] {
         try auditLog.page(before: nil, limit: AuditLog.largestPage).entries.map(\.event)
     }
+
+    /// Sends a request as the fixture's device.
+    func send(_ method: HTTPRequest.Method, _ path: String, body: Data? = nil) async throws -> APIAnswer {
+        let token = try token()
+        return try await application.test(.router) { client in
+            try await client.execute(uri: path, method: method, headers: headers(token: token), body: body.map { ByteBuffer(bytes: $0) }) {
+                APIAnswer(status: $0.status, body: Data($0.body.readableBytesView))
+            }
+        }
+    }
+
+    func send(_ method: HTTPRequest.Method, _ path: String, json: some Encodable) async throws -> APIAnswer {
+        try await send(method, path, body: JSONEncoder().encode(json))
+    }
+}
+
+struct APIAnswer {
+    let status: HTTPResponse.Status
+    let body: Data
+
+    func decoded<Value: Decodable>(as _: Value.Type) throws -> Value {
+        try JSONDecoder().decode(Value.self, from: body)
+    }
+
+    /// The problems in a 422 refusal.
+    var problems: [ConfigurationProblem] {
+        get throws { try decoded(as: ConfigurationRefusal.self).problems }
+    }
 }
 
 enum APIFixtureError: Error {
     case couldNotSignIn
+    case unexpectedStatus(HTTPResponse.Status)
 }
 
 extension TestResponse {

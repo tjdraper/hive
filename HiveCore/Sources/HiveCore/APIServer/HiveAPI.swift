@@ -9,6 +9,8 @@ public struct HiveAPI: Sendable {
     let settingsStore: HiveSettingsStore
     let settings: HiveSettingsWorkflow
     let auditLog: AuditLog
+    let servers: ServerWorkflow
+    let jobs: BackupJobWorkflow
     /// Checked on every request, since it can be turned off while Hive runs.
     let fullDiskAccess: @Sendable () -> FullDiskAccess
 
@@ -16,7 +18,8 @@ public struct HiveAPI: Sendable {
         hiveID: UUID,
         database: HiveDatabase,
         settings: HiveSettingsStore,
-        listeners: ListenerCoordinator
+        listeners: ListenerCoordinator,
+        sealer: SecretSealer
     ) {
         let devices = DeviceStore(database: database)
         self.init(
@@ -25,6 +28,7 @@ public struct HiveAPI: Sendable {
             signIn: SignInWorkflow(hiveID: hiveID, devices: devices, sessions: SessionStore()),
             settingsStore: settings,
             listeners: listeners,
+            sealer: sealer,
             fullDiskAccess: { FullDiskAccessProbe().check() },
             now: Date.init
         )
@@ -36,6 +40,7 @@ public struct HiveAPI: Sendable {
         signIn: SignInWorkflow,
         settingsStore: HiveSettingsStore,
         listeners: any ListenerControl,
+        sealer: SecretSealer,
         fullDiskAccess: @escaping @Sendable () -> FullDiskAccess,
         now: @escaping @Sendable () -> Date
     ) {
@@ -46,6 +51,8 @@ public struct HiveAPI: Sendable {
         self.settingsStore = settingsStore
         settings = HiveSettingsWorkflow(store: settingsStore, listeners: listeners, now: now)
         auditLog = AuditLog(database: database)
+        servers = ServerWorkflow(store: ServerStore(database: database), now: now)
+        jobs = BackupJobWorkflow(store: BackupJobStore(database: database), sealer: sealer, now: now)
         self.fullDiskAccess = fullDiskAccess
     }
 }

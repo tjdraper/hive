@@ -48,6 +48,56 @@ enum HiveDatabaseMigrator {
             }
         }
 
+        migrator.registerMigration("Add servers and backup jobs", migrate: addServersAndJobs)
+
         return migrator
+    }
+
+    private static func addServersAndJobs(_ database: Database) throws {
+        try database.create(table: "server") { table in
+            table.primaryKey("id", .blob)
+            table.column("name", .text).notNull()
+            table.column("host", .text).notNull()
+            table.column("port", .integer).notNull()
+            table.column("user", .text).notNull()
+            table.column("quotaBytes", .integer)
+            table.column("hostKey", .text)
+            table.column("createdAt", .datetime).notNull()
+        }
+
+        try database.create(table: "backupJob") { table in
+            table.primaryKey("id", .blob)
+            table.column("serverID", .blob).notNull().indexed().references("server", onDelete: .cascade)
+            table.column("name", .text).notNull()
+            table.column("dailySnapshots", .integer).notNull()
+            table.column("monthlySnapshots", .integer).notNull()
+            table.column("createdAt", .datetime).notNull()
+        }
+
+        try database.create(table: "backupDirectory") { table in
+            table.column("jobID", .blob).notNull().references("backupJob", onDelete: .cascade)
+            table.column("position", .integer).notNull()
+            table.column("path", .text).notNull()
+            table.column("folder", .text).notNull()
+            table.primaryKey(["jobID", "position"])
+        }
+
+        try database.create(table: "backupDatabase") { table in
+            table.primaryKey("id", .blob)
+            table.column("jobID", .blob).notNull().indexed().references("backupJob", onDelete: .cascade)
+            table.column("position", .integer).notNull()
+            table.column("kind", .text).notNull()
+            // Empty for a database running on the server itself.
+            table.column("serviceName", .text)
+            table.column("user", .text).notNull()
+            table.column("name", .text).notNull()
+            table.column("sealedPassword", .blob)
+        }
+
+        try database.create(table: "backupTime") { table in
+            table.column("jobID", .blob).notNull().references("backupJob", onDelete: .cascade)
+            table.column("minuteOfDay", .integer).notNull()
+            table.primaryKey(["jobID", "minuteOfDay"])
+        }
     }
 }

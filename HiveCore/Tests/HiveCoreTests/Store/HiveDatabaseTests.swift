@@ -52,6 +52,34 @@ struct HiveDatabaseTests {
         #expect(settings == HiveSettings(name: "Studio Mac mini", networkAccess: .thisMacOnly, port: 4483))
     }
 
+    @Test("A store from before servers keeps its Hive ID, devices, settings and audit log, and starts with no servers")
+    func migratesFromSettingsSchema() throws {
+        // Arrange
+        let writer = try HiveDatabase.inMemory(migratedUpTo: "Add the Hive's settings and the audit log")
+        let hiveID = try writer.read { try UUID.fetchOne($0, sql: "SELECT id FROM hive") }
+        let deviceID = UUID()
+        try writer.write { database in
+            try database.execute(
+                sql: "INSERT INTO device (id, name, publicKey, pairedAt) VALUES (?, ?, ?, ?)",
+                arguments: [deviceID, "Studio Mac", P256.Signing.PrivateKey().publicKey.x963Representation, Date()]
+            )
+            try database.execute(sql: "UPDATE hive SET name = 'Studio Hive', port = 5000")
+            try AuditLog.record(.pairedOnHiveMac, by: deviceID, at: Date(), in: database)
+        }
+
+        // Act
+        let database = try HiveDatabase.migrate(writer, defaultHiveName: "Ignored")
+
+        // Assert
+        #expect(try database.hiveID() == hiveID)
+        #expect(try DeviceStore(database: database).device(id: deviceID)?.name == "Studio Mac")
+        let settings = try HiveSettingsStore(database: database, defaultPort: 4483).settings()
+        #expect(settings == HiveSettings(name: "Studio Hive", networkAccess: .thisMacOnly, port: 5000))
+        #expect(try AuditLog(database: database).page(before: nil, limit: 10).entries.map(\.event) == [.pairedOnHiveMac])
+        #expect(try ServerStore(database: database).all().isEmpty)
+        #expect(try BackupJobStore(database: database).all().isEmpty)
+    }
+
     @Test("A Mac name that isn't a valid name gives a Hive named Hive")
     func invalidMacNameFallsBack() throws {
         // Arrange

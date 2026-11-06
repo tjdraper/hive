@@ -7,6 +7,7 @@ References like §6 point to [00-Info.md](00-Info.md). Read the brainstorm's "Ha
 ## Engine
 
 - **A second Secure Enclave key for each Hive,** protected by `.userPresence`, created and registered by each paired device the first time it needs one. On a Mac without Touch ID, macOS asks for the account password instead.
+- **Changes to servers and jobs:** C1's `ConfirmationRequirement` already says which need confirmation and why. Check them inside the store's write transaction, against the stored values, so a change made in between can't slip through.
 - **Each action that needs confirmation carries a fresh signature** from that key over the action, the object it acts on and a nonce from Hive. A session alone is never enough, and Hive refuses the action without one.
 - **The actions in this slice** (§6): deleting snapshots; lowering a quota or a job's tiers; changing a server's host, port, user or credentials; confirming a changed host key; and regenerating the identity. Later slices add their own: E1 the SMTP host, F1 a new recovery key, F3 rotating SSH keys, and G1 opening a pairing window.
 

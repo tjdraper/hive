@@ -25,7 +25,7 @@ Check off a slice here when its "done when" is true.
 
 ### Phase C — Backups in Hive
 
-- [ ] [C1. Servers and backup jobs](08-C1-ServersAndBackupJobs.md) — Engine, 1 session
+- [x] [C1. Servers and backup jobs](08-C1-ServersAndBackupJobs.md) — Engine, 1 session
 - [ ] [C2. SSH keys, host keys and the test server](09-C2-SSHKeysHostKeysAndTheTestServer.md) — Engine, 1 session
 - [ ] [C3. Directory snapshots](10-C3-DirectorySnapshots.md) — Engine, 1–2 sessions, installed build
 - [ ] [C4. Database dumps](11-C4-DatabaseDumps.md) — Engine, 1 session

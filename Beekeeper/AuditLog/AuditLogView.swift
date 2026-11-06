@@ -61,20 +61,3 @@ private struct AuditEntryRow: View {
         .padding(.vertical, 2)
     }
 }
-
-extension AuditEvent {
-    var summary: String {
-        switch self {
-        case .pairedOnHiveMac:
-            "Paired as Beekeeper on the Hive's Mac"
-        case .deviceRevoked(_, let deviceName):
-            "Revoked “\(deviceName)”"
-        case .hiveRenamed(let old, let new):
-            "Renamed the Hive from “\(old)” to “\(new)”"
-        case .networkAccessChanged(let old, let new):
-            "Changed where Hive listens from \(old.summary) to \(new.summary)"
-        case .portChanged(let old, let new):
-            "Changed the port from \(old) to \(new)"
-        }
-    }
-}

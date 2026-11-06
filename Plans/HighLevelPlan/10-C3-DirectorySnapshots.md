@@ -23,6 +23,7 @@ References like §9 point to [00-Info.md](00-Info.md). Look at `../site-backups/
 - **Server and job folders** are named once, from the name plus a short ID, and never renamed (§9)
 - **Manifests,** in a versioned JSON format (§9)
 - **The catalog of snapshots** in Hive's store, updated as each one is made
+- **Removing a job or server** removes its configuration rows through foreign keys (C1). The catalog must not reference `backupJob` or `server` with a cascading delete, since their snapshots stay (§10).
 - **Run now** through the API, to back up a job's directories. C5 moves it onto the queue.
 - **Logging:** each step, its duration and how much it transferred. Never paths.
 

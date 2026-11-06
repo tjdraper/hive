@@ -25,7 +25,13 @@ enum DaemonStart {
             let listeners = ListenerCoordinator(target: try settings.settings().listenTarget)
 
             server = try APIServer(
-                api: HiveAPI(hiveID: hiveID, database: database, settings: settings, listeners: listeners),
+                api: HiveAPI(
+                    hiveID: hiveID,
+                    database: database,
+                    settings: settings,
+                    listeners: listeners,
+                    sealer: SecretSealer(key: keys.storage)
+                ),
                 identity: identity,
                 listeners: listeners
             )

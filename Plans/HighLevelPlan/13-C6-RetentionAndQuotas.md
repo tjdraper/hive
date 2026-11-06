@@ -10,6 +10,7 @@ Retention must never remove the wrong snapshot (AGENTS.md). This slice is mostly
 - **Counting space** as it's used on the drive: files are grouped by inode, so a file hard-linked into several snapshots counts once. For each snapshot, how much removing it would free, and the total for each server. Kept in the catalog, and recounted only where a run or removal changed something, since a full recount of large trees over USB could take hours.
 - **Quotas** (§10): when a server is over, its oldest daily snapshots are removed first, across all its jobs, until it fits. Monthly snapshots and the newest complete snapshot of each job are never removed for a quota. If it still doesn't fit, the server is marked over quota, for E2 to email about.
 - **Lowering a quota or tiers:** nothing is removed because of the change until it's confirmed (D4)
+- **Defaults:** C1 takes tiers and a quota with every job and server, and allows no quota. Choose the defaults D2 offers, and whether no quota stays allowed.
 - **After a restore:** retention and quotas don't run until you confirm in Beekeeper (F3)
 - **Removing safely:** a snapshot is removed only if it's in the catalog, its real path is inside its job's folder on the backup drive, and nothing is writing to it. It's renamed first, so a restart in the middle finishes the removal instead of leaving half a snapshot. Folders copied from servers without write permission get it back before removal. Symbolic links inside a snapshot are removed, never followed.
 - **When it runs:** after each run, and once a day

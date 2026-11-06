@@ -21,4 +21,9 @@ extension HiveRequestContext {
         guard let signedInDeviceID else { throw HTTPError(.unauthorized) }
         return signedInDeviceID
     }
+
+    /// The UUID in the route's `:id`, or nil when it isn't one.
+    var idParameter: UUID? {
+        parameters.get("id").flatMap(UUID.init(uuidString:))
+    }
 }

@@ -25,6 +25,33 @@ public enum AuditEvent: Codable, Hashable, Sendable {
     case hiveRenamed(old: String, new: String)
     case networkAccessChanged(old: NetworkAccess, new: NetworkAccess)
     case portChanged(old: Int, new: Int)
+    /// The server's name as it was after the change.
+    case server(serverID: UUID, serverName: String, change: ServerChange)
+    /// The names as they were after the change.
+    case backupJob(jobID: UUID, serverName: String, jobName: String, change: BackupJobChange)
+}
+
+public enum ServerChange: Codable, Hashable, Sendable {
+    case added(connection: ServerConnection)
+    case renamed(old: String, new: String)
+    /// Also cleared its jobs' database passwords and its confirmed host key.
+    case connection(old: ServerConnection, new: ServerConnection)
+    case quota(old: Int64?, new: Int64?)
+    /// Its configuration only. Its snapshots stay on the backup drive.
+    case removed
+}
+
+public enum BackupJobChange: Codable, Hashable, Sendable {
+    case added
+    case renamed(old: String, new: String)
+    case directories(old: [BackupDirectory], new: [BackupDirectory])
+    case databases(old: [DatabaseSettings], new: [DatabaseSettings])
+    /// A password was entered. Its value is never recorded.
+    case databasePassword(databaseName: String)
+    case times(old: [TimeOfDay], new: [TimeOfDay])
+    case retention(old: RetentionTiers, new: RetentionTiers)
+    /// Its configuration only. Its snapshots stay on the backup drive.
+    case removed
 }
 
 public struct AuditLogPage: Codable, Hashable, Sendable {

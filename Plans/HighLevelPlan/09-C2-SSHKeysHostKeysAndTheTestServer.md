@@ -17,6 +17,7 @@ A Docker setup in the repository, started by a script (Part 2, "Development serv
 - **Handing the key to `ssh`:** decide between a short-lived file in a `0700` folder deleted after use, and an `ssh-agent` run by Hive (§19). Record the decision in §11.
 - **An `SSHRunner`** that builds every `ssh` command the same way: `-F /dev/null`, so the user's own `~/.ssh/config` never applies; `BatchMode=yes`; `StrictHostKeyChecking=yes` with Hive's own `known_hosts` file; `HostKeyAlias` set to the server's ID; `IdentitiesOnly=yes` with Hive's key; a connect timeout; and `ServerAliveInterval` so a stalled connection ends. It captures output, supports cancellation, and tells a changed host key apart from a refused login and an unreachable host.
 - **Host keys through the API:** scan a server's key with `ssh-keyscan`, return its SHA-256 fingerprints, and record it only once a device confirms it. D4 adds confirming a changed key.
+- **Where the host key goes:** C1 added `server.hostKey`, empty until a device confirms one, and cleared when the server's host, port or user changes. Decide its form here, and write Hive's `known_hosts` from it.
 - **Test connection** through the API: connects with Hive's key and runs a harmless command.
 - **Logging:** connection results and why one failed. Never hostnames or users.
 

@@ -8,6 +8,7 @@ struct DeveloperWindow: View {
     static let id = "developer"
 
     private static let methods = ["GET", "POST", "PUT", "DELETE"]
+    private static let methodsWithBody: Set<String> = ["POST", "PUT"]
 
     @Environment(HiveListStore.self) private var store
     @State private var hiveID: UUID?
@@ -74,8 +75,10 @@ struct DeveloperWindow: View {
         guard let hiveID, let link = store.link(for: hiveID) else { return }
         isSending = true
         defer { isSending = false }
-        let body = requestBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : Data(requestBody.utf8)
         let method = method
+        // URLSession refuses a GET with a body without sending it, which would read as the Hive being offline.
+        let sendsBody = Self.methodsWithBody.contains(method) && !requestBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let body = sendsBody ? Data(requestBody.utf8) : nil
         let path = path
         do {
             let answer = try await link.perform { try await $0.send(method: method, path: path, body: body) }

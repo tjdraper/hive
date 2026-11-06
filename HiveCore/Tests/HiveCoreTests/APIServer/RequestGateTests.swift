@@ -58,6 +58,11 @@ struct RequestGateTests {
             HiveEndpoint.devices,
             HiveEndpoint.settings,
             HiveEndpoint.auditLog,
+            HiveEndpoint.servers,
+            HiveEndpoint.server(UUID()),
+            HiveEndpoint.jobs,
+            HiveEndpoint.jobs(onServer: UUID()),
+            HiveEndpoint.job(UUID()),
         ]
     )
     func otherPathsAreRefused(path: String) async throws {
@@ -118,6 +123,39 @@ struct RequestGateTests {
         #expect(try api.settings.settings().name == "Test Hive")
         #expect(api.listeners.applied.isEmpty)
         #expect(try fixture.devices.device(id: fixture.device.id) != nil)
+    }
+
+    @Test("Servers and jobs can't be added, changed or removed without signing in")
+    func configurationChangesAreRefused() async throws {
+        // Arrange
+        let server = try await api.addServer()
+        let job = try await api.addJob(to: server)
+        let before = try api.auditEvents()
+        let requests: [(String, HTTPRequest.Method)] = [
+            (HiveEndpoint.servers, .post),
+            (HiveEndpoint.server(server.id), .put),
+            (HiveEndpoint.server(server.id), .delete),
+            (HiveEndpoint.jobs(onServer: server.id), .post),
+            (HiveEndpoint.job(job.id), .put),
+            (HiveEndpoint.job(job.id), .delete),
+        ]
+        // A job is the bigger body, and a server route that got past the gate would answer 400 rather than 401.
+        let body = ByteBuffer(bytes: try JSONEncoder().encode(ConfigurationSamples.job(name: "Changed")))
+
+        for (path, method) in requests {
+            // Act
+            try await application.test(.router) { client in
+                try await client.execute(uri: path, method: method, body: body) { response in
+                    // Assert
+                    #expect(response.status == .unauthorized)
+                }
+            }
+        }
+
+        // Assert
+        #expect(try api.servers.all() == [server])
+        #expect(try api.jobs.all() == [job])
+        #expect(try api.auditEvents() == before)
     }
 
     @Test("A made-up session token gets no further than no token at all")

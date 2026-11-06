@@ -49,6 +49,8 @@ public struct APIServer: Sendable {
         DeviceRoutes.add(to: router, devices: api.devices, revocation: api.revocation)
         SettingsRoutes.add(to: router, workflow: api.settings)
         AuditLogRoutes.add(to: router, auditLog: api.auditLog)
+        ServerRoutes.add(to: router, workflow: api.servers)
+        BackupJobRoutes.add(to: router, workflow: api.jobs)
         return router
     }
 
