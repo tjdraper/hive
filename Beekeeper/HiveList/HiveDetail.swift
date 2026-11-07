@@ -27,6 +27,7 @@ struct HiveDetail: View {
             }
         }
         .navigationTitle(hive.name)
+        .locationPath([LocationPath.Part(title: hive.name, systemImage: "hexagon")])
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Picker("Page", selection: $page) {

@@ -27,6 +27,9 @@ struct HiveSidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .onChange(of: selection) { _, selected in
+            if case .server(let hiveID, _) = selected { collapsed.remove(hiveID) }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Button("Add Server", systemImage: "plus") {
@@ -50,7 +53,13 @@ struct HiveSidebar: View {
         Binding {
             !collapsed.contains(id)
         } set: { isExpanded in
-            if isExpanded { collapsed.remove(id) } else { collapsed.insert(id) }
+            if isExpanded {
+                collapsed.remove(id)
+            } else {
+                collapsed.insert(id)
+                // As in Finder, a selection that would be hidden moves up to what still shows.
+                if case .server(id, _) = selection { selection = .hive(id) }
+            }
         }
     }
 }

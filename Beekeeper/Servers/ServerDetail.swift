@@ -7,7 +7,8 @@ struct ServerDetail: View {
     let link: HiveLink
     let servers: ServerList
     let serverID: UUID
-    let onRemoved: () -> Void
+    /// Selects the server's Hive, such as from the path or once the server is removed.
+    let onShowHive: () -> Void
 
     @State private var isEditing = false
     @State private var isConfirmingRemoval = false
@@ -22,9 +23,10 @@ struct ServerDetail: View {
             }
         }
         .navigationTitle(servers.server(serverID)?.name ?? "Server")
-        #if os(macOS)
-        .navigationSubtitle(hive.name)
-        #endif
+        .locationPath([
+            LocationPath.Part(title: hive.name, systemImage: "hexagon", action: onShowHive),
+            LocationPath.Part(title: servers.server(serverID)?.name ?? "Server", systemImage: "server.rack"),
+        ])
     }
 
     private func page(_ server: Server) -> some View {
@@ -54,7 +56,10 @@ struct ServerDetail: View {
         }
         .formStyle(.grouped)
         .toolbar {
-            Button("Edit…") { isEditing = true }
+            ToolbarSpacer(.flexible)
+            ToolbarItem {
+                Button("Edit…") { isEditing = true }
+            }
         }
         .sheet(isPresented: $isEditing) {
             EditServerSheet(servers: servers, server: server)
@@ -69,7 +74,7 @@ struct ServerDetail: View {
     private func remove(_ server: Server) async {
         do {
             try await servers.remove(server.id)
-            onRemoved()
+            onShowHive()
         } catch {
             failure = HiveLink.message(for: error)
         }
