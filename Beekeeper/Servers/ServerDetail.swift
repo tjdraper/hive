@@ -10,9 +10,7 @@ struct ServerDetail: View {
     /// Selects the server's Hive, such as from the path or once the server is removed.
     let onShowHive: () -> Void
 
-    @State private var isEditing = false
-    @State private var isConfirmingRemoval = false
-    @State private var failure: String?
+    @State private var editRequest: ServerEditRequest?
 
     var body: some View {
         HiveConnectionGate(hive: hive, link: link) {
@@ -43,40 +41,18 @@ struct ServerDetail: View {
                 ConnectionTestCheck(link: link, server: server)
             }
             .id(server.connection)
-            Section {
-                HStack {
-                    if let failure {
-                        Text(failure)
-                            .foregroundStyle(.red)
-                    }
-                    Spacer()
-                    Button("Remove Server…", role: .destructive) { isConfirmingRemoval = true }
-                }
-            }
         }
         .formStyle(.grouped)
         .toolbar {
             ToolbarSpacer(.flexible)
-            ToolbarItem {
-                Button("Edit…") { isEditing = true }
+            ToolbarItemGroup {
+                Button("Edit…") { editRequest = ServerEditRequest(action: .edit, server: server, servers: servers) }
+                Button("Remove…", systemImage: "trash", role: .destructive) {
+                    editRequest = ServerEditRequest(action: .remove, server: server, servers: servers)
+                }
+                .help("Remove this server")
             }
         }
-        .sheet(isPresented: $isEditing) {
-            EditServerSheet(servers: servers, server: server)
-        }
-        .confirmationDialog("Remove “\(server.name)”?", isPresented: $isConfirmingRemoval) {
-            Button("Remove Server", role: .destructive) { Task { await remove(server) } }
-        } message: {
-            Text("Its backup jobs are removed with it. Their snapshots stay on the backup drive.")
-        }
-    }
-
-    private func remove(_ server: Server) async {
-        do {
-            try await servers.remove(server.id)
-            onShowHive()
-        } catch {
-            failure = HiveLink.message(for: error)
-        }
+        .serverEditing($editRequest) { _ in onShowHive() }
     }
 }

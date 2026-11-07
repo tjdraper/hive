@@ -2,18 +2,27 @@ import HiveKit
 import SwiftUI
 
 /// Hive's key for a server, with the line to add to the server's `authorized_keys`, limited to the
-/// addresses the person chooses.
+/// Hive Mac's addresses the person chooses.
 struct AuthorizedKeySetup: View {
     let link: HiveLink
     let server: Server
 
+    private enum Limit: Hashable {
+        case macAddresses
+        case anywhere
+    }
+
     @State private var key: ServerSSHKey?
+    @State private var limit = Limit.anywhere
     @State private var acceptedFrom: Set<String> = []
     @State private var isMissing = false
     @State private var failure: String?
 
     var body: some View {
-        Section {
+        if let key, !key.macAddresses.isEmpty {
+            limitSection(key)
+        }
+        Section("Add Hive's Key to the Server") {
             if let key {
                 keyRows(key)
             } else if isMissing {
@@ -26,34 +35,63 @@ struct AuthorizedKeySetup: View {
                 ProgressView()
                     .controlSize(.small)
             }
-        } header: {
-            Text("Hive's Key")
-        } footer: {
-            if let key, !key.macAddresses.isEmpty {
-                Text(
-                    "With no address chosen, the server accepts the key from anywhere. Choose none when the server "
-                        + "sees Hive's connections come from another address, such as through a port forward."
-                )
-                .foregroundStyle(.secondary)
-            }
         }
         .task { await load() }
     }
 
+    private func limitSection(_ key: ServerSSHKey) -> some View {
+        Section {
+            Picker("Accept Hive's key", selection: $limit) {
+                Text("Only from these addresses of the Hive's Mac").tag(Limit.macAddresses)
+                Text("From any address").tag(Limit.anywhere)
+            }
+            .labelsHidden()
+            #if os(macOS)
+            .pickerStyle(.radioGroup)
+            #else
+            .pickerStyle(.inline)
+            #endif
+            if limit == .macAddresses {
+                ForEach(Self.tailscaleFirst(key.macAddresses), id: \.address) { address in
+                    Toggle(address.label, isOn: accepts(address.address))
+                    #if os(macOS)
+                        .toggleStyle(.checkbox)
+                        .padding(.leading, 20)
+                    #endif
+                }
+            }
+        } header: {
+            Text("Where the Server Accepts Hive's Key")
+        } footer: {
+            Text(
+                "Hive connects to the server over SSH. Limited to the Hive's Mac's addresses, the server turns Hive's key "
+                    + "away from anywhere else, so a copy of it is no use. Choose any address when the server sees Hive's "
+                    + "connections come from another address, such as through a port forward."
+            )
+            .foregroundStyle(.secondary)
+        }
+    }
+
     @ViewBuilder private func keyRows(_ key: ServerSSHKey) -> some View {
         Text("Add this line to \(authorizedKeysPath) on \(server.connection.host), so Hive can sign in as \(server.connection.user).")
-        if !key.macAddresses.isEmpty {
-            Text("Accept the key only from")
-            ForEach(key.macAddresses, id: \.address) { address in
-                Toggle(address.label, isOn: accepts(address.address))
-            }
+        if let line = line(for: key) {
+            CommandText(text: line)
+        } else {
+            Text("Choose at least one address above.")
+                .foregroundStyle(.orange)
         }
-        CommandText(text: key.authorizedKeysLine(acceptingFrom: key.macAddresses.map(\.address).filter(acceptedFrom.contains)))
         LabeledContent("Fingerprint") {
             Text(key.fingerprint)
                 .font(.callout.monospaced())
                 .textSelection(.enabled)
         }
+    }
+
+    /// Nil while limited to the Mac's addresses with none chosen, which would otherwise read as no limit.
+    private func line(for key: ServerSSHKey) -> String? {
+        guard limit == .macAddresses, !key.macAddresses.isEmpty else { return key.authorizedKeysLine() }
+        let chosen = key.macAddresses.map(\.address).filter(acceptedFrom.contains)
+        return chosen.isEmpty ? nil : key.authorizedKeysLine(acceptingFrom: chosen)
     }
 
     private var authorizedKeysPath: String {
@@ -67,6 +105,10 @@ struct AuthorizedKeySetup: View {
         } set: { isOn in
             if isOn { acceptedFrom.insert(address) } else { acceptedFrom.remove(address) }
         }
+    }
+
+    private static func tailscaleFirst(_ addresses: [NetworkInterfaceAddress]) -> [NetworkInterfaceAddress] {
+        addresses.filter(\.isTailscale) + addresses.filter { !$0.isTailscale }
     }
 
     private func load() async {
@@ -93,6 +135,7 @@ struct AuthorizedKeySetup: View {
     private func show(_ loaded: ServerSSHKey) {
         if key == nil {
             acceptedFrom = Set(loaded.macAddresses.filter(\.isTailscale).map(\.address))
+            limit = acceptedFrom.isEmpty ? .anywhere : .macAddresses
         }
         key = loaded
     }

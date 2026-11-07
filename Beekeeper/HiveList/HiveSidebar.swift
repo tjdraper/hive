@@ -9,14 +9,23 @@ struct HiveSidebar: View {
 
     /// Hives are open until closed, so a new one shows its servers.
     @State private var collapsed: Set<UUID> = []
+    @State private var editRequest: ServerEditRequest?
 
     var body: some View {
         List(selection: $selection) {
             ForEach(store.hives) { hive in
                 DisclosureGroup(isExpanded: expanded(hive.id)) {
-                    ForEach(store.servers(for: hive.id)?.servers ?? []) { server in
-                        NavigationLink(value: SidebarItem.server(hiveID: hive.id, serverID: server.id)) {
-                            ServerSidebarRow(server: server)
+                    if let servers = store.servers(for: hive.id) {
+                        ForEach(servers.servers) { server in
+                            NavigationLink(value: SidebarItem.server(hiveID: hive.id, serverID: server.id)) {
+                                ServerSidebarRow(server: server)
+                            }
+                            .contextMenu {
+                                Button("Edit…") { editRequest = ServerEditRequest(action: .edit, server: server, servers: servers) }
+                                Button("Remove…", role: .destructive) {
+                                    editRequest = ServerEditRequest(action: .remove, server: server, servers: servers)
+                                }
+                            }
                         }
                     }
                 } label: {
@@ -27,6 +36,9 @@ struct HiveSidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .serverEditing($editRequest) { removed in
+            if case .server(let hiveID, removed.id) = selection { selection = .hive(hiveID) }
+        }
         .onChange(of: selection) { _, selected in
             if case .server(let hiveID, _) = selected { collapsed.remove(hiveID) }
         }
