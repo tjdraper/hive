@@ -16,6 +16,8 @@ References like §13 point to [00-Info.md](00-Info.md). Read the brainstorm's "S
 - **Alert state in Hive's store,** so a restart never sends one twice or forgets one
 - **Emails name servers and jobs,** since you need them to act. Never a secret.
 
+- **From C5:** `OverdueCheck` says when a job became overdue (three hours after the first of its times following its last complete snapshot, never while it runs), and `JobStatus.overdueSince` gives it per job. Each finished run is a `jobLogEntry` with its failure, and `BackupRunCoordinator.events` sends `finished` as each ends. A missing drive fails runs with `driveMissing` only after Hive has been running five minutes. A run cut short by a restart ends `interrupted` and runs once more, so it shouldn't email on its own.
+
 ## Tests
 
 - Each alert goes out once, then daily as described, and stops when resolved, across restarts

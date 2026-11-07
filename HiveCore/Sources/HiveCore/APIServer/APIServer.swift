@@ -27,12 +27,14 @@ public struct APIServer: Sendable {
 
     /// Runs until the process is sent SIGTERM or SIGINT. Throws when it can't listen on `127.0.0.1`.
     public func run() async throws {
+        // Before anything can reach the queue, so a run a restart cut short can't be taken for one going now.
+        try await api.runs.start()
         let service = ListeningService(
             listeners: listeners,
             factory: TLSListenerFactory(responder: Self.responder(api: api), tlsConfiguration: tlsConfiguration)
         )
         let group = ServiceGroup(configuration: ServiceGroupConfiguration(
-            services: [service],
+            services: [service, SchedulingService(scheduler: api.scheduler, runs: api.runs)],
             gracefulShutdownSignals: [.sigterm, .sigint],
             logger: TLSListener.quietLogger
         ))
@@ -45,7 +47,13 @@ public struct APIServer: Sendable {
             HTTPResponse.Status.noContent
         }
         SignInRoutes.add(to: router, workflow: api.signIn)
-        OverviewRoutes.add(to: router, hiveID: api.hiveID, settings: api.settingsStore, fullDiskAccess: api.fullDiskAccess)
+        OverviewRoutes.add(
+            to: router,
+            hiveID: api.hiveID,
+            settings: api.settingsStore,
+            fullDiskAccess: api.fullDiskAccess,
+            macSleep: api.macSleep
+        )
         DeviceRoutes.add(to: router, devices: api.devices, revocation: api.revocation)
         SettingsRoutes.add(to: router, workflow: api.settings)
         AuditLogRoutes.add(to: router, auditLog: api.auditLog)
@@ -55,7 +63,8 @@ public struct APIServer: Sendable {
         HostKeyRoutes.add(to: router, workflow: api.hostKeys)
         ConnectionTestRoutes.add(to: router, workflow: api.connectionTest)
         BackupDriveRoutes.add(to: router, workflow: api.backupDrive)
-        BackupRunRoutes.add(to: router, coordinator: api.runs)
+        BackupRunRoutes.add(to: router, coordinator: api.runs, statuses: api.jobStatus)
+        JobLogRoutes.add(to: router, jobLog: api.jobLog)
         return router
     }
 
@@ -70,5 +79,18 @@ private struct ListeningService: Service {
 
     func run() async throws {
         try await listeners.run(with: factory)
+    }
+}
+
+private struct SchedulingService: Service {
+    let scheduler: BackupScheduler
+    let runs: BackupRunCoordinator
+
+    /// Stops the run going now before Hive exits, so its processes have their chance to clean up.
+    func run() async throws {
+        await cancelWhenGracefulShutdown {
+            await scheduler.run()
+        }
+        await runs.stop()
     }
 }

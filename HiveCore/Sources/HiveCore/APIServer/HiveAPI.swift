@@ -1,4 +1,5 @@
 import Foundation
+import HiveKit
 
 /// Everything the API's routes work with.
 public struct HiveAPI: Sendable {
@@ -16,8 +17,12 @@ public struct HiveAPI: Sendable {
     let connectionTest: ConnectionTestWorkflow
     let backupDrive: BackupDriveWorkflow
     let runs: BackupRunCoordinator
+    let jobStatus: JobStatusReader
+    let jobLog: JobLog
+    let scheduler: BackupScheduler
     /// Checked on every request, since it can be turned off while Hive runs.
     let fullDiskAccess: @Sendable () -> FullDiskAccess
+    let macSleep: @Sendable () async -> MacSleep
 
     public init(
         hiveID: UUID,
@@ -43,6 +48,11 @@ public struct HiveAPI: Sendable {
             rsync: RsyncRunner(rsync: rsync),
             dumps: DatabaseDumpRunner(),
             origin: { .server($0) },
+            calendar: .autoupdatingCurrent,
+            sleepPrevention: PowerAssertion(),
+            macSleep: { await SleepSettingReader().read() },
+            startupDriveGrace: 5 * 60,
+            pause: { try await Task.sleep(for: $0) },
             now: Date.init
         )
     }
@@ -62,6 +72,11 @@ public struct HiveAPI: Sendable {
         rsync: RsyncRunner,
         dumps: DatabaseDumpRunner,
         origin: @escaping @Sendable (SSHTarget) -> BackupOrigin,
+        calendar: Calendar,
+        sleepPrevention: any SleepPreventing,
+        macSleep: @escaping @Sendable () async -> MacSleep,
+        startupDriveGrace: TimeInterval,
+        pause: @escaping @Sendable (Duration) async throws -> Void,
         now: @escaping @Sendable () -> Date
     ) {
         self.hiveID = hiveID
@@ -92,17 +107,27 @@ public struct HiveAPI: Sendable {
         connectionTest = ConnectionTestWorkflow(targets: targets, ssh: ssh)
         let driveStore = BackupDriveStore(database: database)
         backupDrive = BackupDriveWorkflow(store: driveStore, volumes: volumes, hiveID: hiveID, now: now)
-        runs = BackupRunCoordinator(workflow: BackupRunWorkflow(
-            hiveID: hiveID,
-            database: database,
-            drives: BackupDriveLocator(store: driveStore, volumes: volumes, hiveID: hiveID),
-            targets: targets,
-            rsync: rsync,
-            dumps: dumps,
-            passwords: DatabasePasswordLoader(database: database, sealer: sealer),
-            origin: origin,
-            now: now
-        ))
+        runs = BackupRunCoordinator(
+            workflow: BackupRunWorkflow(
+                hiveID: hiveID,
+                database: database,
+                drives: BackupDriveLocator(store: driveStore, volumes: volumes, hiveID: hiveID),
+                targets: targets,
+                rsync: rsync,
+                dumps: dumps,
+                passwords: DatabasePasswordLoader(database: database, sealer: sealer),
+                origin: origin,
+                now: now
+            ),
+            sleep: sleepPrevention,
+            startupDriveGrace: startupDriveGrace,
+            pause: pause
+        )
+        let schedule = ScheduleCalendar(calendar: calendar)
+        jobStatus = JobStatusReader(database: database, runs: runs, schedule: schedule, now: now)
+        jobLog = JobLog(database: database)
+        scheduler = BackupScheduler(database: database, schedule: schedule, runs: runs, now: now)
         self.fullDiskAccess = fullDiskAccess
+        self.macSleep = macSleep
     }
 }

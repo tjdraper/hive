@@ -38,10 +38,11 @@ struct BackupRunFixture {
     init(
         directories: [(folder: String, source: String)] = [("site", "srv/site")],
         databases: [BackupDatabaseDraft] = [],
-        chooseDrive: Bool = true
+        chooseDrive: Bool = true,
+        startupDriveGrace: TimeInterval = 0
     ) async throws {
         databaseServer = try FakeDatabaseServer()
-        api = try APIFixture(dumpSearchPath: databaseServer.searchPath)
+        api = try APIFixture(dumpSearchPath: databaseServer.searchPath, startupDriveGrace: startupDriveGrace)
         temporary = try TemporaryDirectory()
         volume = temporary.url.appending(path: "Volume", directoryHint: .isDirectory)
         server = temporary.url.appending(path: "Server", directoryHint: .isDirectory)
@@ -108,11 +109,18 @@ struct BackupRunFixture {
 
     /// Starts a run through the API a minute after the last, and waits for it to finish.
     func run() async throws -> BackupRun {
+        try await runEntry().run
+    }
+
+    /// The run's entry in the job log.
+    func runEntry() async throws -> JobLogEntry {
         api.signIn.clock.advance(by: 60)
         let started = try await api.send(.post, HiveEndpoint.run(ofJob: job.id))
         guard started.status == .accepted else { throw APIFixtureError.unexpectedStatus(started.status) }
         await api.api.runs.waitUntilIdle()
-        return try await api.send(.get, HiveEndpoint.run(ofJob: job.id)).decoded(as: BackupRun.self)
+        let status = try await api.send(.get, HiveEndpoint.run(ofJob: job.id)).decoded(as: JobStatus.self)
+        guard let entry = status.lastRun else { throw APIFixtureError.unexpectedStatus(.notFound) }
+        return entry
     }
 
     func catalog() throws -> [SnapshotRecord] {
@@ -155,4 +163,69 @@ func extendedAttribute(_ name: String, of url: URL) -> String? {
 func setExtendedAttribute(_ name: String, to value: String, of url: URL) throws {
     let bytes = Array(value.utf8)
     guard setxattr(url.fileSystemPath, name, bytes, bytes.count, 0, XATTR_NOFOLLOW) == 0 else { throw POSIXError(.EIO) }
+}
+
+/// Queue and job log helpers.
+extension BackupRunFixture {
+    var clock: TestClock {
+        api.signIn.clock
+    }
+
+    var runs: BackupRunCoordinator {
+        api.api.runs
+    }
+
+    /// Another job on the fixture's server, backing up one folder, made with a file in it.
+    func addJob(named name: String) async throws -> BackupJob {
+        let source = "srv/\(name)"
+        try write(name, to: "\(source)/index.html")
+        var draft = ConfigurationSamples.job(name: name, password: nil)
+        draft.databases = []
+        draft.directories = [BackupDirectory(path: self.source(source).fileSystemPath, folder: "site")]
+        return try await api.addJob(draft, to: serverRecord)
+    }
+
+    func runNow(_ job: BackupJob? = nil) async throws -> APIAnswer {
+        try await api.send(.post, HiveEndpoint.run(ofJob: (job ?? self.job).id))
+    }
+
+    func status(of job: BackupJob? = nil) async throws -> JobStatus {
+        try await api.send(.get, HiveEndpoint.run(ofJob: (job ?? self.job).id)).decoded(as: JobStatus.self)
+    }
+
+    func jobLog(_ query: String = "") async throws -> JobLogPage {
+        try await api.send(.get, HiveEndpoint.jobLog + query).decoded(as: JobLogPage.self)
+    }
+
+    /// Waits, for up to five seconds, until the run going now is at `step`.
+    func waitUntilRunning(_ step: RunStep) async throws {
+        for _ in 0 ..< 500 {
+            if await runs.current()?.step == step { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        throw RunWaitError.timedOut
+    }
+}
+
+enum RunWaitError: Error {
+    case timedOut
+}
+
+/// A job with the sample MySQL database in a container, whose dump the fake server answers.
+extension BackupRunFixture {
+    static let database = DatabaseSettings(kind: .mysql, location: .container(serviceName: "site_db"), user: "site", name: "site")
+
+    static func withDatabase(startupDriveGrace: TimeInterval = 0) async throws -> BackupRunFixture {
+        let fixture = try await BackupRunFixture(
+            databases: [BackupDatabaseDraft(id: nil, settings: database, password: ConfigurationSamples.password)],
+            startupDriveGrace: startupDriveGrace
+        )
+        try fixture.write("hello", to: "srv/site/index.html")
+        fixture.databaseServer.setContainers([containerLine(swarmService: "site_db")])
+        fixture.databaseServer.answer(output: RecordedDumpOutput.mysqlDump)
+        return fixture
+    }
+
+    /// The step a run's held dump waits at.
+    static let dumping = RunStep.dumping(database: database.name)
 }

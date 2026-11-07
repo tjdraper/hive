@@ -29,7 +29,7 @@ Check off a slice here when its "done when" is true.
 - [x] [C2. SSH keys, host keys and the test server](09-C2-SSHKeysHostKeysAndTheTestServer.md) — Engine, 1 session
 - [x] [C3. Directory snapshots](10-C3-DirectorySnapshots.md) — Engine, 1–2 sessions, installed build
 - [x] [C4. Database dumps](11-C4-DatabaseDumps.md) — Engine, 1 session
-- [ ] [C5. Scheduling, the job queue and the job log](12-C5-SchedulingTheJobQueueAndTheJobLog.md) — Engine, 1 session
+- [x] [C5. Scheduling, the job queue and the job log](12-C5-SchedulingTheJobQueueAndTheJobLog.md) — Engine, 1 session
 - [ ] [C6. Retention and quotas](13-C6-RetentionAndQuotas.md) — Engine, 1–2 sessions
 
 ### Phase D — Managing backups in Beekeeper (Mac)
@@ -228,13 +228,13 @@ Configuration is data, edited in Beekeeper. The PHP configuration (`../site-back
 - **Stalls end runs:** rsync's `--timeout` and SSH's `ServerAliveInterval`, so a hung transfer fails instead of blocking the queue.
 - **Database containers are found by their Swarm or Compose service name,** and exactly one must match. Your servers run Docker Swarm, which names containers like `buzzingpixel_db.1.<id>`.
 - **Database passwords never appear on a command line,** on either machine. The PHP version puts them there. They reach the dump through standard input (C4).
-- **Scheduling:** each job runs at its times, in the Hive Mac's local time. If Hive was off or the Mac was asleep at a scheduled time, the job runs once when Hive is back. Hive warns when the Mac is set to sleep. Jobs run one at a time from a queue kept in the store, so it survives restarts. Beekeeper can start and cancel runs.
+- **Scheduling:** each job runs at its times, in the Hive Mac's local time. If Hive was off or the Mac was asleep at a scheduled time, the job runs once when Hive is back. Hive warns when the Mac is set to sleep. Jobs run one at a time from a queue kept in the store, so it survives restarts, with Run Now ahead of scheduled runs. Beekeeper can start and cancel runs.
 
 ## §12. Logs
 
 As AGENTS.md describes:
 
-- **The job log** is Hive's record of what each run did: which job, each directory and database, how long it took, how much it transferred, and what failed and why. Beekeeper shows it.
+- **The job log** is Hive's record of what each run did: which job, each directory and database, how long it took, how much it transferred, and what failed and why. Beekeeper shows it. Entries are kept for a year.
 - **The audit log** records every change made through the API, which device made it and when, never the value of a secret. Beekeeper shows it.
 - **The system log** is for debugging, and never holds hostnames, paths or other private details.
 
@@ -312,7 +312,7 @@ Each gets its own plan once this one is done. Until then, features not in Part 1
 - [x] One SSH key per server, or one for the whole Hive: one per server (§11, C2)
 - [x] Bundling rsync: yes, rsync 3.x, for its exit codes and `--fake-super` (§11)
 - [x] Owners and groups of backed-up files: kept with rsync's `--fake-super` (§9)
-- [ ] How long the job log is kept (C5)
+- [x] How long the job log is kept: a year, pruned daily (C5)
 - [ ] Default retention tiers and quota (C6)
 - [ ] An SMTP library, or a small client of Hive's own over SwiftNIO (E1)
 - [ ] How Hive updates itself (G2). `Hive.app` isn't running most of the time, and the daemon has to restart from the new bundle.

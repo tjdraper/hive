@@ -46,6 +46,15 @@ final class FakeDatabaseServer {
         }
     }
 
+    /// Dump tools wait, as a slow dump would, until `release()`.
+    func hold() {
+        write("", to: "hold")
+    }
+
+    func release() {
+        try? FileManager.default.removeItem(at: record.appending(path: "hold"))
+    }
+
     /// Each time `docker` or a dump tool ran: its name, then its arguments.
     var runs: [String] {
         recorded("arguments")?.split(separator: "\n").map(String.init) ?? []
@@ -89,6 +98,7 @@ final class FakeDatabaseServer {
             esac
         done
         if [ -n "${PGPASSWORD+set}" ]; then printf '%s' "$PGPASSWORD" > \(record)/postgres-password; fi
+        while [ -e \(record)/hold ]; do sleep 0.05; done
         cat \(record)/"$tool.output"
         cat \(record)/"$tool.error" >&2
         exit "$(cat \(record)/"$tool.status")"

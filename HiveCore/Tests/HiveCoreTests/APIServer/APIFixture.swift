@@ -116,8 +116,72 @@ final class FakeVolumes: VolumeListing {
     }
 }
 
+/// Counts the power assertions a run takes and lets go of.
+final class FakeSleepPrevention: SleepPreventing {
+    private let counts = Mutex((taken: 0, held: 0))
+
+    var taken: Int {
+        counts.withLock { $0.taken }
+    }
+
+    var held: Int {
+        counts.withLock { $0.held }
+    }
+
+    func preventSleep() -> @Sendable () -> Void {
+        counts.withLock {
+            $0.taken += 1
+            $0.held += 1
+        }
+        return { self.counts.withLock { $0.held -= 1 } }
+    }
+}
+
+/// Counts the pauses a run makes waiting for the backup drive, and does what it's told at each. A
+/// pause moves the fixture's clock on instead of sleeping, but still lets other work in, as a real
+/// one would.
+final class FakePauses: Sendable {
+    private struct State {
+        var count = 0
+        var action: (@Sendable (Int) -> Void)?
+        var realDelay: Duration?
+    }
+
+    private let state = Mutex(State())
+
+    var count: Int {
+        state.withLock { $0.count }
+    }
+
+    /// `action` gets how many pauses there have been, this one included.
+    func onEach(_ action: @escaping @Sendable (Int) -> Void) {
+        state.withLock { $0.action = action }
+    }
+
+    /// Makes each pause take `delay` of real time too, so a test can catch a run while it waits.
+    func takeRealTime(_ delay: Duration) {
+        state.withLock { $0.realDelay = delay }
+    }
+
+    func pause() async throws {
+        let (count, action, delay) = state.withLock { state in
+            state.count += 1
+            return (state.count, state.action, state.realDelay)
+        }
+        action?(count)
+        if let delay {
+            try await Task.sleep(for: delay)
+        } else {
+            await Task.yield()
+        }
+    }
+}
+
 /// The whole API over an in-memory Hive with one signed-in device.
 struct APIFixture {
+    /// Schedules are worked out in a time zone with daylight saving, whatever the Mac running the tests uses.
+    static let timeZone = TimeZone(identifier: "America/New_York") ?? .gmt
+
     static let defaultPort = 4483
 
     let signIn: SignInFixture
@@ -126,15 +190,32 @@ struct APIFixture {
     let auditLog: AuditLog
     let api: HiveAPI
     let fullDiskAccess = FakeFullDiskAccess()
-    let sealer = SecretSealer(key: P256.KeyAgreement.PrivateKey())
+    let sealer: SecretSealer
     let ssh = FakeSSH()
     let addresses = FakeMacAddresses()
     let volumes = FakeVolumes()
+    let sleepPrevention = FakeSleepPrevention()
+    let pauses = FakePauses()
+
+    static var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar
+    }
 
     /// `dumpSearchPath` is where database dumps find `docker` and the dump tools, which tests stand in
-    /// for with scripts.
-    init(signIn: SignInFixture? = nil, dumpSearchPath: String = "/usr/bin:/bin") throws {
+    /// for with scripts. Runs wait for the backup drive only within `startupDriveGrace` of the fixture's
+    /// start, and waiting moves the clock on rather than sleeping. Sharing `signIn` and `sealer` with
+    /// another fixture starts the same Hive again.
+    init(
+        signIn: SignInFixture? = nil,
+        sealer: SecretSealer? = nil,
+        dumpSearchPath: String = "/usr/bin:/bin",
+        startupDriveGrace: TimeInterval = 0
+    ) throws {
         self.signIn = try signIn ?? SignInFixture()
+        let sealer = sealer ?? SecretSealer(key: P256.KeyAgreement.PrivateKey())
+        self.sealer = sealer
         let signIn = self.signIn
         settings = HiveSettingsStore(database: signIn.database, defaultPort: Self.defaultPort)
         auditLog = AuditLog(database: signIn.database)
@@ -155,6 +236,14 @@ struct APIFixture {
             dumps: DatabaseDumpRunner(localSearchPath: dumpSearchPath),
             // Directories and dumps are read from folders and scripts the tests make on this Mac, never over `ssh`.
             origin: { _ in .thisMac },
+            calendar: Self.calendar,
+            sleepPrevention: sleepPrevention,
+            macSleep: { .afterIdle(minutes: 10) },
+            startupDriveGrace: startupDriveGrace,
+            pause: { [pauses] in
+                clock.advance(by: TimeInterval($0.components.seconds))
+                try await pauses.pause()
+            },
             now: { clock.now }
         )
     }

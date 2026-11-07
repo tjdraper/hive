@@ -55,27 +55,23 @@ struct ChildProcess: Sendable {
     /// Cancelling the task that iterates the stream, or dropping the stream, stops the process.
     func stream() -> AsyncThrowingStream<Event, any Error> {
         AsyncThrowingStream { continuation in
-            let process = Process()
-            process.executableURL = executableURL
-            process.arguments = arguments
-            process.environment = environment
             let standardInput = input.map { _ in Pipe() }
-            process.standardInput = standardInput ?? FileHandle.nullDevice
-
             let standardOutput = Pipe()
             let standardError = Pipe()
-            process.standardOutput = standardOutput
-            process.standardError = standardError
 
             // A process can exit before its output has been read, so the exit is only reported once
             // the process has ended and both pipes have reached end of file.
             let finished = DispatchGroup()
             finished.enter()
-            process.terminationHandler = { _ in finished.leave() }
+            let exitStatus = OSAllocatedUnfairLock<Int32>(initialState: 0)
             let handlerFailure = OSAllocatedUnfairLock<(any Error)?>(initialState: nil)
 
+            let process: SpawnedProcess
             do {
-                try process.run()
+                process = try spawn(standardInput: standardInput, standardOutput: standardOutput, standardError: standardError) { status in
+                    exitStatus.withLock { $0 = status }
+                    finished.leave()
+                }
             } catch {
                 continuation.finish(throwing: Failure.couldNotStart(error))
                 return
@@ -99,7 +95,7 @@ struct ChildProcess: Sendable {
                     continuation.finish(throwing: error)
                     return
                 }
-                continuation.yield(.exited(status: process.terminationStatus))
+                continuation.yield(.exited(status: exitStatus.withLock { $0 }))
                 continuation.finish()
             }
 
@@ -114,12 +110,35 @@ struct ChildProcess: Sendable {
         }
     }
 
+    /// Starts the process with the pipes' child ends, then closes them here.
+    private func spawn(
+        standardInput: Pipe?,
+        standardOutput: Pipe,
+        standardError: Pipe,
+        exited: @escaping @Sendable (Int32) -> Void
+    ) throws -> SpawnedProcess {
+        let process = try SpawnedProcess(
+            executable: executableURL,
+            arguments: arguments,
+            environment: environment,
+            standardInput: standardInput?.fileHandleForReading.fileDescriptor ?? FileHandle.nullDevice.fileDescriptor,
+            standardOutput: standardOutput.fileHandleForWriting.fileDescriptor,
+            standardError: standardError.fileHandleForWriting.fileDescriptor,
+            exited: exited
+        )
+        // Only the child may hold these ends open, or the pipes never reach end of file.
+        try? standardInput?.fileHandleForReading.close()
+        try? standardOutput.fileHandleForWriting.close()
+        try? standardError.fileHandleForWriting.close()
+        return process
+    }
+
     /// Passes output to `handler` until it throws, then records why, stops the process, and drops the
     /// rest while it ends.
     private static func handing(
         to handler: @escaping @Sendable (Data) throws -> Void,
         failure: OSAllocatedUnfairLock<(any Error)?>,
-        stopping process: Process
+        stopping process: SpawnedProcess
     ) -> @Sendable (Data) -> Void {
         { data in
             guard failure.withLock({ $0 == nil }) else { return }
@@ -158,14 +177,11 @@ struct ChildProcess: Sendable {
         }
     }
 
-    private static func stop(_ process: Process) {
+    static func stop(_ process: SpawnedProcess) {
         guard process.isRunning else { return }
-        process.terminate()
-        let processIdentifier = process.processIdentifier
+        process.signal(SIGTERM)
         DispatchQueue.global().asyncAfter(deadline: .now() + terminationGracePeriod) {
-            if process.isRunning {
-                kill(processIdentifier, SIGKILL)
-            }
+            process.signal(SIGKILL)
         }
     }
 }

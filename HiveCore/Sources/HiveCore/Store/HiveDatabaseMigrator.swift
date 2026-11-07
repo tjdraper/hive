@@ -58,8 +58,43 @@ enum HiveDatabaseMigrator {
         }
 
         migrator.registerMigration("Add the backup drive and the snapshot catalog", migrate: addBackupDriveAndSnapshots)
+        migrator.registerMigration("Add schedules, the job queue and the job log", migrate: addQueueAndJobLog)
 
         return migrator
+    }
+
+    private static func addQueueAndJobLog(_ database: Database) throws {
+        try database.create(table: "jobSchedule") { table in
+            table.primaryKey("jobID", .blob).references("backupJob", onDelete: .cascade)
+            // The times and time zone `nextRunAt` was worked out for. A change to either works it out again.
+            table.column("scheduleKey", .text).notNull()
+            table.column("nextRunAt", .datetime).notNull()
+        }
+
+        try database.create(table: "jobLogEntry") { table in
+            table.autoIncrementedPrimaryKey("id")
+            // Not references to `backupJob` or `server`: entries outlive both.
+            table.column("jobID", .blob).notNull().indexed()
+            table.column("serverID", .blob).notNull().indexed()
+            table.column("serverName", .text).notNull()
+            table.column("jobName", .text).notNull()
+            table.column("trigger", .text).notNull()
+            table.column("startedAt", .datetime).notNull()
+            table.column("finishedAt", .datetime)
+            table.column("failure", .text)
+            table.column("pickedUpPartialSnapshot", .boolean).notNull()
+            table.column("directories", .text).notNull()
+            table.column("databases", .text).notNull()
+        }
+
+        // One row per job, so a job can't wait in the queue twice.
+        try database.create(table: "queuedRun") { table in
+            table.primaryKey("jobID", .blob).references("backupJob", onDelete: .cascade)
+            table.column("trigger", .text).notNull()
+            table.column("queuedAt", .datetime).notNull()
+            // Set while it runs.
+            table.column("logEntryID", .integer).references("jobLogEntry", onDelete: .setNull)
+        }
     }
 
     private static func addBackupDriveAndSnapshots(_ database: Database) throws {

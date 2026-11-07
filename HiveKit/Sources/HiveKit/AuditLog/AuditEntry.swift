@@ -30,7 +30,10 @@ public enum AuditEvent: Codable, Hashable, Sendable {
     /// The names as they were after the change.
     case backupJob(jobID: UUID, serverName: String, jobName: String, change: BackupJobChange)
     case backupDriveChosen(old: BackupDriveIdentity?, new: BackupDriveIdentity)
+    /// Run Now: a run was queued.
     case backupRunStarted(jobID: UUID, serverName: String, jobName: String)
+    /// A waiting run was taken out of the queue, or a running one stopped.
+    case backupRunCancelled(jobID: UUID, serverName: String, jobName: String)
 }
 
 public enum ServerChange: Codable, Hashable, Sendable {

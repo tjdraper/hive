@@ -66,6 +66,8 @@ struct RequestGateTests {
             HiveEndpoint.sshKey(onServer: UUID()),
             HiveEndpoint.backupDrive,
             HiveEndpoint.run(ofJob: UUID()),
+            HiveEndpoint.jobStatus,
+            HiveEndpoint.jobLog,
         ]
     )
     func otherPathsAreRefused(path: String) async throws {

@@ -11,7 +11,7 @@ Built with you:
   - directories: the path on the server and its folder name in the snapshot
   - directories can go in nested folders, such as `images/galleries`
   - databases: kind, container service name or host, user, database name, and a password field that says only whether one is set, with Change to replace it (§7)
-  - the times it runs
+  - the times it runs, as many a day as you like, with a new job starting at midnight
   - its retention tiers
 - **The server's quota,** in the server editor, with how much the server uses now
 - **Hive's checks** (C1) shown beside the field they're about: a 422 lists every problem with its field, its place in a list and a reason, never the value

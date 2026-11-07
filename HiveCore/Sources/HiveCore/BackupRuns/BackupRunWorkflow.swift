@@ -13,9 +13,56 @@ struct BackupRunWorkflow: Sendable {
         let failure: BackupFailure
     }
 
+    /// What a run tells whoever started it, as it goes.
+    enum Report: Sendable {
+        case step(RunStep)
+        /// The run so far, each time a directory or database finishes.
+        case progress(BackupRun)
+    }
+
     private enum Step {
+        case snapshotReady(pickedUp: Bool)
+        case started(RunStep)
         case pulled(DirectoryRun)
         case dumped(DatabaseRun)
+    }
+
+    /// The run as far as it has got.
+    private struct RunSoFar {
+        let jobID: UUID
+        let startedAt: Date
+        var directories: [DirectoryRun] = []
+        var databases: [DatabaseRun] = []
+        var pickedUp = false
+        var failure: BackupFailure?
+
+        func run(finishedAt: Date?) -> BackupRun {
+            BackupRun(
+                jobID: jobID,
+                startedAt: startedAt,
+                finishedAt: finishedAt,
+                failure: failure,
+                directories: directories,
+                databases: databases,
+                pickedUpPartialSnapshot: pickedUp
+            )
+        }
+
+        /// What to report about the step, if anything.
+        mutating func take(_ step: Step) -> Report? {
+            switch step {
+            case .snapshotReady(let pickedUpPartial):
+                pickedUp = pickedUpPartial
+                return nil
+            case .started(let step):
+                return .step(step)
+            case .pulled(let directory):
+                directories.append(directory)
+            case .dumped(let database):
+                databases.append(database)
+            }
+            return .progress(run(finishedAt: nil))
+        }
     }
 
     /// What a partial snapshot holds so far, for its manifest.
@@ -39,9 +86,8 @@ struct BackupRunWorkflow: Sendable {
         SnapshotCatalog(database: database)
     }
 
-    /// Nil when no job has that ID. `progress` gets the run as each directory and database finishes. Off
-    /// the caller's actor, since a run takes minutes.
-    @concurrent func run(jobID: UUID, progress: @Sendable (BackupRun) async -> Void) async throws -> BackupRun? {
+    /// Nil when no job has that ID. Off the caller's actor, since a run takes minutes.
+    @concurrent func run(jobID: UUID, report: @Sendable (Report) async -> Void) async throws -> BackupRun? {
         guard let job = try BackupJobStore(database: database).job(id: jobID),
               let server = try ServerStore(database: database).server(id: job.serverID)
         else { return nil }
@@ -53,37 +99,27 @@ struct BackupRunWorkflow: Sendable {
         Started a run with \(directoryCount, privacy: .public) directories and \(databaseCount, privacy: .public) databases
         """)
 
-        var directories: [DirectoryRun] = []
-        var databases: [DatabaseRun] = []
-        var failure: BackupFailure?
+        var soFar = RunSoFar(jobID: jobID, startedAt: startedAt)
         do {
             try await perform(job, on: server, startedAt: startedAt) { step in
-                switch step {
-                case .pulled(let directory): directories.append(directory)
-                case .dumped(let database): databases.append(database)
-                }
-                await progress(BackupRun(
-                    jobID: jobID, startedAt: startedAt, finishedAt: nil, failure: nil, directories: directories, databases: databases
-                ))
+                if let next = soFar.take(step) { await report(next) }
             }
         } catch let stop as Stop {
-            failure = stop.failure
+            soFar.failure = stop.failure
         } catch is CancellationError {
-            failure = .cancelled
+            soFar.failure = .cancelled
         } catch {
             Self.logger.error("The run stopped on \(String(describing: type(of: error)), privacy: .public)")
-            failure = .failed
+            soFar.failure = .failed
         }
 
         let seconds = (ContinuousClock.now - clock).roundedSeconds
-        if let failure {
+        if let failure = soFar.failure {
             Self.logger.error("The run failed after \(seconds, privacy: .public)s: \(failure.rawValue, privacy: .public)")
         } else {
             Self.logger.notice("The run completed its snapshot in \(seconds, privacy: .public)s")
         }
-        return BackupRun(
-            jobID: jobID, startedAt: startedAt, finishedAt: now(), failure: failure, directories: directories, databases: databases
-        )
+        return soFar.run(finishedAt: now())
     }
 
     private func perform(
@@ -95,6 +131,7 @@ struct BackupRunWorkflow: Sendable {
         let drive = try locateDrive()
         let origin = try origin(for: server)
 
+        await completed(.started(.checkingDirectories))
         if let problem = try await SourceCheck(rsync: rsync).problem(with: job.directories, from: origin) {
             throw Stop(failure: problem)
         }
@@ -110,6 +147,7 @@ struct BackupRunWorkflow: Sendable {
         }
         let start = partial.isPickedUp ? "Picked up the partial snapshot a failed run left" : "Started a new snapshot"
         Self.logger.notice("\(start, privacy: .public)")
+        await completed(.snapshotReady(pickedUp: partial.isPickedUp))
         let previous = try previousSnapshot(of: job, on: drive, folder: partial.jobFolder)
 
         var contents = SnapshotContents()
@@ -122,6 +160,7 @@ struct BackupRunWorkflow: Sendable {
         for (directory, destination) in zip(job.directories, partial.destinations) {
             let parts = ["files"] + directory.folder.split(separator: "/").map(String.init)
             let linkTo = previous.flatMap { RealFolder.existing(parts, under: $0) }
+            await completed(.started(.pulling(folder: directory.folder)))
             let report = try await pull.pull(directory, from: origin, into: destination, linkingTo: linkTo)
             await completed(.pulled(report))
             if let failure = report.failure { throw Stop(failure: failure) }
@@ -136,6 +175,7 @@ struct BackupRunWorkflow: Sendable {
             try onDrive { try partial.write(manifest(job, server: server, partial: partial, contents: contents, completedAt: nil)) }
         }
 
+        await completed(.started(.completing))
         let completedAt = now()
         try onDrive {
             try partial.write(manifest(job, server: server, partial: partial, contents: contents, completedAt: completedAt))
@@ -156,6 +196,7 @@ struct BackupRunWorkflow: Sendable {
         let folder = try onDrive { try RealFolder.make([SnapshotManifest.databasesFolder], under: partial.url) }
         let dump = DatabaseDump(runner: dumps)
         for database in job.databases {
+            await completed(.started(.dumping(database: database.settings.name)))
             let password = try passwords.password(forDatabase: database.id)
             let report = try await dump.dump(database, password: password, from: origin, into: folder)
             await completed(.dumped(report))

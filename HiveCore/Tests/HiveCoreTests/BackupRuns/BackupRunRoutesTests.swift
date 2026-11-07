@@ -74,7 +74,9 @@ struct BackupRunRoutesTests {
         await fixture.api.api.runs.waitUntilIdle()
 
         // Assert
-        #expect(try await fixture.api.send(.get, HiveEndpoint.run(ofJob: fixture.job.id)).status == .notFound)
+        let status = try await fixture.api.send(.get, HiveEndpoint.run(ofJob: fixture.job.id)).decoded(as: JobStatus.self)
+        #expect(status.state == .idle)
+        #expect(status.lastRun == nil)
         #expect(try fixture.api.auditEvents() == before)
         #expect(try fixture.catalog().isEmpty)
     }

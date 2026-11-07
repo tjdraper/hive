@@ -12,6 +12,9 @@ public struct BackupRun: Codable, Hashable, Sendable {
     public let directories: [DirectoryRun]
     /// The databases it dumped after the directories, in the job's order. One that failed is the last.
     public let databases: [DatabaseRun]
+    /// It carried on with the partial snapshot a failed or interrupted run left, so files that run
+    /// already copied weren't copied again.
+    public let pickedUpPartialSnapshot: Bool
 
     public init(
         jobID: UUID,
@@ -19,7 +22,8 @@ public struct BackupRun: Codable, Hashable, Sendable {
         finishedAt: Date?,
         failure: BackupFailure?,
         directories: [DirectoryRun],
-        databases: [DatabaseRun]
+        databases: [DatabaseRun],
+        pickedUpPartialSnapshot: Bool
     ) {
         self.jobID = jobID
         self.startedAt = startedAt
@@ -27,6 +31,7 @@ public struct BackupRun: Codable, Hashable, Sendable {
         self.failure = failure
         self.directories = directories
         self.databases = databases
+        self.pickedUpPartialSnapshot = pickedUpPartialSnapshot
     }
 }
 
@@ -136,6 +141,8 @@ public enum BackupFailure: String, Codable, Hashable, Sendable {
     /// Hive couldn't write the snapshot to the backup drive.
     case couldNotWriteSnapshot
     case cancelled
+    /// Hive stopped or restarted while it ran. Its partial snapshot is picked up by the next run.
+    case interrupted
     /// Anything else.
     case failed
 

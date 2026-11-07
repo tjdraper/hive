@@ -11,6 +11,7 @@ References like §12 point to [00-Info.md](00-Info.md).
 
 - **From C3:** the catalog is the `snapshot` table, and `GET /jobs/<id>/run` gives the latest run until C5's job log.
 - **From C4:** a run reports each database's dump with its time, bytes dumped and stored, and failure. The database failures each need words in Beekeeper, such as "the database turned down the password" for `databaseLoginRefused`.
+- **From C5:** `BackupRunCoordinator.events.listen()` is the WebSocket's source: `RunEvent`s for a run queued, leaving the queue, starting, each `RunStep`, progress as each directory and database finishes, and finishing. `GET /job-status` gives every job's `JobStatus` (state, the run going now and its step, last run, last snapshot, next run, overdue), for Beekeeper to start from before events arrive. `GET /job-log` takes `before`, `limit`, `job` and `server`. Run Now is `POST /jobs/<id>/run` (409 while waiting or running) and Cancel is `DELETE`. `HiveOverview.macSleep` says whether the Mac sleeps when idle. A run that picked up a partial snapshot says so in `pickedUpPartialSnapshot`, and `interrupted` means Hive restarted during the run.
 
 ## UI
 

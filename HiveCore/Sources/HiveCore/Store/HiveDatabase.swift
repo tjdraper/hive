@@ -2,8 +2,8 @@ import Foundation
 import GRDB
 import os
 
-/// Hive's store: its configuration, and later the job queue, the snapshot catalog and the logs. It
-/// lives in the data directory, so the Mac's own backup picks it up.
+/// Hive's store: its configuration, the job queue, the snapshot catalog and the logs. It lives in the
+/// data directory, so the Mac's own backup picks it up.
 public struct HiveDatabase: Sendable {
     static let fileName = "hive.sqlite"
 

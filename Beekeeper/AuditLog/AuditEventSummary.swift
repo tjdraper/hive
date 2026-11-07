@@ -24,6 +24,8 @@ extension AuditEvent {
             "Chose “\(new.name)” as the backup drive, replacing “\(old.name)”"
         case .backupRunStarted(_, let serverName, let jobName):
             "Started a run of “\(jobName)” on “\(serverName)”"
+        case .backupRunCancelled(_, let serverName, let jobName):
+            "Cancelled the run of “\(jobName)” on “\(serverName)”"
         }
     }
 }

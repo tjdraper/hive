@@ -15,6 +15,11 @@ public enum HiveEndpoint {
     public static let jobs = "/jobs"
     /// `GET` reads the chosen drive and the volumes mounted, and `PUT` chooses one.
     public static let backupDrive = "/backup-drive"
+    /// Every job's `JobStatus`.
+    public static let jobStatus = "/job-status"
+    /// Newest first. `?before=<entry ID>` gives the page after one already shown, and `?job=<ID>` or
+    /// `?server=<ID>` keeps only that job's or server's runs.
+    public static let jobLog = "/job-log"
 
     public static func device(_ id: UUID) -> String {
         "\(devices)/\(id.uuidString)"
@@ -52,7 +57,8 @@ public enum HiveEndpoint {
         "\(jobs)/\(id.uuidString)"
     }
 
-    /// `POST` starts a run, answering 409 while another is going, and `GET` reads the job's latest run.
+    /// `POST` queues a run, answering 409 while the job is already waiting or running. `DELETE` cancels its
+    /// waiting or running run. `GET` reads its `JobStatus`.
     public static func run(ofJob id: UUID) -> String {
         "\(job(id))/run"
     }
