@@ -18,7 +18,7 @@ struct JobLogTests {
 
         // Assert
         #expect(page.nextBefore == nil)
-        let (failed, succeeded) = (page.entries[0], page.entries[1])
+        let (failed, succeeded) = (page.runs[0], page.runs[1])
         #expect(failed.id > succeeded.id)
         #expect(failed.run.failure == .databaseLoginRefused)
         #expect(failed.run.databases.map(\.failure) == [.databaseLoginRefused])
@@ -52,12 +52,12 @@ struct JobLogTests {
         let unreadable = try await fixture.api.send(.get, HiveEndpoint.jobLog + "?job=not-an-id")
 
         // Assert
-        #expect(first.entries.map(\.jobName) == [fixture.job.name, "Other"])
-        #expect(second.entries.map(\.jobName) == [fixture.job.name])
+        #expect(first.runs.map(\.jobName) == [fixture.job.name, "Other"])
+        #expect(second.runs.map(\.jobName) == [fixture.job.name])
         #expect(second.nextBefore == nil)
-        #expect(oneJob.entries.map(\.jobName) == ["Other"])
-        #expect(oneServer.entries.count == 3)
-        #expect(otherServer.entries.isEmpty)
+        #expect(oneJob.runs.map(\.jobName) == ["Other"])
+        #expect(oneServer.runs.count == 3)
+        #expect(otherServer.runs.isEmpty)
         #expect(unreadable.status == .badRequest)
     }
 
@@ -74,7 +74,7 @@ struct JobLogTests {
 
         // Assert
         #expect(removed.status == .noContent)
-        #expect(page.entries.map(\.jobName) == [fixture.job.name])
+        #expect(page.runs.map(\.jobName) == [fixture.job.name])
     }
 
     @Test("Each step of a run is told to listeners as it happens")

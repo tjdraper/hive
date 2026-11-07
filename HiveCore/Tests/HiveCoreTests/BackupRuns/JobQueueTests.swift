@@ -88,7 +88,7 @@ struct JobQueueTests {
         #expect(running.status == .conflict)
         #expect(waiting.status == .conflict)
         #expect(scheduled == .alreadyQueued)
-        #expect(try await fixture.jobLog().entries.count == 2)
+        #expect(try await fixture.jobLog().runs.count == 2)
     }
 
     @Test("Cancelling a waiting run takes it out of the queue without an entry in the job log, and is audited")

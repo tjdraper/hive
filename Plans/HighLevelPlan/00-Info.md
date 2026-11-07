@@ -30,7 +30,7 @@ Check off a slice here when its "done when" is true.
 - [x] [C3. Directory snapshots](10-C3-DirectorySnapshots.md) — Engine, 1–2 sessions, installed build
 - [x] [C4. Database dumps](11-C4-DatabaseDumps.md) — Engine, 1 session
 - [x] [C5. Scheduling, the job queue and the job log](12-C5-SchedulingTheJobQueueAndTheJobLog.md) — Engine, 1 session
-- [ ] [C6. Retention and quotas](13-C6-RetentionAndQuotas.md) — Engine, 1–2 sessions
+- [x] [C6. Retention and quotas](13-C6-RetentionAndQuotas.md) — Engine, 1–2 sessions
 
 ### Phase D — Managing backups in Beekeeper (Mac)
 
@@ -210,8 +210,8 @@ Configuration is data, edited in Beekeeper. The PHP configuration (`../site-back
 
 ## §10. Retention and quotas
 
-- **Tiers:** each job keeps its newest snapshot from each of the newest N days that have one, and its newest from each of the last M months. Counting days that have a snapshot, rather than calendar days, means a long outage never ages out history. This replaces the PHP version's retention count and monthly copies. C6 settles the exact rules, with tests.
-- **A quota for each server,** covering all its jobs' snapshots. Space is counted as it's used on the drive: a file hard-linked into several snapshots counts once.
+- **Tiers:** each job keeps its newest snapshot from each of the newest N days that have one, and its newest from each of the newest M months that have one, in the Hive Mac's time zone. Counting days and months that have a snapshot, rather than calendar ones, means a long outage never ages out history. This replaces the PHP version's retention count and monthly copies. New jobs start with 30 daily and 12 monthly (C6).
+- **A quota for each server,** covering all its jobs' snapshots, or none, which is the default (C6). Space is counted as it's used on the drive: a file hard-linked into several snapshots counts once.
 - **When a server is over its quota,** Hive removes its oldest daily snapshots first until it fits. It never removes a monthly snapshot or the newest complete snapshot of any job to meet a quota. If that isn't enough, it emails (§13) and leaves the server over quota until you lower retention or raise the quota.
 - **Lowering a quota or a job's tiers needs confirmation** (§6), since it deletes snapshots.
 - **After a restore, retention and quotas wait** until you confirm in Beekeeper (F3). A drive restored from a Mac backup may have lost its hard links, and its space count would delete history.
@@ -313,7 +313,7 @@ Each gets its own plan once this one is done. Until then, features not in Part 1
 - [x] Bundling rsync: yes, rsync 3.x, for its exit codes and `--fake-super` (§11)
 - [x] Owners and groups of backed-up files: kept with rsync's `--fake-super` (§9)
 - [x] How long the job log is kept: a year, pruned daily (C5)
-- [ ] Default retention tiers and quota (C6)
+- [x] Default retention tiers and quota: 30 daily and 12 monthly snapshots, and no quota, which stays allowed (C6)
 - [ ] An SMTP library, or a small client of Hive's own over SwiftNIO (E1)
 - [ ] How Hive updates itself (G2). `Hive.app` isn't running most of the time, and the daemon has to restart from the new bundle.
 - [ ] The license (I1). The other open-source Locus apps use MIT.

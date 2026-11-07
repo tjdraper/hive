@@ -103,22 +103,22 @@ public struct HiveAPI: Sendable {
             pending: PendingHostKeyScans(),
             now: now
         )
-        let targets = SSHTargetLoader(database: database, sealer: sealer)
-        connectionTest = ConnectionTestWorkflow(targets: targets, ssh: ssh)
-        let driveStore = BackupDriveStore(database: database)
-        backupDrive = BackupDriveWorkflow(store: driveStore, volumes: volumes, hiveID: hiveID, now: now)
+        connectionTest = ConnectionTestWorkflow(targets: SSHTargetLoader(database: database, sealer: sealer), ssh: ssh)
+        let drives = BackupDriveLocator(store: BackupDriveStore(database: database), volumes: volumes, hiveID: hiveID)
+        backupDrive = BackupDriveWorkflow(store: drives.store, volumes: volumes, hiveID: hiveID, now: now)
         runs = BackupRunCoordinator(
             workflow: BackupRunWorkflow(
                 hiveID: hiveID,
                 database: database,
-                drives: BackupDriveLocator(store: driveStore, volumes: volumes, hiveID: hiveID),
-                targets: targets,
+                drives: drives,
+                targets: connectionTest.targets,
                 rsync: rsync,
                 dumps: dumps,
                 passwords: DatabasePasswordLoader(database: database, sealer: sealer),
                 origin: origin,
                 now: now
             ),
+            retention: RetentionWorkflow(database: database, drives: drives, calendar: calendar, now: now),
             sleep: sleepPrevention,
             startupDriveGrace: startupDriveGrace,
             pause: pause

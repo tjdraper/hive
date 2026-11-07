@@ -90,12 +90,16 @@ public struct TimeOfDay: Codable, Hashable, Comparable, Sendable {
     }
 }
 
-/// Which of a job's snapshots it keeps. Days are counted only when they have a snapshot, so a long
-/// outage never ages out history.
+/// Which of a job's snapshots it keeps. Days and months are counted only when they have a snapshot, so
+/// a long outage never ages out history.
 public struct RetentionTiers: Codable, Hashable, Sendable {
-    /// Its newest snapshot from each of the newest this many days that have one.
+    /// What a new job starts with: a month of daily snapshots and a year of monthly ones.
+    public static let suggested = RetentionTiers(dailySnapshots: 30, monthlySnapshots: 12)
+
+    /// Its newest snapshot from each of the newest this many days that have one, in the Hive Mac's
+    /// time zone.
     public var dailySnapshots: Int
-    /// Its newest snapshot from each of the last this many months.
+    /// Its newest snapshot from each of the newest this many months that have one.
     public var monthlySnapshots: Int
 
     public init(dailySnapshots: Int, monthlySnapshots: Int) {

@@ -19,11 +19,25 @@ enum SnapshotFolderName {
     /// In UTC, so a repeated hour when the clocks go back can't give two snapshots the same name, and
     /// without colons, which Finder shows as slashes.
     static func snapshot(at date: Date) -> String {
-        date.formatted(Date.ISO8601FormatStyle(timeSeparator: .omitted, timeZone: .gmt))
+        date.formatted(style)
     }
+
+    private static let style = Date.ISO8601FormatStyle(timeSeparator: .omitted, timeZone: .gmt)
 
     static func partial(at date: Date) -> String {
         snapshot(at: date) + partialSuffix
+    }
+
+    /// Whether `name` is one Hive gives a snapshot or a partial one, and nothing else.
+    static func isSnapshot(_ name: String) -> Bool {
+        let base = name.hasSuffix(partialSuffix) ? String(name.dropLast(partialSuffix.count)) : name
+        guard let date = try? Date(base, strategy: style) else { return false }
+        return snapshot(at: date) == base
+    }
+
+    /// A snapshot's folder while retention removes it, so one half gone never looks like a snapshot.
+    static func removing(_ folder: String) -> String {
+        folder + ".removing"
     }
 
     /// Letters, digits, spaces and a little punctuation. Anything else, such as `/`, a control character

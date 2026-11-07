@@ -39,7 +39,7 @@ struct BackupSchedulerTests {
         await check(fixture)
         fixture.clock.advance(by: 11 * 60 * 60 - 1)
         await check(fixture)
-        let before = try await fixture.jobLog().entries
+        let before = try await fixture.jobLog().runs
 
         // Act
         fixture.clock.advance(by: 30)
@@ -47,7 +47,7 @@ struct BackupSchedulerTests {
 
         // Assert
         #expect(before.isEmpty)
-        let entries = try await fixture.jobLog().entries
+        let entries = try await fixture.jobLog().runs
         #expect(entries.count == 1)
         #expect(entries.first?.trigger == .scheduled)
         #expect(entries.first?.run.failure == nil)
@@ -68,7 +68,7 @@ struct BackupSchedulerTests {
         await check(fixture)
 
         // Assert
-        let entries = try await fixture.jobLog().entries
+        let entries = try await fixture.jobLog().runs
         #expect(entries.count == 1)
         #expect(entries.first?.trigger == .scheduled)
         #expect(try await fixture.status().nextRunAt == (try date("2027-01-18T14:00:00-05:00")))
@@ -90,7 +90,7 @@ struct BackupSchedulerTests {
         await fixture.runs.waitUntilIdle()
 
         // Assert
-        let entries = try await fixture.jobLog().entries
+        let entries = try await fixture.jobLog().runs
         #expect(entries.map(\.trigger) == [.runNow])
         #expect(try await fixture.status().nextRunAt == (try date("2027-01-16T02:30:00-05:00")))
     }
@@ -110,7 +110,7 @@ struct BackupSchedulerTests {
 
         // Assert
         #expect(answer.status == .ok)
-        #expect(try await fixture.jobLog().entries.isEmpty)
+        #expect(try await fixture.jobLog().runs.isEmpty)
         #expect(try await fixture.status().nextRunAt == (try date("2027-01-16T01:00:00-05:00")))
     }
 
@@ -136,7 +136,7 @@ struct BackupSchedulerTests {
         await check(fixture)
 
         // Assert
-        let kept = try await fixture.jobLog().entries.map { now.timeIntervalSince($0.run.startedAt) / day }
+        let kept = try await fixture.jobLog().runs.map { now.timeIntervalSince($0.run.startedAt) / day }
         #expect(kept == [400, 364])
     }
 }

@@ -5,11 +5,11 @@ public struct JobStatus: Codable, Hashable, Sendable {
     public let jobID: UUID
     public let state: JobRunState
     /// The run going now, as far as it has got.
-    public let current: JobLogEntry?
+    public let current: RunLogEntry?
     /// What the run going now is doing.
     public let step: RunStep?
     /// The newest finished run.
-    public let lastRun: JobLogEntry?
+    public let lastRun: RunLogEntry?
     /// When its newest complete snapshot was made.
     public let lastSnapshotAt: Date?
     public let nextRunAt: Date?
@@ -20,9 +20,9 @@ public struct JobStatus: Codable, Hashable, Sendable {
     public init(
         jobID: UUID,
         state: JobRunState,
-        current: JobLogEntry?,
+        current: RunLogEntry?,
         step: RunStep?,
-        lastRun: JobLogEntry?,
+        lastRun: RunLogEntry?,
         lastSnapshotAt: Date?,
         nextRunAt: Date?,
         overdueSince: Date?
@@ -59,9 +59,9 @@ public enum RunEvent: Codable, Hashable, Sendable {
     case queued(jobID: UUID, trigger: RunTrigger)
     /// Cancelled before it started. It leaves no entry in the job log.
     case leftQueue(jobID: UUID)
-    case started(JobLogEntry)
+    case started(RunLogEntry)
     case step(jobID: UUID, step: RunStep)
     /// A directory or database finished.
-    case progress(JobLogEntry)
-    case finished(JobLogEntry)
+    case progress(RunLogEntry)
+    case finished(RunLogEntry)
 }

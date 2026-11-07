@@ -16,7 +16,7 @@ actor BackupScheduler {
     private let runs: BackupRunCoordinator
     private let jobLog: JobLog
     private let now: @Sendable () -> Date
-    private var lastPrunedAt: Date?
+    private var lastUpkeepAt: Date?
 
     init(
         database: HiveDatabase,
@@ -58,18 +58,20 @@ actor BackupScheduler {
                 try schedules.save(JobScheduleRecord(jobID: job.id, scheduleKey: key, nextRunAt: next))
             }
             if queued > 0 { Self.logger.notice("Queued \(queued, privacy: .public) scheduled runs") }
-            try pruneJobLog(now: now)
+            try await dailyUpkeep(now: now)
         } catch {
             Self.logger.error("Couldn't check the schedules: \(String(describing: type(of: error)), privacy: .public)")
         }
     }
 
-    /// Once a day, and on the first check after starting.
-    private func pruneJobLog(now: Date) throws {
-        if let lastPrunedAt, now.timeIntervalSince(lastPrunedAt) < 24 * 60 * 60 { return }
+    /// Once a day, and on the first check after starting: prunes the job log, and asks for a retention
+    /// pass, which also finishes any removal a restart cut short.
+    private func dailyUpkeep(now: Date) async throws {
+        if let lastUpkeepAt, now.timeIntervalSince(lastUpkeepAt) < 24 * 60 * 60 { return }
+        lastUpkeepAt = now
+        await runs.requestRetentionPass()
         guard let yearAgo = schedule.calendar.date(byAdding: .year, value: -1, to: now) else { return }
         let removed = try jobLog.removeEntries(startedBefore: yearAgo)
-        lastPrunedAt = now
         if removed > 0 { Self.logger.notice("Removed \(removed, privacy: .public) job log entries older than a year") }
     }
 }

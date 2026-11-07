@@ -45,7 +45,7 @@ struct HiveStoppingTests {
 
         // Act
         await fixture.runs.stop()
-        let afterStopping = try await fixture.jobLog().entries
+        let afterStopping = try await fixture.jobLog().runs
         fixture.databaseServer.release()
         let restarted = try APIFixture(
             signIn: fixture.api.signIn,
@@ -59,7 +59,7 @@ struct HiveStoppingTests {
         // Assert
         #expect(afterStopping.count == 1)
         #expect(afterStopping.first?.run.finishedAt == nil)
-        let entries = try await fixture.jobLog().entries
+        let entries = try await fixture.jobLog().runs
         // Run Now still goes first.
         #expect(entries.map(\.jobName) == [fixture.job.name, "Other", fixture.job.name])
         #expect(entries.map(\.trigger) == [.afterInterruption, .runNow, .runNow])

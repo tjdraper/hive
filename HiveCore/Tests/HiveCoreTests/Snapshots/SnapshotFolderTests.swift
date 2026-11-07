@@ -64,7 +64,7 @@ struct SnapshotFolderTests {
         #expect(!FileManager.default.fileExists(atPath: temporary.url.appending(path: "escaped").fileSystemPath))
     }
 
-    @Test("A partial snapshot with a link where a folder must go is left alone, and nothing is written through the link")
+    @Test("A partial snapshot with a link where a folder must go isn't picked up, and nothing is written or removed through the link")
     func linkInPartial() async throws {
         // Arrange
         let fixture = try await BackupRunFixture(directories: [("images/galleries", "srv/galleries"), ("site", "srv/site")])
@@ -75,6 +75,7 @@ struct SnapshotFolderTests {
         let partial = try #require(try fixture.catalog().first)
         let outside = fixture.temporary.url.appending(path: "Outside", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try Data("not Hive's".utf8).write(to: outside.appending(path: "keep.txt"))
         let images = fixture.snapshotURL(partial).appending(path: "files/images")
         try FileManager.default.removeItem(at: images)
         try FileManager.default.createSymbolicLink(at: images, withDestinationURL: outside)
@@ -85,10 +86,9 @@ struct SnapshotFolderTests {
 
         // Assert
         #expect(run.failure == nil)
-        #expect(BackupRunFixture.contents(of: outside).isEmpty)
-        let catalog = try fixture.catalog()
-        #expect(catalog.map(\.state) == [.partial, .complete])
-        #expect(catalog.first?.id == partial.id)
+        #expect(BackupRunFixture.contents(of: outside) == ["keep.txt"])
+        #expect(try fixture.catalog().map(\.state) == [.complete])
+        #expect(!FileManager.default.fileExists(atPath: fixture.snapshotURL(partial).fileSystemPath))
         let snapshot = try #require(try fixture.snapshots().first)
         #expect(BackupRunFixture.contents(of: snapshot.appending(path: "files/images")) == ["galleries", "galleries/summer.jpg"])
     }

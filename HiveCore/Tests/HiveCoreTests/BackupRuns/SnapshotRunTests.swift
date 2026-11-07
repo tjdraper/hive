@@ -132,7 +132,7 @@ struct SnapshotRunTests {
         #expect(files == ["site", "site/large.bin", "uploads", "uploads/locked.jpg"])
     }
 
-    @Test("A partial from before the job's directories changed is left alone, and a new snapshot started without what was dropped")
+    @Test("A partial from before the job's directories changed isn't picked up, and goes once the new snapshot completes")
     func stalePartialLeft() async throws {
         // Arrange
         let fixture = try await BackupRunFixture(directories: [("site", "srv/site"), ("uploads", "srv/uploads")])
@@ -151,10 +151,8 @@ struct SnapshotRunTests {
 
         // Assert
         #expect(run.failure == nil)
-        let catalog = try fixture.catalog()
-        #expect(catalog.map(\.state) == [.partial, .complete])
-        #expect(catalog.first?.id == partial.id)
-        #expect(FileManager.default.fileExists(atPath: fixture.snapshotURL(partial).appending(path: "files/uploads").fileSystemPath))
+        #expect(try fixture.catalog().map(\.state) == [.complete])
+        #expect(!FileManager.default.fileExists(atPath: fixture.snapshotURL(partial).fileSystemPath))
         let snapshot = try #require(try fixture.snapshots().first)
         #expect(BackupRunFixture.contents(of: snapshot.appending(path: "files")) == ["site", "site/index.html"])
     }

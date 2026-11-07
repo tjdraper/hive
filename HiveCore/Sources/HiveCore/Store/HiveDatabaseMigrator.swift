@@ -59,8 +59,82 @@ enum HiveDatabaseMigrator {
 
         migrator.registerMigration("Add the backup drive and the snapshot catalog", migrate: addBackupDriveAndSnapshots)
         migrator.registerMigration("Add schedules, the job queue and the job log", migrate: addQueueAndJobLog)
+        migrator.registerMigration("Add retention and counting space", migrate: addRetention)
 
         return migrator
+    }
+
+    private static func addRetention(_ database: Database) throws {
+        try database.alter(table: "snapshot") { table in
+            // Whether its files are in its job's `jobSpace.usedBytes`. Every snapshot is, but one being written.
+            table.add(column: "isCounted", .boolean).notNull().defaults(to: false)
+            // What removing it would free, as last counted. Empty until it's counted, and after a change
+            // nearby may have moved it.
+            table.add(column: "freesBytes", .integer)
+            // Set while it's being removed.
+            table.add(column: "removalReason", .text)
+        }
+
+        try database.create(table: "jobSpace") { table in
+            table.column("driveUUID", .text).notNull()
+            // Not a reference to `backupJob`: snapshots outlive their jobs.
+            table.column("jobID", .blob).notNull()
+            // Each file once, however many of the job's snapshots link to it. Empty until it's counted.
+            table.column("usedBytes", .integer)
+            table.primaryKey(["driveUUID", "jobID"])
+        }
+
+        try database.create(table: "overQuotaServer") { table in
+            table.primaryKey("serverID", .blob).references("server", onDelete: .cascade)
+            table.column("since", .datetime).notNull()
+        }
+
+        try database.alter(table: "hive") { table in
+            // Set by a restore: nothing is removed until a device starts retention again (§10, F3).
+            table.add(column: "retentionPausedSince", .datetime)
+        }
+
+        try addRemovalsToJobLog(database)
+    }
+
+    /// SQLite can't make a column optional in place, so the table is made again, keeping every entry
+    /// and its ID. The migration runs with foreign keys off, so dropping the old table leaves
+    /// `queuedRun.logEntryID` alone.
+    private static func addRemovalsToJobLog(_ database: Database) throws {
+        try database.create(table: "newJobLogEntry") { table in
+            table.autoIncrementedPrimaryKey("id")
+            table.column("kind", .text).notNull().defaults(to: "run")
+            // Not references to `backupJob` or `server`: entries outlive both.
+            table.column("jobID", .blob).notNull()
+            table.column("serverID", .blob).notNull()
+            table.column("serverName", .text).notNull()
+            table.column("jobName", .text).notNull()
+            table.column("startedAt", .datetime).notNull()
+            table.column("finishedAt", .datetime)
+            // Runs only.
+            table.column("trigger", .text)
+            table.column("failure", .text)
+            table.column("pickedUpPartialSnapshot", .boolean)
+            table.column("directories", .text)
+            table.column("databases", .text)
+            // Removals only.
+            table.column("removed", .text)
+            table.column("notRemoved", .text)
+        }
+        try database.execute(sql: """
+        INSERT INTO newJobLogEntry (
+            id, kind, jobID, serverID, serverName, jobName, startedAt, finishedAt,
+            "trigger", failure, pickedUpPartialSnapshot, directories, databases
+        )
+        SELECT
+            id, 'run', jobID, serverID, serverName, jobName, startedAt, finishedAt,
+            "trigger", failure, pickedUpPartialSnapshot, directories, databases
+        FROM jobLogEntry
+        """)
+        try database.drop(table: "jobLogEntry")
+        try database.rename(table: "newJobLogEntry", to: "jobLogEntry")
+        try database.create(index: "jobLogEntry_on_jobID", on: "jobLogEntry", columns: ["jobID"])
+        try database.create(index: "jobLogEntry_on_serverID", on: "jobLogEntry", columns: ["serverID"])
     }
 
     private static func addQueueAndJobLog(_ database: Database) throws {

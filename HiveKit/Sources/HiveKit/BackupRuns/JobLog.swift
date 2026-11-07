@@ -1,7 +1,7 @@
 import Foundation
 
 /// One run in the job log.
-public struct JobLogEntry: Codable, Hashable, Identifiable, Sendable {
+public struct RunLogEntry: Codable, Hashable, Identifiable, Sendable {
     public let id: Int64
     public let serverID: UUID
     /// The names when it ran, so the entry reads the same after a rename or once the job is removed.
@@ -28,6 +28,19 @@ public enum RunTrigger: String, Codable, Hashable, Sendable {
     /// Hive stopped or restarted during the job's last run. A run queued this way isn't queued again
     /// if it's interrupted too, so a run that brings Hive down can't do it on every start.
     case afterInterruption
+}
+
+/// One entry in the job log: a run, or the snapshots retention removed from one job.
+public enum JobLogEntry: Codable, Hashable, Identifiable, Sendable {
+    case run(RunLogEntry)
+    case removal(RemovalLogEntry)
+
+    public var id: Int64 {
+        switch self {
+        case .run(let entry): entry.id
+        case .removal(let entry): entry.id
+        }
+    }
 }
 
 public struct JobLogPage: Codable, Hashable, Sendable {

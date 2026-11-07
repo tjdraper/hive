@@ -45,7 +45,7 @@ struct InterruptedRunTests {
         await fixture.runs.waitUntilIdle()
 
         // Assert
-        let entries = try await fixture.jobLog().entries
+        let entries = try await fixture.jobLog().runs
         let marked = try #require(entries.first { $0.id == interrupted })
         #expect(marked.run.failure == .interrupted)
         #expect(marked.run.finishedAt == fixture.clock.now)
@@ -68,7 +68,7 @@ struct InterruptedRunTests {
         await fixture.runs.waitUntilIdle()
 
         // Assert
-        let entries = try await fixture.jobLog().entries
+        let entries = try await fixture.jobLog().runs
         #expect(entries.map(\.id) == [interrupted])
         #expect(entries.first?.run.failure == .interrupted)
         #expect(try await fixture.status().state == .idle)
@@ -88,7 +88,7 @@ struct InterruptedRunTests {
         await fixture.runs.waitUntilIdle()
 
         // Assert
-        let entries = try await fixture.jobLog().entries
+        let entries = try await fixture.jobLog().runs
         #expect(entries.map(\.trigger) == [.scheduled])
         #expect(entries.first?.run.failure == nil)
     }

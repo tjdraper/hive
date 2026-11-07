@@ -20,7 +20,7 @@ struct StartupDriveWaitTests {
         }
 
         // Act
-        let entry = try await fixture.runEntry()
+        let entry = try await fixture.runEntry(after: 60)
 
         // Assert
         #expect(entry.run.failure == nil)

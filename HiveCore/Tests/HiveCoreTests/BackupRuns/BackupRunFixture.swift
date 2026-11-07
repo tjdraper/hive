@@ -112,9 +112,10 @@ struct BackupRunFixture {
         try await runEntry().run
     }
 
-    /// The run's entry in the job log.
-    func runEntry() async throws -> JobLogEntry {
-        api.signIn.clock.advance(by: 60)
+    /// The run's entry in the job log. By default each run is a day after the last, so the job's tiers
+    /// keep them all.
+    func runEntry(after interval: TimeInterval = 24 * 60 * 60) async throws -> RunLogEntry {
+        api.signIn.clock.advance(by: interval)
         let started = try await api.send(.post, HiveEndpoint.run(ofJob: job.id))
         guard started.status == .accepted else { throw APIFixtureError.unexpectedStatus(started.status) }
         await api.api.runs.waitUntilIdle()
@@ -204,6 +205,16 @@ extension BackupRunFixture {
             try await Task.sleep(for: .milliseconds(10))
         }
         throw RunWaitError.timedOut
+    }
+}
+
+extension JobLogPage {
+    /// Its runs, leaving out what retention removed.
+    var runs: [RunLogEntry] {
+        entries.compactMap { entry in
+            guard case .run(let run) = entry else { return nil }
+            return run
+        }
     }
 }
 

@@ -17,6 +17,7 @@ Built with you:
 - **Hive's checks** (C1) shown beside the field they're about: a 422 lists every problem with its field, its place in a list and a reason, never the value
 - **Lowering the quota or tiers** goes through D4's confirmation once D4 is done
 
+- **From C6:** a new job starts with `RetentionTiers.suggested`, 30 daily and 12 monthly, and a new server with no quota.
 - **From C4:** the official Postgres image trusts every connection from `127.0.0.1` by default, so a wrong password there still dumps. Say so beside a Postgres database's password, so nobody takes a working dump as proof the password is right.
 
 **Done when:** in the installed builds, the test server's directories and all three databases are set up as a job entirely in Beekeeper, and its first scheduled run makes a complete snapshot.

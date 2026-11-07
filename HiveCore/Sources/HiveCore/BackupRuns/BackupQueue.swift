@@ -36,7 +36,7 @@ struct BackupQueue: Sendable {
     /// Run Now is recorded in the audit log, as `deviceID`, in the same transaction.
     func add(jobID: UUID, trigger: RunTrigger, at date: Date, by deviceID: UUID? = nil) throws -> Addition {
         try database.writer.write { database in
-            guard let names = try Self.names(ofJob: jobID, in: database) else { return .unknownJob }
+            guard let names = try JobNames.fetch(jobID: jobID, in: database) else { return .unknownJob }
             guard try !QueuedRunRecord.exists(database, key: jobID) else { return .alreadyQueued }
             try QueuedRunRecord(jobID: jobID, trigger: trigger, queuedAt: date, logEntryID: nil).insert(database)
             if let deviceID {
@@ -51,7 +51,7 @@ struct BackupQueue: Sendable {
     func cancel(jobID: UUID, by deviceID: UUID, at date: Date) throws -> Cancellation {
         try database.writer.write { database in
             guard let queued = try QueuedRunRecord.fetchOne(database, key: jobID),
-                  let names = try Self.names(ofJob: jobID, in: database)
+                  let names = try JobNames.fetch(jobID: jobID, in: database)
             else { return .notQueued }
             let event = AuditEvent.backupRunCancelled(jobID: jobID, serverName: names.server, jobName: names.job)
             try AuditLog.record(event, by: deviceID, at: date, in: database)
@@ -76,7 +76,7 @@ struct BackupQueue: Sendable {
     func begin(_ queued: QueuedRunRecord, at date: Date) throws -> JobLogRecord? {
         try database.writer.write { database in
             guard var running = try QueuedRunRecord.fetchOne(database, key: queued.jobID) else { return nil }
-            guard let names = try Self.names(ofJob: queued.jobID, in: database) else {
+            guard let names = try JobNames.fetch(jobID: queued.jobID, in: database) else {
                 try running.delete(database)
                 return nil
             }
@@ -140,24 +140,5 @@ struct BackupQueue: Sendable {
     /// Each queued job, and whether it's running.
     func all() throws -> [QueuedRunRecord] {
         try database.writer.read { try QueuedRunRecord.fetchAll($0) }
-    }
-
-    private struct JobNames {
-        let serverID: UUID
-        let server: String
-        let job: String
-    }
-
-    private static func names(ofJob jobID: UUID, in database: Database) throws -> JobNames? {
-        guard let row = try Row.fetchOne(
-            database,
-            sql: """
-            SELECT server.id AS serverID, server.name AS serverName, backupJob.name AS jobName
-            FROM backupJob JOIN server ON server.id = backupJob.serverID
-            WHERE backupJob.id = ?
-            """,
-            arguments: [jobID]
-        ) else { return nil }
-        return JobNames(serverID: row["serverID"], server: row["serverName"], job: row["jobName"])
     }
 }

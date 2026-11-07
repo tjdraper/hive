@@ -71,6 +71,7 @@ struct PartialSnapshotFactory: Sendable {
             // started: it could hold a directory the job no longer has, or a server's link where one of
             // the new directories needs a folder.
             if holdsOnly(job, in: url), let destinations = try? destinations(for: job, in: url) {
+                try catalog.pickUp(record.id)
                 return PartialSnapshot(record: record, url: url, destinations: destinations, isPickedUp: true)
             }
         }

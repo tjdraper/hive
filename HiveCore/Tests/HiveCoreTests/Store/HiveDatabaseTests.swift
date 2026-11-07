@@ -143,4 +143,58 @@ struct HiveDatabaseTests {
         // Assert
         #expect(try HiveSettingsStore(database: database, defaultPort: 4483).settings().name == "Hive")
     }
+
+    @Test("A store from before retention keeps its job log entries, their IDs and the run going, with its snapshots uncounted")
+    func migratesFromJobLogSchema() throws {
+        // Arrange
+        let writer = try HiveDatabase.inMemory(migratedUpTo: "Add schedules, the job queue and the job log")
+        let (serverID, jobID, snapshotID) = (UUID(), UUID(), UUID())
+        try writer.write { database in
+            try database.execute(
+                sql: "INSERT INTO server (id, name, host, port, user, createdAt) VALUES (?, 'Web', 'web.example.com', 22, 'root', ?)",
+                arguments: [serverID, Date()]
+            )
+            try database.execute(
+                sql: """
+                INSERT INTO backupJob (id, serverID, name, dailySnapshots, monthlySnapshots, createdAt)
+                VALUES (?, ?, 'Site', 14, 12, ?)
+                """,
+                arguments: [jobID, serverID, Date()]
+            )
+            for id in [4, 9] {
+                try database.execute(
+                    sql: """
+                    INSERT INTO jobLogEntry (id, jobID, serverID, serverName, jobName, "trigger", startedAt, finishedAt,
+                        pickedUpPartialSnapshot, directories, databases)
+                    VALUES (?, ?, ?, 'Web', 'Site', 'scheduled', ?, ?, 0, '[]', '[]')
+                    """,
+                    arguments: [id, jobID, serverID, Date(), id == 4 ? Date() : nil]
+                )
+            }
+            try database.execute(
+                sql: "INSERT INTO queuedRun (jobID, \"trigger\", queuedAt, logEntryID) VALUES (?, 'scheduled', ?, 9)",
+                arguments: [jobID, Date()]
+            )
+            try database.execute(
+                sql: """
+                INSERT INTO snapshot (id, jobID, serverID, driveUUID, serverFolder, jobFolder, folder, state, startedAt, completedAt)
+                VALUES (?, ?, ?, 'drive', 'Web', 'Site', '2026-11-06T120000Z', 'complete', ?, ?)
+                """,
+                arguments: [snapshotID, jobID, serverID, Date(), Date()]
+            )
+        }
+
+        // Act
+        let database = try HiveDatabase.migrate(writer, defaultHiveName: "Ignored")
+
+        // Assert
+        let page = try JobLog(database: database).page(before: nil, limit: 10)
+        #expect(page.entries.map(\.id) == [9, 4])
+        #expect(try BackupQueue(database: database).all().map(\.logEntryID) == [9])
+        let snapshot = try #require(try database.writer.read { try SnapshotRecord.fetchOne($0, key: snapshotID) })
+        #expect(!snapshot.isCounted)
+        #expect(snapshot.freesBytes == nil)
+        #expect(try SnapshotSpaceStore(database: database).usedBytes(ofJob: jobID, onDrive: "drive") == nil)
+        #expect(try !RetentionStore(database: database).isPaused())
+    }
 }
