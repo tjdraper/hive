@@ -26,6 +26,8 @@ struct HiveSettingsView: View {
 
     private func form(state: HiveSettingsState, draft: Binding<SettingsDraft>) -> some View {
         Form {
+            BackupDriveSection(link: link)
+
             Section {
                 TextField("Name", text: draft.name)
             }
@@ -48,26 +50,24 @@ struct HiveSettingsView: View {
             } header: {
                 Text("Network")
             } footer: {
-                Text(networkFooter(state: state, draft: draft.wrappedValue))
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                HStack {
-                    if let failure {
-                        Text(failure)
-                            .foregroundStyle(.red)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(networkFooter(state: state, draft: draft.wrappedValue))
+                        .foregroundStyle(.secondary)
+                    // Saves the name too, which has no footer of its own.
+                    HStack {
+                        if let failure {
+                            Text(failure)
+                                .foregroundStyle(.red)
+                        }
+                        Spacer()
+                        Button("Revert") { self.draft = SettingsDraft(state.settings) }
+                            .disabled(!isChanged(state) || isSaving)
+                        Button("Save") { Task { await save(draft.wrappedValue, replacing: state.settings) } }
+                            .keyboardShortcut("s")
+                            .disabled(!isChanged(state) || isSaving)
                     }
-                    Spacer()
-                    Button("Revert") { self.draft = SettingsDraft(state.settings) }
-                        .disabled(!isChanged(state) || isSaving)
-                    Button("Save") { Task { await save(draft.wrappedValue, replacing: state.settings) } }
-                        .keyboardShortcut("s")
-                        .disabled(!isChanged(state) || isSaving)
                 }
             }
-
-            BackupDriveSection(link: link)
         }
         .formStyle(.grouped)
     }

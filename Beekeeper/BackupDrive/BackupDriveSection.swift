@@ -13,9 +13,6 @@ struct BackupDriveSection: View {
         Section {
             if let state {
                 chosen(state.chosen)
-                    .sheet(isPresented: $isChoosing) {
-                        BackupDriveChooser(link: link, state: state) { self.state = $0 }
-                    }
             } else if let failure {
                 Text(failure)
                     .foregroundStyle(.secondary)
@@ -32,24 +29,25 @@ struct BackupDriveSection: View {
             )
             .foregroundStyle(.secondary)
         }
+        .sheet(isPresented: $isChoosing) {
+            if let state {
+                BackupDriveChooser(link: link, state: state) { self.state = $0 }
+            }
+        }
         .task { await load() }
     }
 
     @ViewBuilder private func chosen(_ chosen: ChosenBackupDrive?) -> some View {
         LabeledContent("Drive") {
-            HStack {
-                if let chosen {
-                    Text(chosen.drive.name)
-                    if let problem = chosen.problem {
-                        Label(problem.chosenDriveMessage, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                    }
-                } else {
-                    Text("None chosen")
-                        .foregroundStyle(.secondary)
-                }
+            HStack(spacing: 12) {
+                Text(chosen?.drive.name ?? "None chosen")
+                    .foregroundStyle(.secondary)
                 Button(chosen == nil ? "Choose…" : "Change…") { isChoosing = true }
             }
+        }
+        if let problem = chosen?.problem {
+            Label(problem.chosenDriveMessage, systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
         }
     }
 

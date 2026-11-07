@@ -20,4 +20,6 @@ Built with you:
 - **From C6:** a new job starts with `RetentionTiers.suggested`, 30 daily and 12 monthly, and a new server with no quota.
 - **From C4:** the official Postgres image trusts every connection from `127.0.0.1` by default, so a wrong password there still dumps. Say so beside a Postgres database's password, so nobody takes a working dump as proof the password is right.
 
+- **From D1:** a server's jobs can nest under it in the sidebar, which already nests servers under each Hive, and the toolbar path (`LocationPath`) takes a third part. `EditServerSheet` sends the server's quota back unchanged; the quota field goes there.
+
 **Done when:** in the installed builds, the test server's directories and all three databases are set up as a job entirely in Beekeeper, and its first scheduled run makes a complete snapshot.

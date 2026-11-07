@@ -27,4 +27,6 @@ References like §6 point to [00-Info.md](00-Info.md). Read the brainstorm's "Ha
 - Each confirmed route refuses a request without a signature, with one for a different action or object, and with a reused nonce
 - Lowering a quota without confirmation removes nothing
 
+- **From D1:** `EditServerSheet` already warns when the host, port or user changes; the confirmation goes on its Save. The server page offers "Make Hive's Key" only for a server with no key, which needs no confirmation.
+
 **Done when:** in the installed builds, deleting a snapshot asks for Touch ID and cancelling leaves it; lowering the test server's quota asks first and says what it will remove; a new host key on the test server shows in Beekeeper, and confirming it with Touch ID lets backups run again; regenerating the identity leaves Beekeeper on the Hive Mac paired again; and the tests pass.

@@ -24,4 +24,6 @@ Built with you:
 - **The audit log** (B3) next to it
 - **A warning when the Hive Mac is set to sleep** (C5)
 
+- **From D1:** the sidebar's server rows and the Overview's server list show only "Not set up yet" for now; status goes beside them. The Overview polls `/backup-drive` every 15 seconds for its warning, and `MainWindow` refreshes every Hive every 30, both of which the WebSocket can replace.
+
 **Done when:** in the installed builds, a run started with Run Now shows its progress live in Beekeeper and lands in the job log; Cancel stops it; Beekeeper picks up again after the daemon restarts; and a job's snapshots list matches the test drive.
