@@ -35,6 +35,9 @@ enum SidebarItem: Hashable {
 struct MainWindow: View {
     /// Often enough that the sidebar notices a Hive going offline or coming back without a click.
     private static let refreshInterval = Duration.seconds(30)
+    /// A Hive that didn't answer is often only starting, such as just after an update or a restart, so
+    /// it's asked again soon, then less often while it stays away.
+    private static let firstRetry = Duration.seconds(1)
 
     @Environment(HiveListStore.self) private var store
     @State private var selection: SidebarItem?
@@ -58,9 +61,16 @@ struct MainWindow: View {
             }
         }
         .task {
+            var retry = Self.firstRetry
             while !Task.isCancelled {
                 await store.refreshAll()
-                try? await Task.sleep(for: Self.refreshInterval)
+                if store.hasOfflineHive {
+                    try? await Task.sleep(for: retry)
+                    retry = min(retry * 2, Self.refreshInterval)
+                } else {
+                    retry = Self.firstRetry
+                    try? await Task.sleep(for: Self.refreshInterval)
+                }
             }
         }
         .onAppear {

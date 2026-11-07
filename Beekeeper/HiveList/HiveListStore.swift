@@ -34,6 +34,10 @@ final class HiveListStore {
         serverLists[id]
     }
 
+    var hasOfflineHive: Bool {
+        hives.contains { links[$0.id]?.status == .offline }
+    }
+
     func refreshAll() async {
         for hive in hives {
             await refresh(hive.id)
