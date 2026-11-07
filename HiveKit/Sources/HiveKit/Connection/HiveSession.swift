@@ -56,6 +56,11 @@ public actor HiveSession {
         try await decoded(send(method: "POST", path: path, body: JSONEncoder().encode(body)))
     }
 
+    /// For an action that takes nothing, such as a scan or a test.
+    public func post<Response: Decodable>(_ path: String, as _: Response.Type = Response.self) async throws -> Response {
+        try await decoded(send(method: "POST", path: path))
+    }
+
     public func delete(_ path: String) async throws {
         _ = try await checked(send(method: "DELETE", path: path))
     }

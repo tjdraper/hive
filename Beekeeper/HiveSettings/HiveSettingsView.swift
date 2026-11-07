@@ -66,6 +66,8 @@ struct HiveSettingsView: View {
                         .disabled(!isChanged(state) || isSaving)
                 }
             }
+
+            BackupDriveSection(link: link)
         }
         .formStyle(.grouped)
     }

@@ -17,7 +17,7 @@ struct SSHKeyRoutesTests {
         return try SSHKeyPair(seed: fixture.sealer.open(SealedSecret(data: sealed)))
     }
 
-    @Test("A new server gets its own key, whose public half is shown with lines for authorized_keys")
+    @Test("A new server gets its own key, whose public half is shown with the Hive's name and the Mac's addresses")
     func newServerHasKey() async throws {
         // Arrange
         let server = try await fixture.addServer()
@@ -31,8 +31,8 @@ struct SSHKeyRoutesTests {
         #expect(key.publicKey == stored.line)
         #expect(key.fingerprint == stored.fingerprint)
         #expect(server.sshKeyFingerprint == stored.fingerprint)
-        #expect(key.authorizedKeysLine == "restrict \(stored.line) Hive Test Hive")
-        #expect(key.restrictedAuthorizedKeysLine == "restrict,from=\"100.64.0.7,192.168.1.20\" \(stored.line) Hive Test Hive")
+        #expect(key.comment == "Hive Test Hive")
+        #expect(key.macAddresses == fixture.addresses.current)
     }
 
     @Test("Each server has a key of its own")
@@ -49,8 +49,8 @@ struct SSHKeyRoutesTests {
         #expect(first.sshKeyFingerprint != second.sshKeyFingerprint)
     }
 
-    @Test("With no address another machine could see, there's no restricted line")
-    func noAddresses() async throws {
+    @Test("The Mac's addresses are read when the key is asked for")
+    func addressesReadFresh() async throws {
         // Arrange
         let server = try await fixture.addServer()
         fixture.addresses.set([])
@@ -59,7 +59,7 @@ struct SSHKeyRoutesTests {
         let key = try await fixture.send(.get, HiveEndpoint.sshKey(onServer: server.id)).decoded(as: ServerSSHKey.self)
 
         // Assert
-        #expect(key.restrictedAuthorizedKeysLine == nil)
+        #expect(key.macAddresses.isEmpty)
     }
 
     @Test("Making a new key replaces the old one, with an audit entry naming both fingerprints")

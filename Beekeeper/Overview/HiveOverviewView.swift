@@ -4,22 +4,74 @@ import SwiftUI
 struct HiveOverviewView: View {
     let hive: KnownHive
     let link: HiveLink
+    let servers: ServerList
+    let onAddServer: () -> Void
+    let onOpenSettings: () -> Void
+    let onSelectServer: (UUID) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if let overview = link.overview, overview.fullDiskAccess != .granted {
                 FullDiskAccessWarning(isOnThisMac: hive.isOnThisMac)
             }
-            ContentUnavailableView(
-                "No Servers Yet",
-                systemImage: "server.rack",
-                description: Text("Servers this Hive backs up will appear here.")
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            BackupDriveWarning(link: link, onOpenSettings: onOpenSettings)
+            if servers.servers.isEmpty {
+                ContentUnavailableView {
+                    Label("No Servers Yet", systemImage: "server.rack")
+                } description: {
+                    Text("Add a server for this Hive to back up.")
+                } actions: {
+                    Button("Add Server…", action: onAddServer)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ServerOverviewList(servers: servers.servers, onSelect: onSelectServer)
+            }
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .task { await link.refresh() }
+        .task {
+            await link.refresh()
+            await servers.refresh()
+        }
+    }
+}
+
+private struct ServerOverviewList: View {
+    let servers: [Server]
+    let onSelect: (UUID) -> Void
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(servers) { server in
+                    Button { onSelect(server.id) } label: {
+                        HStack {
+                            Label(server.name, systemImage: "server.rack")
+                            Spacer()
+                            if server.isSetUp {
+                                Text(server.connection.host)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Label("Not set up yet", systemImage: "exclamationmark.circle")
+                                    .foregroundStyle(.orange)
+                            }
+                            Image(systemName: "chevron.forward")
+                                .foregroundStyle(.tertiary)
+                        }
+                        .contentShape(.rect)
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                    if server.id != servers.last?.id {
+                        Divider()
+                    }
+                }
+            }
+            .padding(.horizontal, 4)
+        } label: {
+            Text("Servers")
+        }
     }
 }
 

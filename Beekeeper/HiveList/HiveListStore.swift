@@ -10,6 +10,7 @@ final class HiveListStore {
 
     private(set) var hives: [KnownHive]
     private var links: [UUID: HiveLink] = [:]
+    private var serverLists: [UUID: ServerList] = [:]
     private let file: HiveListFile
     private let keychain = DeviceKeychain()
 
@@ -17,7 +18,7 @@ final class HiveListStore {
         self.file = file
         hives = file.load()
         for hive in hives {
-            links[hive.id] = HiveLink(hive: hive, keychain: keychain)
+            track(hive)
         }
     }
 
@@ -29,12 +30,27 @@ final class HiveListStore {
         links[id]
     }
 
+    func servers(for id: UUID) -> ServerList? {
+        serverLists[id]
+    }
+
     func refreshAll() async {
         for hive in hives {
-            guard let link = links[hive.id] else { continue }
-            await link.refresh()
-            if let name = link.overview?.name { rename(hive.id, to: name) }
+            await refresh(hive.id)
         }
+    }
+
+    private func refresh(_ id: UUID) async {
+        guard let link = links[id] else { return }
+        await link.refresh()
+        if let name = link.overview?.name { rename(id, to: name) }
+        if link.status == .connected { await serverLists[id]?.refresh() }
+    }
+
+    private func track(_ hive: KnownHive) {
+        let link = HiveLink(hive: hive, keychain: keychain)
+        links[hive.id] = link
+        serverLists[hive.id] = ServerList(link: link)
     }
 
     /// Keeps the name the Hive gives itself, so the list reads right while it's offline.
@@ -56,6 +72,7 @@ final class HiveListStore {
     func remove(_ id: UUID) {
         hives.removeAll { $0.id == id }
         links[id] = nil
+        serverLists[id] = nil
         try? keychain.delete(hiveID: id)
         file.save(hives)
     }
@@ -76,15 +93,12 @@ final class HiveListStore {
         } else {
             let hive = KnownHive(id: pairing.hiveID, name: "This Mac's Hive", addresses: [address], isOnThisMac: true)
             hives.append(hive)
-            links[hive.id] = HiveLink(hive: hive, keychain: keychain)
+            track(hive)
         }
         file.save(hives)
         Self.logger.notice("Saved this Mac's Hive in the list")
 
-        if let link = links[pairing.hiveID] {
-            await link.refresh()
-            if let name = link.overview?.name { rename(pairing.hiveID, to: name) }
-        }
+        await refresh(pairing.hiveID)
         return pairing.hiveID
     }
     #endif

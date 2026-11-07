@@ -88,13 +88,16 @@ final class FakeSSH: SSHRunning, HostKeyScanning {
 
 /// The Mac's addresses, as the fixture's Hive sees them.
 final class FakeMacAddresses: Sendable {
-    private let addresses = Mutex(["100.64.0.7", "192.168.1.20"])
+    private let addresses = Mutex([
+        NetworkInterfaceAddress(interface: "en0", address: "192.168.1.20"),
+        NetworkInterfaceAddress(interface: "utun4", address: "100.64.0.7"),
+    ])
 
-    var current: [String] {
+    var current: [NetworkInterfaceAddress] {
         addresses.withLock { $0 }
     }
 
-    func set(_ new: [String]) {
+    func set(_ new: [NetworkInterfaceAddress]) {
         addresses.withLock { $0 = new }
     }
 }

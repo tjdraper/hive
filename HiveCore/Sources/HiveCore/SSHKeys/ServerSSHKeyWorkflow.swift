@@ -10,7 +10,7 @@ struct ServerSSHKeyWorkflow: Sendable {
     let sealer: SecretSealer
     let settings: HiveSettingsStore
     /// The Hive Mac's addresses another machine could see, read fresh each time.
-    let addresses: @Sendable () -> [String]
+    let addresses: @Sendable () -> [NetworkInterfaceAddress]
     let now: @Sendable () -> Date
 
     /// Nil when no server has that ID, or the server has no key yet.
@@ -29,13 +29,11 @@ struct ServerSSHKeyWorkflow: Sendable {
     }
 
     private func serverSSHKey(_ key: OpenSSHPublicKey) throws -> ServerSSHKey {
-        let comment = try AuthorizedKeysLine.comment(hiveName: settings.settings().name)
-        let addresses = addresses()
-        return ServerSSHKey(
+        try ServerSSHKey(
             publicKey: key.line,
             fingerprint: key.fingerprint,
-            authorizedKeysLine: AuthorizedKeysLine.line(for: key, comment: comment),
-            restrictedAuthorizedKeysLine: addresses.isEmpty ? nil : AuthorizedKeysLine.line(for: key, comment: comment, from: addresses)
+            comment: "Hive \(settings.settings().name)",
+            macAddresses: addresses()
         )
     }
 }

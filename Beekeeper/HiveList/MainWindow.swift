@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// A Hive's own pages, switched in the toolbar when the Hive is selected in the sidebar.
 enum HivePage: String, CaseIterable, Identifiable {
     case overview
     case devices
@@ -18,20 +19,17 @@ enum HivePage: String, CaseIterable, Identifiable {
         case .settings: "Settings"
         }
     }
-
-    var systemImage: String {
-        switch self {
-        case .overview: "house"
-        case .devices: "laptopcomputer.and.iphone"
-        case .auditLog: "list.bullet.rectangle"
-        case .settings: "gearshape"
-        }
-    }
 }
 
-struct SidebarItem: Hashable {
-    let hiveID: UUID
-    let page: HivePage
+enum SidebarItem: Hashable {
+    case hive(UUID)
+    case server(hiveID: UUID, serverID: UUID)
+
+    var hiveID: UUID {
+        switch self {
+        case .hive(let id), .server(let id, _): id
+        }
+    }
 }
 
 struct MainWindow: View {
@@ -40,16 +38,25 @@ struct MainWindow: View {
 
     @Environment(HiveListStore.self) private var store
     @State private var selection: SidebarItem?
+    @State private var page = HivePage.overview
+    @State private var addingServer: AddServerRequest?
 
     var body: some View {
         NavigationSplitView {
-            HiveSidebar(selection: $selection)
+            HiveSidebar(selection: $selection, onAddServer: addServer)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240)
         } detail: {
             detail
         }
         // A floor for the window, so no page's content can make its smallest size larger than the screen.
         .frame(minWidth: 640, minHeight: 400)
+        .sheet(item: $addingServer) { request in
+            if let link = store.link(for: request.hiveID), let servers = store.servers(for: request.hiveID) {
+                AddServerSheet(link: link, servers: servers) { serverID in
+                    selection = .server(hiveID: request.hiveID, serverID: serverID)
+                }
+            }
+        }
         .task {
             while !Task.isCancelled {
                 await store.refreshAll()
@@ -58,20 +65,44 @@ struct MainWindow: View {
         }
         .onAppear {
             if selection == nil, let first = store.hives.first {
-                selection = SidebarItem(hiveID: first.id, page: .overview)
+                selection = .hive(first.id)
             }
         }
     }
 
     @ViewBuilder private var detail: some View {
-        if let selection, let hive = store.hive(selection.hiveID), let link = store.link(for: hive.id) {
-            HiveDetail(hive: hive, link: link, page: selection.page)
+        if let selection, let hive = store.hive(selection.hiveID), let link = store.link(for: hive.id),
+           let servers = store.servers(for: hive.id) {
+            switch selection {
+            case .hive:
+                HiveDetail(hive: hive, link: link, servers: servers, page: $page, selection: $selection) {
+                    addServer(to: hive.id)
+                }
+            case .server(_, let serverID):
+                ServerDetail(hive: hive, link: link, servers: servers, serverID: serverID) {
+                    self.selection = .hive(hive.id)
+                }
+                .id(serverID)
+            }
         } else if store.hives.isEmpty {
             EmptyHiveList { hiveID in
-                selection = SidebarItem(hiveID: hiveID, page: .overview)
+                selection = .hive(hiveID)
             }
         } else {
             ContentUnavailableView("Choose a Hive", systemImage: "hexagon")
         }
+    }
+
+    private func addServer(to hiveID: UUID) {
+        addingServer = AddServerRequest(hiveID: hiveID)
+    }
+}
+
+/// Which Hive the Add Server sheet adds to.
+struct AddServerRequest: Identifiable {
+    let hiveID: UUID
+
+    var id: UUID {
+        hiveID
     }
 }

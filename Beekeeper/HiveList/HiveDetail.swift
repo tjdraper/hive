@@ -4,25 +4,53 @@ import SwiftUI
 struct HiveDetail: View {
     let hive: KnownHive
     let link: HiveLink
-    let page: HivePage
+    let servers: ServerList
+    @Binding var page: HivePage
+    @Binding var selection: SidebarItem?
+    let onAddServer: () -> Void
 
     var body: some View {
-        content
-            .navigationTitle(hive.name)
-        #if os(macOS)
-            .navigationSubtitle(page.title)
-        #endif
-    }
-
-    @ViewBuilder private var content: some View {
-        switch link.status {
-        case .connected:
+        HiveConnectionGate(hive: hive, link: link) {
             switch page {
-            case .overview: HiveOverviewView(hive: hive, link: link)
+            case .overview:
+                HiveOverviewView(
+                    hive: hive,
+                    link: link,
+                    servers: servers,
+                    onAddServer: onAddServer,
+                    onOpenSettings: { page = .settings },
+                    onSelectServer: { selection = .server(hiveID: hive.id, serverID: $0) }
+                )
             case .devices: DeviceListView(hive: hive, link: link)
             case .auditLog: AuditLogView(link: link)
             case .settings: HiveSettingsView(hive: hive, link: link)
             }
+        }
+        .navigationTitle(hive.name)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("Page", selection: $page) {
+                    ForEach(HivePage.allCases) { page in
+                        Text(page.title).tag(page)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+        }
+    }
+}
+
+/// Shows `content` while Beekeeper is signed in to the Hive, and otherwise why it isn't.
+struct HiveConnectionGate<Content: View>: View {
+    let hive: KnownHive
+    let link: HiveLink
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        switch link.status {
+        case .connected:
+            content()
         case .connecting:
             ProgressView("Connecting…")
                 .task { await link.refresh() }

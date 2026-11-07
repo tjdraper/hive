@@ -15,17 +15,47 @@ protocol HostKeyScanning: Sendable {
 /// server could answer in its place, which is why a person checks the fingerprint before it's recorded.
 struct HostKeyScanner: HostKeyScanning {
     static let timeoutSeconds = 10
+    /// Each address can take the whole timeout, so a name with many stops being tried after this many.
+    static let mostAddressesTried = 4
 
     var tools = SSHTools()
 
     func scan(_ connection: ServerConnection) async throws -> HostKeyScanOutcome {
+        // ssh-keyscan connects only to the first address a name resolves to, unlike ssh, which tries each.
+        // `localhost` resolves to ::1 first, so a server listening only on 127.0.0.1 looked unreachable.
+        let addresses = await HostAddressResolver.addresses(of: connection.host)
+        let tried = addresses.isEmpty ? [connection.host] : Array(addresses.prefix(Self.mostAddressesTried))
+        return try await Self.firstFound(trying: tried) { address in
+            try await scan(address, port: connection.port)
+        }
+    }
+
+    /// The first key found, or the most telling failure: a server that answered without a usable key
+    /// says more than an address that didn't answer.
+    static func firstFound(
+        trying addresses: [String],
+        scan: (String) async throws -> HostKeyScanOutcome
+    ) async rethrows -> HostKeyScanOutcome {
+        var failure = ConnectionFailure.unreachable
+        for address in addresses {
+            switch try await scan(address) {
+            case .found(let key):
+                return .found(key)
+            case .failed(let reason):
+                if reason != .unreachable { failure = reason }
+            }
+        }
+        return .failed(failure)
+    }
+
+    private func scan(_ address: String, port: Int) async throws -> HostKeyScanOutcome {
         let result = try await ChildProcess(
             executableURL: tools.keyscan,
             arguments: [
                 "-T", String(Self.timeoutSeconds),
-                "-p", String(connection.port),
+                "-p", String(port),
                 "-t", "ed25519,ecdsa,rsa",
-                "--", connection.host,
+                "--", address,
             ],
             environment: SSHTools.environment()
         ).run()

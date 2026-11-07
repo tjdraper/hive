@@ -74,18 +74,4 @@ struct SSHKeyPairTests {
         #expect(OpenSSHPublicKey(line: "ssh-ed25519 not-base64") == nil)
         #expect(OpenSSHPublicKey(line: "ssh-ed25519") == nil)
     }
-
-    @Test("The authorized_keys line is restricted, and limited to the given addresses")
-    func authorizedKeysLine() {
-        // Arrange
-        let key = SSHKeyPair().publicKey
-
-        // Act
-        let open = AuthorizedKeysLine.line(for: key, comment: "Hive Studio")
-        let limited = AuthorizedKeysLine.line(for: key, comment: "Hive Studio", from: ["100.64.0.7", "fd7a:115c:a1e0::7"])
-
-        // Assert
-        #expect(open == "restrict \(key.line) Hive Studio")
-        #expect(limited == "restrict,from=\"100.64.0.7,fd7a:115c:a1e0::7\" \(key.line) Hive Studio")
-    }
 }
