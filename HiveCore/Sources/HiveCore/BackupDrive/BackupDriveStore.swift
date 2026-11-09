@@ -23,7 +23,7 @@ struct BackupDriveStore: Sendable {
         }
     }
 
-    private static func chosen(in database: Database) throws -> BackupDriveIdentity? {
+    static func chosen(in database: Database) throws -> BackupDriveIdentity? {
         guard let row = try Row.fetchOne(database, sql: "SELECT backupDriveUUID, backupDriveName FROM hive"),
               let uuid = (row["backupDriveUUID"] as String?).flatMap(UUID.init(uuidString:))
         else { return nil }

@@ -6,10 +6,12 @@ struct HiveSidebar: View {
     @Environment(HiveListStore.self) private var store
     @Binding var selection: SidebarItem?
     let onAddServer: (UUID) -> Void
+    let onAddJob: (_ serverID: UUID, _ hiveID: UUID) -> Void
 
-    /// Hives are open until closed, so a new one shows its servers.
+    /// Hives and servers are open until closed, so a new one shows what's under it.
     @State private var collapsed: Set<UUID> = []
     @State private var editRequest: ServerEditRequest?
+    @State private var jobEditRequest: JobEditRequest?
 
     var body: some View {
         List(selection: $selection) {
@@ -17,15 +19,7 @@ struct HiveSidebar: View {
                 DisclosureGroup(isExpanded: expanded(hive.id)) {
                     if let servers = store.servers(for: hive.id) {
                         ForEach(servers.servers) { server in
-                            NavigationLink(value: SidebarItem.server(hiveID: hive.id, serverID: server.id)) {
-                                ServerSidebarRow(server: server)
-                            }
-                            .contextMenu {
-                                Button("Edit…") { editRequest = ServerEditRequest(action: .edit, server: server, servers: servers) }
-                                Button("Remove…", role: .destructive) {
-                                    editRequest = ServerEditRequest(action: .remove, server: server, servers: servers)
-                                }
-                            }
+                            serverRow(server, in: servers, hiveID: hive.id)
                         }
                     }
                 } label: {
@@ -37,10 +31,16 @@ struct HiveSidebar: View {
         }
         .listStyle(.sidebar)
         .serverEditing($editRequest) { removed in
-            if case .server(let hiveID, removed.id) = selection { selection = .hive(hiveID) }
+            if let selection, selection.serverID == removed.id { self.selection = .hive(selection.hiveID) }
+        }
+        .jobEditing($jobEditRequest) { removed in
+            if case .job(let hiveID, let serverID, removed.id) = selection { selection = .server(hiveID: hiveID, serverID: serverID) }
         }
         .onChange(of: selection) { _, selected in
-            if case .server(let hiveID, _) = selected { collapsed.remove(hiveID) }
+            if let selected, let serverID = selected.serverID {
+                collapsed.remove(selected.hiveID)
+                if case .job = selected { collapsed.remove(serverID) }
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
@@ -53,6 +53,43 @@ struct HiveSidebar: View {
             }
             .buttonStyle(.borderless)
             .padding(10)
+        }
+    }
+
+    @ViewBuilder
+    private func serverRow(_ server: Server, in servers: ServerList, hiveID: UUID) -> some View {
+        let jobs = servers.jobs.jobs(onServer: server.id)
+        let link = NavigationLink(value: SidebarItem.server(hiveID: hiveID, serverID: server.id)) {
+            ServerSidebarRow(server: server)
+        }
+        .contextMenu {
+            Button("Add Job…") { onAddJob(server.id, hiveID) }
+            Divider()
+            Button("Edit…") { editRequest = ServerEditRequest(action: .edit, server: server, servers: servers) }
+            Button("Remove…", role: .destructive) {
+                editRequest = ServerEditRequest(action: .remove, server: server, servers: servers)
+            }
+        }
+
+        if jobs.isEmpty {
+            link
+        } else {
+            DisclosureGroup(isExpanded: expanded(server: server.id, hiveID: hiveID)) {
+                ForEach(jobs) { job in
+                    NavigationLink(value: SidebarItem.job(hiveID: hiveID, serverID: server.id, jobID: job.id)) {
+                        Label(job.name, systemImage: "archivebox")
+                            .lineLimit(1)
+                    }
+                    .contextMenu {
+                        Button("Edit…") { jobEditRequest = JobEditRequest(action: .edit, job: job, jobs: servers.jobs) }
+                        Button("Remove…", role: .destructive) {
+                            jobEditRequest = JobEditRequest(action: .remove, job: job, jobs: servers.jobs)
+                        }
+                    }
+                }
+            } label: {
+                link
+            }
         }
     }
 
@@ -70,7 +107,20 @@ struct HiveSidebar: View {
             } else {
                 collapsed.insert(id)
                 // As in Finder, a selection that would be hidden moves up to what still shows.
-                if case .server(id, _) = selection { selection = .hive(id) }
+                if let selection, selection != .hive(id), selection.hiveID == id { self.selection = .hive(id) }
+            }
+        }
+    }
+
+    private func expanded(server serverID: UUID, hiveID: UUID) -> Binding<Bool> {
+        Binding {
+            !collapsed.contains(serverID)
+        } set: { isExpanded in
+            if isExpanded {
+                collapsed.remove(serverID)
+            } else {
+                collapsed.insert(serverID)
+                if case .job(_, serverID, _) = selection { selection = .server(hiveID: hiveID, serverID: serverID) }
             }
         }
     }

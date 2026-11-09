@@ -64,6 +64,7 @@ struct RequestGateTests {
             HiveEndpoint.jobs(onServer: UUID()),
             HiveEndpoint.job(UUID()),
             HiveEndpoint.sshKey(onServer: UUID()),
+            HiveEndpoint.space(ofServer: UUID()),
             HiveEndpoint.backupDrive,
             HiveEndpoint.run(ofJob: UUID()),
             HiveEndpoint.jobStatus,

@@ -1,7 +1,7 @@
 import HiveKit
 import SwiftUI
 
-/// One server: where Hive connects, its keys, a connection test, and editing or removing it.
+/// One server: its backup jobs, where Hive connects, its keys, a connection test, and editing or removing it.
 struct ServerDetail: View {
     let hive: KnownHive
     let link: HiveLink
@@ -9,6 +9,8 @@ struct ServerDetail: View {
     let serverID: UUID
     /// Selects the server's Hive, such as from the path or once the server is removed.
     let onShowHive: () -> Void
+    let onAddJob: () -> Void
+    let onSelectJob: (UUID) -> Void
 
     @State private var editRequest: ServerEditRequest?
 
@@ -29,11 +31,13 @@ struct ServerDetail: View {
 
     private func page(_ server: Server) -> some View {
         Form {
+            ServerJobsSection(jobs: servers.jobs.jobs(onServer: server.id), onAddJob: onAddJob, onSelectJob: onSelectJob)
             Section("Connection") {
                 LabeledContent("Host", value: server.connection.host)
                 LabeledContent("Port", value: String(server.connection.port))
                 LabeledContent("SSH user", value: server.connection.user)
             }
+            ServerQuotaSection(servers: servers, server: server)
             // A new identity, so a changed connection starts the checks over rather than showing an old result.
             Group {
                 HostKeyCheck(link: link, servers: servers, server: server)

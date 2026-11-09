@@ -24,6 +24,10 @@ public struct HiveAPI: Sendable {
     let fullDiskAccess: @Sendable () -> FullDiskAccess
     let macSleep: @Sendable () async -> MacSleep
 
+    var serverSpace: ServerSpaceReader {
+        ServerSpaceReader(database: servers.store.database)
+    }
+
     public init(
         hiveID: UUID,
         database: HiveDatabase,

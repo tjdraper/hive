@@ -81,6 +81,7 @@ struct ServerFieldProblems {
         case (.host, _): "Enter a host name or address, such as web1.example.com or 100.64.0.7."
         case (.port, _): "Choose a port from 1 to 65535."
         case (.user, _): "Enter a user name of letters, digits, “-”, “.” and “_”, not starting with “-”."
+        case (.quota, _): "Choose a quota above zero."
         default: "Hive turned this down."
         }
     }

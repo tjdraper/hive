@@ -1,3 +1,4 @@
+import HiveKit
 import SwiftUI
 
 /// A Hive's own pages, switched in the toolbar when the Hive is selected in the sidebar.
@@ -24,10 +25,18 @@ enum HivePage: String, CaseIterable, Identifiable {
 enum SidebarItem: Hashable {
     case hive(UUID)
     case server(hiveID: UUID, serverID: UUID)
+    case job(hiveID: UUID, serverID: UUID, jobID: UUID)
 
     var hiveID: UUID {
         switch self {
-        case .hive(let id), .server(let id, _): id
+        case .hive(let id), .server(let id, _), .job(let id, _, _): id
+        }
+    }
+
+    var serverID: UUID? {
+        switch self {
+        case .hive: nil
+        case .server(_, let id), .job(_, let id, _): id
         }
     }
 }
@@ -43,10 +52,11 @@ struct MainWindow: View {
     @State private var selection: SidebarItem?
     @State private var page = HivePage.overview
     @State private var addingServer: AddServerRequest?
+    @State private var addingJob: AddJobRequest?
 
     var body: some View {
         NavigationSplitView {
-            HiveSidebar(selection: $selection, onAddServer: addServer)
+            HiveSidebar(selection: $selection, onAddServer: addServer, onAddJob: addJob)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240)
         } detail: {
             detail
@@ -57,6 +67,13 @@ struct MainWindow: View {
             if let link = store.link(for: request.hiveID), let servers = store.servers(for: request.hiveID) {
                 AddServerSheet(link: link, servers: servers) { serverID in
                     selection = .server(hiveID: request.hiveID, serverID: serverID)
+                }
+            }
+        }
+        .sheet(item: $addingJob) { request in
+            if let servers = store.servers(for: request.hiveID) {
+                JobEditorSheet(jobs: servers.jobs, serverID: request.serverID, job: nil) { job in
+                    selection = .job(hiveID: request.hiveID, serverID: job.serverID, jobID: job.id)
                 }
             }
         }
@@ -89,10 +106,26 @@ struct MainWindow: View {
                     addServer(to: hive.id)
                 }
             case .server(_, let serverID):
-                ServerDetail(hive: hive, link: link, servers: servers, serverID: serverID) {
-                    self.selection = .hive(hive.id)
-                }
+                ServerDetail(
+                    hive: hive,
+                    link: link,
+                    servers: servers,
+                    serverID: serverID,
+                    onShowHive: { self.selection = .hive(hive.id) },
+                    onAddJob: { addJob(to: serverID, on: hive.id) },
+                    onSelectJob: { self.selection = .job(hiveID: hive.id, serverID: serverID, jobID: $0) }
+                )
                 .id(serverID)
+            case .job(_, let serverID, let jobID):
+                JobDetail(
+                    hive: hive,
+                    link: link,
+                    servers: servers,
+                    jobID: jobID,
+                    onShowHive: { self.selection = .hive(hive.id) },
+                    onShowServer: { self.selection = .server(hiveID: hive.id, serverID: serverID) }
+                )
+                .id(jobID)
             }
         } else if store.hives.isEmpty {
             EmptyHiveList { hiveID in
@@ -105,6 +138,20 @@ struct MainWindow: View {
 
     private func addServer(to hiveID: UUID) {
         addingServer = AddServerRequest(hiveID: hiveID)
+    }
+
+    private func addJob(to serverID: UUID, on hiveID: UUID) {
+        addingJob = AddJobRequest(hiveID: hiveID, serverID: serverID)
+    }
+}
+
+/// Which server the job editor adds a job to.
+struct AddJobRequest: Identifiable {
+    let hiveID: UUID
+    let serverID: UUID
+
+    var id: UUID {
+        serverID
     }
 }
 

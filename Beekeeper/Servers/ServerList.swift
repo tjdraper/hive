@@ -2,14 +2,16 @@ import Foundation
 import HiveKit
 import Observation
 
-/// One Hive's servers, as it last listed them, kept in step with what this device changes.
+/// One Hive's servers, as it last listed them, kept in step with what this device changes, with their jobs.
 @Observable
 final class ServerList {
     private(set) var servers: [Server] = []
+    let jobs: JobList
     private let link: HiveLink
 
     init(link: HiveLink) {
         self.link = link
+        jobs = JobList(link: link)
     }
 
     func server(_ id: UUID) -> Server? {
@@ -20,6 +22,7 @@ final class ServerList {
     func refresh() async {
         guard let listed: [Server] = try? await link.perform({ try await $0.get(HiveEndpoint.servers) }) else { return }
         servers = Self.sorted(listed)
+        await jobs.refresh()
     }
 
     func add(_ draft: ServerDraft) async throws -> Server {
@@ -29,14 +32,22 @@ final class ServerList {
     }
 
     func change(_ id: UUID, to draft: ServerDraft) async throws -> Server {
+        let old = self.server(id)
         let server: Server = try await link.perform { try await $0.put(HiveEndpoint.server(id), body: draft) }
         update(server)
+        // Hive clears the jobs' database passwords when the connection changes.
+        if old?.connection != server.connection { await jobs.refresh() }
         return server
     }
 
     func remove(_ id: UUID) async throws {
         try await link.perform { try await $0.delete(HiveEndpoint.server(id)) }
         servers.removeAll { $0.id == id }
+        jobs.forgetJobs(onServer: id)
+    }
+
+    func space(of id: UUID) async throws -> ServerSpace {
+        try await link.perform { try await $0.get(HiveEndpoint.space(ofServer: id)) }
     }
 
     /// Takes a server as Hive last sent it, such as after its host key was confirmed.

@@ -49,6 +49,11 @@ public enum HiveEndpoint {
         "\(server(id))/connection-test"
     }
 
+    /// `GET` reads the server's `ServerSpace`.
+    public static func space(ofServer id: UUID) -> String {
+        "\(server(id))/space"
+    }
+
     public static func jobs(onServer id: UUID) -> String {
         "\(server(id))\(jobs)"
     }

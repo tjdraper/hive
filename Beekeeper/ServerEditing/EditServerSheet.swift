@@ -1,7 +1,7 @@
 import HiveKit
 import SwiftUI
 
-/// Changing a server's name or where Hive connects.
+/// Changing a server's name, where Hive connects, or its quota.
 struct EditServerSheet: View {
     let servers: ServerList
     let server: Server
@@ -11,6 +11,7 @@ struct EditServerSheet: View {
     @State private var problems = ServerFieldProblems()
     @State private var isSaving = false
     @State private var failure: String?
+    @State private var space: ServerSpace?
 
     init(servers: ServerList, server: Server) {
         self.servers = servers
@@ -32,6 +33,7 @@ struct EditServerSheet: View {
                         .foregroundStyle(.orange)
                     }
                 }
+                QuotaField(quotaBytes: $draft.quotaBytes, saved: server.quotaBytes, space: space, problem: problems[.quota])
                 if let failure {
                     Text(failure)
                         .foregroundStyle(.red)
@@ -49,7 +51,8 @@ struct EditServerSheet: View {
             }
             .padding()
         }
-        .frame(width: 520, height: 420)
+        .frame(width: 560, height: 560)
+        .task { space = try? await servers.space(of: server.id) }
     }
 
     /// Hive lowercases the host and trims the user, so compare them as it will store them.
