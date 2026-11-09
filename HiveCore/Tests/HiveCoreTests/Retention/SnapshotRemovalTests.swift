@@ -258,6 +258,12 @@ struct SnapshotRemovalTests {
         let removing = jobFolder.appending(path: SnapshotFolderName.removing(record.folder), directoryHint: .isDirectory)
         try FileManager.default.moveItem(at: jobFolder.appending(path: record.folder), to: removing)
         try FileManager.default.removeItem(at: removing.appending(path: "files/site/index.html"))
+        // Past the times the skipped days missed, so the check starts only the pass Hive asks for when it starts.
+        let schedule = ScheduleCalendar(calendar: APIFixture.calendar)
+        let nextRun = try #require(schedule.nextRun(after: fixture.clock.now, times: fixture.job.times))
+        try ScheduleStore(database: fixture.database).save(
+            JobScheduleRecord(jobID: fixture.job.id, scheduleKey: schedule.key(for: fixture.job.times), nextRunAt: nextRun)
+        )
 
         // Act
         await fixture.api.api.scheduler.check()

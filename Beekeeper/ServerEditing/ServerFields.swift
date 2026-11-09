@@ -29,15 +29,13 @@ struct ServerFields: View {
     }
 
     private func field(_ title: String, problem: String?, @ViewBuilder input: () -> some View) -> some View {
-        LabeledContent(title) {
-            VStack(alignment: .trailing, spacing: 4) {
-                input()
-                    .labelsHidden()
-                if let problem {
-                    Text(problem)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
+        StackedRow(title: title) {
+            input()
+                .stackedField(title)
+            if let problem {
+                Text(problem)
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
         }
     }

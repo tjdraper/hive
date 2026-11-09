@@ -26,7 +26,13 @@ struct BackupJobStore: Sendable {
     }
 
     /// `sealed` has passed `BackupJobDraftCheck`. Returns nil when no server has that ID.
-    func add(_ sealed: SealedJobDraft, toServer serverID: UUID, by deviceID: UUID, at date: Date) throws -> BackupJob? {
+    func add(
+        _ sealed: SealedJobDraft,
+        toServer serverID: UUID,
+        by deviceID: UUID,
+        at date: Date,
+        schedule: ScheduleCalendar
+    ) throws -> BackupJob? {
         try database.writer.write { database in
             guard let server = try ServerRecord.fetchOne(database, key: serverID) else { return nil }
             try Self.checkDatabaseIDs(in: sealed.draft, known: [])
@@ -34,6 +40,7 @@ struct BackupJobStore: Sendable {
 
             let stored = StoredBackupJob(id: UUID(), serverID: serverID, createdAt: date, draft: sealed, existing: [])
             try stored.insert(in: database)
+            try ScheduleStore.reschedule(jobID: stored.job.id, times: sealed.draft.times, from: date, schedule: schedule, in: database)
             let event = AuditEvent.backupJob(jobID: stored.job.id, serverName: server.name, jobName: stored.job.name, change: .added)
             try AuditLog.record(event, by: deviceID, at: date, in: database)
             return try stored.backupJob()
@@ -41,7 +48,13 @@ struct BackupJobStore: Sendable {
     }
 
     /// Returns nil when no job has that ID.
-    func change(id: UUID, to sealed: SealedJobDraft, by deviceID: UUID, at date: Date) throws -> (old: BackupJob, new: BackupJob)? {
+    func change(
+        id: UUID,
+        to sealed: SealedJobDraft,
+        by deviceID: UUID,
+        at date: Date,
+        schedule: ScheduleCalendar
+    ) throws -> (old: BackupJob, new: BackupJob)? {
         try database.writer.write { database in
             guard let stored = try StoredBackupJob.fetch(id: id, in: database) else { return nil }
             // Only a database's own ID carries its password, so a password can never move to another job or server.
@@ -58,6 +71,7 @@ struct BackupJobStore: Sendable {
             )
             try replacement.replace(in: database)
             let new = try replacement.backupJob()
+            try ScheduleStore.reschedule(jobID: id, times: new.times, from: date, schedule: schedule, in: database)
 
             let serverName = try Self.serverName(stored.job.serverID, in: database)
             for change in Self.changes(from: old, to: new, passwordsEnteredAt: sealed.passwordPositions) {

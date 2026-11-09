@@ -12,7 +12,8 @@ for _ in $(seq 1 60); do
     sleep 0.5
 done
 
-if ! mariadb -e 'USE site' 2> /dev/null; then
-    mariadb < /usr/local/share/hive-test/mysql-seed.sql
+if ! mariadb -e 'USE notes' 2> /dev/null; then
+    mariadb -e 'CREATE DATABASE notes'
+    mariadb notes < /usr/local/share/hive-test/mysql-seed.sql
     echo "Seeded the host's MariaDB"
 fi

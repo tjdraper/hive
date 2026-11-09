@@ -27,12 +27,10 @@ struct JobEditorSheet: View {
         VStack(spacing: 0) {
             Form {
                 Section {
-                    LabeledContent("Name") {
-                        VStack(alignment: .trailing, spacing: 4) {
-                            TextField("Name", text: $draft.name, prompt: Text("Example Site"))
-                                .labelsHidden()
-                            FieldProblemText(problems[.name])
-                        }
+                    StackedRow(title: "Name") {
+                        TextField("Name", text: $draft.name, prompt: Text("Example Site"))
+                            .stackedField("Name")
+                        FieldProblemText(problems[.name])
                     }
                 }
                 DirectoryFields(directories: $draft.directories, problems: problems)

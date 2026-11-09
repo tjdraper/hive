@@ -92,7 +92,8 @@ public struct HiveAPI: Sendable {
         auditLog = AuditLog(database: database)
         let servers = ServerStore(database: database)
         self.servers = ServerWorkflow(store: servers, sealer: sealer, now: now)
-        jobs = BackupJobWorkflow(store: BackupJobStore(database: database), sealer: sealer, now: now)
+        let schedule = ScheduleCalendar(calendar: calendar)
+        jobs = BackupJobWorkflow(store: BackupJobStore(database: database), sealer: sealer, schedule: schedule, now: now)
         sshKeys = ServerSSHKeyWorkflow(
             store: ServerSSHKeyStore(database: database),
             sealer: sealer,
@@ -127,7 +128,6 @@ public struct HiveAPI: Sendable {
             startupDriveGrace: startupDriveGrace,
             pause: pause
         )
-        let schedule = ScheduleCalendar(calendar: calendar)
         jobStatus = JobStatusReader(database: database, runs: runs, schedule: schedule, now: now)
         jobLog = JobLog(database: database)
         scheduler = BackupScheduler(database: database, schedule: schedule, runs: runs, now: now)

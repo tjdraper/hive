@@ -4,9 +4,9 @@
 -- The password is a test value. It holds a space, both quotes, a backslash, `$` and `#`, so a dump
 -- only works if Hive passes it on untouched.
 CREATE ROLE site LOGIN PASSWORD 'Hive t3st: "double" ''single'' \back $HOME #hash';
-CREATE DATABASE site OWNER site;
+CREATE DATABASE blog OWNER site;
 
-\connect site site
+\connect blog site
 
 CREATE TABLE entries (
     id INT PRIMARY KEY,

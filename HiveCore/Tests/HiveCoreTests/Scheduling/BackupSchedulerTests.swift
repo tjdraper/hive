@@ -114,6 +114,50 @@ struct BackupSchedulerTests {
         #expect(try await fixture.status().nextRunAt == (try date("2027-01-16T01:00:00-05:00")))
     }
 
+    @Test("A time that comes after a job's times are saved but before the scheduler next checks still runs it")
+    func timeBeforeNextCheck() async throws {
+        // Arrange
+        let fixture = try await BackupRunFixture()
+        try fixture.write("hello", to: "srv/site/index.html")
+        await check(fixture)
+        var draft = fixture.job.draft
+        draft.times = [TimeOfDay(hour: 3, minute: 0), TimeOfDay(hour: 3, minute: 1)]
+        let answer = try await fixture.api.send(.put, HiveEndpoint.job(fixture.job.id), json: draft)
+
+        // Act
+        fixture.clock.advance(by: 90)
+        await check(fixture)
+
+        // Assert
+        #expect(answer.status == .ok)
+        let entries = try await fixture.jobLog().runs
+        #expect(entries.count == 1)
+        #expect(entries.first?.trigger == .scheduled)
+        #expect(try await fixture.status().nextRunAt == (try date("2027-01-16T03:00:00-05:00")))
+    }
+
+    @Test("A new job's first time coming before the scheduler next checks still runs it")
+    func newJobTimeBeforeNextCheck() async throws {
+        // Arrange
+        let fixture = try await BackupRunFixture()
+        await check(fixture)
+        try fixture.write("soon", to: "srv/soon/index.html")
+        var draft = ConfigurationSamples.job(name: "soon", password: nil)
+        draft.databases = []
+        draft.directories = [BackupDirectory(path: fixture.source("srv/soon").fileSystemPath, folder: "site")]
+        draft.times = [TimeOfDay(hour: 3, minute: 1)]
+        let job = try await fixture.api.addJob(draft, to: fixture.serverRecord)
+
+        // Act
+        fixture.clock.advance(by: 90)
+        await check(fixture)
+
+        // Assert
+        let entries = try await fixture.jobLog().runs.filter { $0.jobName == job.name }
+        #expect(entries.count == 1)
+        #expect(entries.first?.trigger == .scheduled)
+    }
+
     @Test("Job log entries are kept for a year, and an unfinished one is never removed")
     func jobLogKeptForAYear() async throws {
         // Arrange

@@ -72,18 +72,15 @@ private struct DatabaseRow: View {
         @ViewBuilder input: () -> some View,
         @ViewBuilder note: () -> some View = { EmptyView() }
     ) -> some View {
-        LabeledContent(title) {
-            VStack(alignment: .trailing, spacing: 4) {
-                input()
-                    .labelsHidden()
-                    .autocorrectionDisabled()
-                note()
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.trailing)
-                    .fixedSize(horizontal: false, vertical: true)
-                FieldProblemText(problem)
-            }
+        StackedRow(title: title) {
+            input()
+                .stackedField(title)
+                .autocorrectionDisabled()
+            note()
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            FieldProblemText(problem)
         }
     }
 }

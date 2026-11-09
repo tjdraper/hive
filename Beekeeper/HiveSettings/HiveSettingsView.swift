@@ -29,7 +29,10 @@ struct HiveSettingsView: View {
             BackupDriveSection(link: link)
 
             Section {
-                TextField("Name", text: draft.name)
+                StackedRow(title: "Name") {
+                    TextField("Name", text: draft.name)
+                        .stackedField("Name")
+                }
             }
 
             Section {
@@ -45,7 +48,10 @@ struct HiveSettingsView: View {
                         }
                     }
                 }
-                TextField("Port", value: draft.port, format: .number.grouping(.never))
+                StackedRow(title: "Port") {
+                    TextField("Port", value: draft.port, format: .number.grouping(.never))
+                        .stackedField("Port")
+                }
                 LabeledContent("Listening on", value: listeningSummary(state.listeningOn))
             } header: {
                 Text("Network")

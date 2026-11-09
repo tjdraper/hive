@@ -8,12 +8,13 @@ struct BackupJobWorkflow: Sendable {
 
     let store: BackupJobStore
     let sealer: SecretSealer
+    let schedule: ScheduleCalendar
     let now: @Sendable () -> Date
 
     /// Returns nil when no server has that ID.
     func add(_ draft: BackupJobDraft, toServer serverID: UUID, by deviceID: UUID) throws -> BackupJob? {
         let sealed = try SealedJobDraft(BackupJobDraftCheck.validated(draft), sealer: sealer)
-        guard let job = try store.add(sealed, toServer: serverID, by: deviceID, at: now()) else { return nil }
+        guard let job = try store.add(sealed, toServer: serverID, by: deviceID, at: now(), schedule: schedule) else { return nil }
         Self.logger.notice(
             "Added a job with \(job.directories.count, privacy: .public) directories and \(job.databases.count, privacy: .public) databases"
         )
@@ -23,7 +24,7 @@ struct BackupJobWorkflow: Sendable {
     /// Returns nil when no job has that ID.
     func change(id: UUID, to draft: BackupJobDraft, by deviceID: UUID) throws -> BackupJob? {
         let sealed = try SealedJobDraft(BackupJobDraftCheck.validated(draft), sealer: sealer)
-        guard let (old, new) = try store.change(id: id, to: sealed, by: deviceID, at: now()) else { return nil }
+        guard let (old, new) = try store.change(id: id, to: sealed, by: deviceID, at: now(), schedule: schedule) else { return nil }
         let changed = BackupJobStore.changes(from: old, to: new, passwordsEnteredAt: sealed.passwordPositions)
         if !changed.isEmpty {
             let reasons = ConfirmationRequirement.logged(

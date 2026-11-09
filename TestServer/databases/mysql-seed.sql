@@ -4,11 +4,12 @@
 --
 -- The password is a test value. It holds a space, both quotes, a backslash, `$` and `#`, so a dump
 -- only works if Hive passes it on untouched.
-CREATE DATABASE site;
 CREATE USER 'site'@'%' IDENTIFIED BY 'Hive t3st: "double" ''single'' \\back $HOME #hash';
-GRANT ALL ON site.* TO 'site'@'%';
-
-USE site;
+-- Run in the database it fills, which each server names differently so one job can dump them all.
+SET @grant_site = CONCAT('GRANT ALL ON `', DATABASE(), '`.* TO ''site''@''%''');
+PREPARE grant_site FROM @grant_site;
+EXECUTE grant_site;
+DEALLOCATE PREPARE grant_site;
 
 CREATE TABLE entries (
     id INT PRIMARY KEY,

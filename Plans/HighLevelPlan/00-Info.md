@@ -35,7 +35,7 @@ Check off a slice here when its "done when" is true.
 ### Phase D — Managing backups in Beekeeper (Mac)
 
 - [x] [D1. Servers in Beekeeper](14-D1-ServersInBeekeeper.md) — UI, 1 session
-- [ ] [D2. Editing backup jobs](15-D2-EditingBackupJobs.md) — UI, 1 session
+- [x] [D2. Editing backup jobs](15-D2-EditingBackupJobs.md) — UI, 1 session
 - [ ] [D3. Progress, snapshots and logs](16-D3-ProgressSnapshotsAndLogs.md) — Mixed, 1–2 sessions
 - [ ] [D4. Confirming destructive actions](17-D4-ConfirmingDestructiveActions.md) — Mixed, 1–2 sessions, installed build
 

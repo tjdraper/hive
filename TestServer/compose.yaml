@@ -30,6 +30,7 @@ services:
       com.docker.swarm.service.name: hive-test_mariadb
     environment:
       MARIADB_RANDOM_ROOT_PASSWORD: "1"
+      MARIADB_DATABASE: site
     volumes:
       - ./databases/mysql-seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
       - mariadb-data:/var/lib/mysql
@@ -47,6 +48,7 @@ services:
       com.docker.swarm.service.name: hive-test_mysql
     environment:
       MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: shop
     volumes:
       - ./databases/mysql-seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
       - mysql-data:/var/lib/mysql

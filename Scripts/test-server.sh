@@ -3,7 +3,9 @@
 # Runs the test server in Docker: sshd and rsync on 127.0.0.1:2222, logging in as root with keys only,
 # with sample files under /srv/sites/example and the Docker socket mounted. Beside it run MariaDB 11,
 # MySQL 8.4 and Postgres 18 containers named as Swarm would name them, and MariaDB runs on the server
-# itself. Each has a database `site`, with sample data, for user `site` (see TestServer/databases).
+# itself. Each has sample data for user `site`, in a database named for it so one job can dump them
+# all: `site` in the MariaDB container, `shop` in MySQL, `blog` in Postgres and `notes` on the server
+# (see TestServer/databases).
 # Development backs this up, never a real server.
 #
 # Usage:
@@ -34,26 +36,27 @@ in_server() {
     compose exec -T ssh "$@"
 }
 
-# The sample database's row count and objects, as its own user sees them in container $2 with client $1.
+# The sample database's row count and objects, as its own user sees them in database $3 of container
+# $2 with client $1.
 source_mysql_summary() {
-    local client="$1" container="$2"
+    local client="$1" container="$2" database="$3"
     # The seed's test password, written for an option file.
     docker exec -i "$container" sh -c 'umask 077; cat > /tmp/hive-summary.cnf' <<'OPTIONS'
 [client]
 user=site
 password="Hive t3st: \"double\" 'single' \\back $HOME #hash"
 OPTIONS
-    docker exec -i "$container" sh -c "$client --defaults-extra-file=/tmp/hive-summary.cnf --batch --skip-column-names; rm /tmp/hive-summary.cnf" \
+    docker exec -i "$container" sh -c "$client --defaults-extra-file=/tmp/hive-summary.cnf --batch --skip-column-names $database; rm /tmp/hive-summary.cnf" \
         < databases/mysql-summary.sql
 }
 
 # The same, as root in a scratch container, where the restored objects' owner doesn't exist.
 scratch_mysql_summary() {
-    docker exec -i "$2" "$1" -uroot --batch --skip-column-names < databases/mysql-summary.sql
+    docker exec -i "$2" "$1" -uroot --batch --skip-column-names "$3" < databases/mysql-summary.sql
 }
 
 postgres_summary() {
-    docker exec -i "$1" psql -U postgres -d site -At -F $'\t' < databases/postgres-summary.sql
+    docker exec -i "$1" psql -U postgres -d "$2" -At -F $'\t' < databases/postgres-summary.sql
 }
 
 service_container() {
@@ -89,22 +92,25 @@ restore() {
         if [[ "$kind" == mysql ]]; then
             client=mysql image=mysql:8.4 ready="mysqladmin ping --host=127.0.0.1 --silent" empty_root=MYSQL_ALLOW_EMPTY_PASSWORD=yes
         fi
+        local database=site
+        [[ "$kind" == mysql ]] && database=shop
+        [[ "$kind" == host ]] && database=notes
         if [[ "$kind" == host ]]; then
-            source_summary=$(source_mysql_summary mariadb "$(compose ps -q ssh)")
+            source_summary=$(source_mysql_summary mariadb "$(compose ps -q ssh)" "$database")
         else
-            source_summary=$(source_mysql_summary "$client" "$(service_container "$kind")")
+            source_summary=$(source_mysql_summary "$client" "$(service_container "$kind")" "$database")
         fi
         scratch=$(start_scratch "$image" "$ready" -e "$empty_root")
-        docker exec "$scratch" "$client" -uroot -e "CREATE DATABASE site"
-        gunzip -c "$dump" | docker exec -i "$scratch" "$client" -uroot site
-        restored_summary=$(scratch_mysql_summary "$client" "$scratch")
+        docker exec "$scratch" "$client" -uroot -e "CREATE DATABASE $database"
+        gunzip -c "$dump" | docker exec -i "$scratch" "$client" -uroot "$database"
+        restored_summary=$(scratch_mysql_summary "$client" "$scratch" "$database")
         ;;
     postgres)
-        source_summary=$(postgres_summary "$(service_container postgres)")
+        source_summary=$(postgres_summary "$(service_container postgres)" blog)
         scratch=$(start_scratch postgres:18 "pg_isready --host=127.0.0.1 --username=postgres" -e POSTGRES_PASSWORD=hive-test-superuser)
-        docker exec "$scratch" createdb -U postgres site
-        docker exec -i "$scratch" pg_restore -U postgres --no-owner --exit-on-error -d site < "$dump"
-        restored_summary=$(postgres_summary "$scratch")
+        docker exec "$scratch" createdb -U postgres blog
+        docker exec -i "$scratch" pg_restore -U postgres --no-owner --exit-on-error -d blog < "$dump"
+        restored_summary=$(postgres_summary "$scratch" blog)
         ;;
     *)
         echo "$usage" >&2
@@ -166,7 +172,7 @@ restore)
     restore "${2:-}" "${3:-}"
     ;;
 *)
-    sed -n '3,21p' "$script" | sed 's/^# \{0,1\}//'
+    sed -n '3,23p' "$script" | sed 's/^# \{0,1\}//'
     exit 64
     ;;
 esac
