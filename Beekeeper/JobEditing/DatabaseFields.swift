@@ -10,14 +10,11 @@ struct DatabaseFields: View {
         ForEach($databases) { $database in
             Section {
                 DatabaseRow(database: $database, problems: problems, index: databases.firstIndex { $0.id == database.id })
-            } header: {
-                HStack {
-                    Text(database.name.isEmpty ? "New Database" : "Database “\(database.name)”")
-                    Spacer()
-                    Button("Remove", role: .destructive) { databases.removeAll { $0.id == database.id } }
-                        .buttonStyle(.borderless)
-                        .font(.callout)
+                Button("Remove Database", systemImage: "minus", role: .destructive) {
+                    databases.removeAll { $0.id == database.id }
                 }
+            } header: {
+                Text(database.name.isEmpty ? "New Database" : "Database “\(database.name)”")
             }
         }
         Section {

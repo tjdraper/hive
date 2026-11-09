@@ -27,14 +27,9 @@ struct ServerJobsSection: View {
                 }
                 .buttonStyle(.plain)
             }
+            Button("Add Job…", systemImage: "plus", action: onAddJob)
         } header: {
-            HStack {
-                Text("Backup Jobs")
-                Spacer()
-                Button("Add Job…", action: onAddJob)
-                    .buttonStyle(.borderless)
-                    .font(.callout)
-            }
+            Text("Backup Jobs")
         }
     }
 }
