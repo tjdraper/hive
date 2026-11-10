@@ -24,6 +24,8 @@ struct PullOutcome: Equatable {
 /// Reads rsync's exit status and output. Its messages can name files, so they're only matched here,
 /// never logged.
 enum RsyncResultReader {
+    /// The connection closed in the middle of rsync's protocol.
+    static let protocolStreamStatus: Int32 = 12
     static let interruptedStatus: Int32 = 20
     /// Some files or attributes weren't copied.
     static let partialTransferStatus: Int32 = 23
@@ -57,8 +59,10 @@ enum RsyncResultReader {
     }
 
     private static func failure(in result: ChildProcess.Result) -> BackupFailure {
-        // rsync passes on ssh's own failures with ssh's status and messages.
-        if result.status == SSHFailureReader.sshErrorStatus, let connection = SSHFailureReader.failure(in: result) {
+        // rsync passes on ssh's own failures with ssh's messages, and with ssh's status when it sees ssh
+        // exit first. When it sees the connection close first, the status is its own protocol error.
+        if [SSHFailureReader.sshErrorStatus, protocolStreamStatus].contains(result.status),
+           let connection = SSHFailureReader.recognizedFailure(in: result.standardError) {
             return BackupFailure(connection)
         }
         let output = String(bytes: result.standardError, encoding: .utf8) ?? ""

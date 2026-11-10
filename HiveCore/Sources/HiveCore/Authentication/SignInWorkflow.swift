@@ -27,11 +27,12 @@ enum SignInRefusal: String, Equatable {
 /// protect it instead.
 public struct SignInWorkflow: Sendable {
     private static let logger = Logger(subsystem: HiveLog.subsystem, category: "SignIn")
+    static let challengeLifetime: TimeInterval = 60
 
     let hiveID: UUID
     let devices: DeviceStore
     let sessions: SessionStore
-    let challenges: SignInChallenges
+    let challenges: IssuedChallenges
     let addressLimiter: FailedAttemptLimiter<ClientAddress>
     let deviceLimiter: FailedAttemptLimiter<UUID>
     let apiVersions: APIVersions
@@ -51,7 +52,7 @@ public struct SignInWorkflow: Sendable {
         self.hiveID = hiveID
         self.devices = devices
         self.sessions = sessions
-        challenges = SignInChallenges()
+        challenges = IssuedChallenges(lifetime: Self.challengeLifetime)
         addressLimiter = FailedAttemptLimiter(policy: .signIn)
         deviceLimiter = FailedAttemptLimiter(policy: .signIn)
         self.apiVersions = apiVersions
@@ -59,7 +60,8 @@ public struct SignInWorkflow: Sendable {
     }
 
     func issueChallenge() -> SignInChallenge {
-        challenges.issue(at: now())
+        let issued = challenges.issue(at: now())
+        return SignInChallenge(challenge: issued.challenge, expiresInSeconds: issued.expiresInSeconds)
     }
 
     func signIn(_ request: SignInRequest?, from address: ClientAddress) -> SignInOutcome {

@@ -5,11 +5,8 @@ import HiveKit
 public struct HiveAPI: Sendable {
     let hiveID: UUID
     let signIn: SignInWorkflow
-    let devices: DeviceStore
-    let revocation: DeviceRevocationWorkflow
     let settingsStore: HiveSettingsStore
     let settings: HiveSettingsWorkflow
-    let auditLog: AuditLog
     let servers: ServerWorkflow
     let jobs: BackupJobWorkflow
     let sshKeys: ServerSSHKeyWorkflow
@@ -19,6 +16,9 @@ public struct HiveAPI: Sendable {
     let runs: BackupRunCoordinator
     let jobStatus: JobStatusReader
     let scheduler: BackupScheduler
+    let confirmations: ConfirmationVerifier
+    let identityKeys: HiveKeyStore
+    let restart: HiveRestart
     /// How often an open live updates response gets a line when nothing else is happening.
     let liveUpdateHeartbeat: Duration
     /// Checked on every request, since it can be turned off while Hive runs.
@@ -33,6 +33,45 @@ public struct HiveAPI: Sendable {
         JobLog(database: servers.store.database)
     }
 
+    var devices: DeviceStore {
+        signIn.devices
+    }
+
+    var revocation: DeviceRevocationWorkflow {
+        DeviceRevocationWorkflow(devices: signIn.devices, sessions: signIn.sessions, now: signIn.now)
+    }
+
+    var auditLog: AuditLog {
+        AuditLog(database: servers.store.database)
+    }
+
+    var identity: IdentityRegenerationWorkflow {
+        IdentityRegenerationWorkflow(
+            keys: identityKeys,
+            database: servers.store.database,
+            sessions: signIn.sessions,
+            restart: restart,
+            now: signIn.now
+        )
+    }
+
+    /// True once Hive is restarting, such as for a new identity.
+    public var isRestarting: Bool {
+        restart.isRequested
+    }
+
+    var removalEstimator: RemovalEstimator {
+        RemovalEstimator(database: servers.store.database, calendar: jobs.schedule.calendar)
+    }
+
+    var removedJobs: RemovedJobReader {
+        RemovedJobReader(database: servers.store.database)
+    }
+
+    var snapshotDeletions: SnapshotDeletionStore {
+        SnapshotDeletionStore(database: servers.store.database)
+    }
+
     var snapshots: JobSnapshotReader {
         JobSnapshotReader(
             database: servers.store.database,
@@ -40,12 +79,14 @@ public struct HiveAPI: Sendable {
         )
     }
 
+    /// `identityKeys` is where the identity key is saved, for regenerating it.
     public init(
         hiveID: UUID,
         database: HiveDatabase,
         settings: HiveSettingsStore,
         listeners: ListenerCoordinator,
         sealer: SecretSealer,
+        identityKeys: HiveKeyStore,
         rsync: URL
     ) {
         let devices = DeviceStore(database: database)
@@ -56,6 +97,8 @@ public struct HiveAPI: Sendable {
             settingsStore: settings,
             listeners: listeners,
             sealer: sealer,
+            identityKeys: identityKeys,
+            restart: HiveRestart(delay: .seconds(1)),
             fullDiskAccess: { FullDiskAccessProbe().check() },
             ssh: SSHRunner(),
             hostKeyScanner: HostKeyScanner(),
@@ -81,6 +124,8 @@ public struct HiveAPI: Sendable {
         settingsStore: HiveSettingsStore,
         listeners: any ListenerControl,
         sealer: SecretSealer,
+        identityKeys: HiveKeyStore,
+        restart: HiveRestart,
         fullDiskAccess: @escaping @Sendable () -> FullDiskAccess,
         ssh: any SSHRunning,
         hostKeyScanner: any HostKeyScanning,
@@ -99,11 +144,8 @@ public struct HiveAPI: Sendable {
     ) {
         self.hiveID = hiveID
         self.signIn = signIn
-        devices = signIn.devices
-        revocation = DeviceRevocationWorkflow(devices: signIn.devices, sessions: signIn.sessions, now: now)
         self.settingsStore = settingsStore
         settings = HiveSettingsWorkflow(store: settingsStore, listeners: listeners, now: now)
-        auditLog = AuditLog(database: database)
         let servers = ServerStore(database: database)
         self.servers = ServerWorkflow(store: servers, sealer: sealer, now: now)
         let schedule = ScheduleCalendar(calendar: calendar)
@@ -147,5 +189,8 @@ public struct HiveAPI: Sendable {
         scheduler = BackupScheduler(database: database, schedule: schedule, runs: runs, now: now)
         self.fullDiskAccess = fullDiskAccess
         self.macSleep = macSleep
+        confirmations = ConfirmationVerifier(hiveID: hiveID, database: database, now: now)
+        self.identityKeys = identityKeys
+        self.restart = restart
     }
 }

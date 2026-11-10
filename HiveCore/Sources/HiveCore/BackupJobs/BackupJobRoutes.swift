@@ -6,7 +6,7 @@ enum BackupJobRoutes {
     static let jobPath = RouterPath("\(HiveEndpoint.jobs)/:id")
     static let serverJobsPath = RouterPath("\(HiveEndpoint.servers)/:id\(HiveEndpoint.jobs)")
 
-    static func add(to router: Router<HiveRequestContext>, workflow: BackupJobWorkflow) {
+    static func add(to router: Router<HiveRequestContext>, workflow: BackupJobWorkflow, confirmations: ConfirmationVerifier) {
         router.get(RouterPath(HiveEndpoint.jobs)) { _, _ in
             try JSONResponse(workflow.store.all())
         }
@@ -38,9 +38,11 @@ enum BackupJobRoutes {
 
         router.put(jobPath) { request, context in
             guard let id = context.idParameter else { return JSONResponse(status: .notFound) }
-            let draft = try await JSONRequest.decode(BackupJobDraft.self, from: request)
+            let confirmed = try await ConfirmedRequest.read(request, context: context, verifier: confirmations)
+            let draft = try confirmed.decode(BackupJobDraft.self)
             return try await ConfigurationChangeError.answering {
-                guard let job = try workflow.change(id: id, to: draft, by: context.requireDevice()) else {
+                let deviceID = try context.requireDevice()
+                guard let job = try workflow.change(id: id, to: draft, isConfirmed: confirmed.isConfirmed, by: deviceID) else {
                     return JSONResponse(status: .notFound)
                 }
                 return try JSONResponse(job)

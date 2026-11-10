@@ -74,6 +74,8 @@ struct HiveSettingsView: View {
                     }
                 }
             }
+
+            IdentitySection(hive: hive, link: link)
         }
         .formStyle(.grouped)
     }

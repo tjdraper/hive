@@ -26,13 +26,18 @@ enum SSHFailureReader {
     static func failure(in result: ChildProcess.Result) -> ConnectionFailure? {
         guard result.status != 0 else { return nil }
         guard result.status == sshErrorStatus else { return .failed }
-        let output = String(bytes: result.standardError, encoding: .utf8) ?? ""
+        return recognizedFailure(in: result.standardError) ?? .failed
+    }
+
+    /// The failure ssh's own messages in `standardError` describe, or nil when there are none.
+    static func recognizedFailure(in standardError: Data) -> ConnectionFailure? {
+        let output = String(bytes: standardError, encoding: .utf8) ?? ""
         // The changed key comes first: its warning can hold words the others look for.
         if containsAny(hostKeyMessages, in: output) { return .hostKeyChanged }
         if containsAny(loginMessages, in: output) { return .loginRefused }
         if containsAny(stallMessages, in: output) { return .stalled }
         if containsAny(unreachableMessages, in: output) { return .unreachable }
-        return .failed
+        return nil
     }
 
     private static func containsAny(_ messages: [String], in output: String) -> Bool {

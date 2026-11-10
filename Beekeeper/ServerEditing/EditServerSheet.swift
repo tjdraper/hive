@@ -1,7 +1,8 @@
 import HiveKit
 import SwiftUI
 
-/// Changing a server's name, where Hive connects, or its quota.
+/// Changing a server's name, where Hive connects, or its quota. Changing where Hive connects or lowering
+/// the quota asks for Touch ID or the password on Save.
 struct EditServerSheet: View {
     let servers: ServerList
     let server: Server
@@ -12,6 +13,7 @@ struct EditServerSheet: View {
     @State private var isSaving = false
     @State private var failure: String?
     @State private var space: ServerSpace?
+    @State private var quotaEstimate: RemovalEstimate?
 
     init(servers: ServerList, server: Server) {
         self.servers = servers
@@ -33,7 +35,13 @@ struct EditServerSheet: View {
                         .foregroundStyle(.orange)
                     }
                 }
-                QuotaField(quotaBytes: $draft.quotaBytes, saved: server.quotaBytes, space: space, problem: problems[.quota])
+                QuotaField(
+                    quotaBytes: $draft.quotaBytes,
+                    saved: server.quotaBytes,
+                    space: space,
+                    estimate: quotaEstimate,
+                    problem: problems[.quota]
+                )
                 if let failure {
                     Text(failure)
                         .foregroundStyle(.red)
@@ -53,6 +61,35 @@ struct EditServerSheet: View {
         }
         .frame(width: 560, height: 560)
         .task { space = try? await servers.space(of: server.id) }
+        .task(id: draft.quotaBytes) { await estimateQuota() }
+    }
+
+    private var lowersQuota: Bool {
+        QuotaField.isLowered(from: server.quotaBytes, to: draft.quotaBytes)
+    }
+
+    /// Once the amount stops changing.
+    private func estimateQuota() async {
+        quotaEstimate = nil
+        guard lowersQuota else { return }
+        try? await Task.sleep(for: .milliseconds(300))
+        guard !Task.isCancelled else { return }
+        quotaEstimate = try? await servers.estimate(quotaBytes: draft.quotaBytes, of: server.id)
+    }
+
+    /// What Touch ID or the password prompt says, or nil when the change needs no confirming.
+    private var confirmationReason: String? {
+        var parts: [String] = []
+        if changesConnection { parts.append("change where Hive connects to “\(server.name)”") }
+        if lowersQuota {
+            let deleting = switch quotaEstimate?.snapshotCount {
+            case nil: ", which deletes snapshots"
+            case 0: ""
+            case .some(let count): ", deleting up to \(SnapshotCount(count))"
+            }
+            parts.append("lower the quota of “\(server.name)”\(deleting)")
+        }
+        return parts.isEmpty ? nil : parts.formatted(.list(type: .and))
     }
 
     /// Hive lowercases the host and trims the user, so compare them as it will store them.
@@ -67,8 +104,10 @@ struct EditServerSheet: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            _ = try await servers.change(server.id, to: draft)
+            _ = try await servers.change(server.id, to: draft, confirming: confirmationReason)
             dismiss()
+        } catch ConfirmationKeyError.cancelled {
+            // Left as it was, to change or cancel.
         } catch {
             if let refused = ServerFieldProblems(error) {
                 problems = refused

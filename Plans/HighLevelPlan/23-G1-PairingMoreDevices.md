@@ -29,4 +29,7 @@ Built with you:
 - A pairing code with a wrong key hash fails to connect
 - Repeated wrong tokens lock out that address
 
+- **From D4:** a confirmed route reads its request with `ConfirmedRequest.read` and checks `ConfirmationRequirement.check` inside the store's write transaction, against the stored values. Add the new `ConfirmationReason` to HiveKit, its Touch ID wording to `ConfirmationReason.prompt`, and a case to `ConfirmedRouteTests.cases`, which covers the refusals. In Beekeeper, send it with `HiveLink.confirmed(_:_:body:reason:)`, giving a `reason` when the change is known to need confirming.
+- **From D4:** Regenerate Identity unpairs every device and restarts Hive, and Beekeeper on the Hive Mac pairs again by itself (`HiveListStore.pairAgainAfterNewIdentity`). Another device then shows "This Hive's Identity Has Changed" (`HiveLink.Status.identityChanged`) and never accepts the new key; check that here, once a second device can pair. A device that pairs again gets a new device record and makes a new confirmation key the first time it needs one.
+
 **Done when:** Beekeeper on a second Mac pairs with the Hive by pasting a code and then signs in over the tailnet; an expired or used code is refused; D4's "identity changed" message shows on the second Mac after regenerating the identity; and the tests pass. The iOS Simulator has no Secure Enclave, so it can't stand in for the second device.

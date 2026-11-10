@@ -100,7 +100,7 @@ final class JobStatusStore {
     private var mayConnect: Bool {
         switch link.status {
         case .connecting, .connected, .offline, .failed: true
-        case .identityChanged, .notRecognized, .notPaired, .lockedOut, .needsUpdate: false
+        case .pairingAgain, .identityChanged, .notRecognized, .notPaired, .lockedOut, .needsUpdate: false
         }
     }
 

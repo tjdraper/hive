@@ -17,6 +17,8 @@ struct DeviceCredential: Codable {
     let pin: PublicKeyPin
     /// The key's saved form, which only this device's Secure Enclave can use.
     let keyData: Data
+    /// The saved form of the `ConfirmationKey`, made the first time a change needs confirming.
+    var confirmationKeyData: Data?
 
     func signingKey() throws -> SecureEnclave.P256.Signing.PrivateKey {
         try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: keyData)

@@ -75,6 +75,8 @@ public enum RemovalReason: String, Codable, Hashable, Sendable {
     case replacedPartial
     /// The server was over its quota, and this was its oldest daily snapshot.
     case quota
+    /// A device deleted it, with its confirmation key.
+    case deletedByDevice
 }
 
 public enum RemovalProblem: String, Codable, Hashable, Sendable {

@@ -22,15 +22,22 @@ struct BackupJobWorkflow: Sendable {
     }
 
     /// Returns nil when no job has that ID.
-    func change(id: UUID, to draft: BackupJobDraft, by deviceID: UUID) throws -> BackupJob? {
+    func change(id: UUID, to draft: BackupJobDraft, isConfirmed: Bool, by deviceID: UUID) throws -> BackupJob? {
         let sealed = try SealedJobDraft(BackupJobDraftCheck.validated(draft), sealer: sealer)
-        guard let (old, new) = try store.change(id: id, to: sealed, by: deviceID, at: now(), schedule: schedule) else { return nil }
+        guard let (old, new) = try store.change(
+            id: id,
+            to: sealed,
+            isConfirmed: isConfirmed,
+            by: deviceID,
+            at: now(),
+            schedule: schedule
+        ) else { return nil }
         let changed = BackupJobStore.changes(from: old, to: new, passwordsEnteredAt: sealed.passwordPositions)
         if !changed.isEmpty {
             let reasons = ConfirmationRequirement.logged(
                 ConfirmationRequirement.reasons(from: old, to: new, passwordsEnteredAt: sealed.passwordPositions)
             )
-            Self.logger.notice("Changed a job (\(changed.count, privacy: .public) changes, to confirm: \(reasons, privacy: .public))")
+            Self.logger.notice("Changed a job (\(changed.count, privacy: .public) changes, confirmed: \(reasons, privacy: .public))")
         }
         return new
     }

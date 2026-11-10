@@ -20,11 +20,13 @@ struct ServerSSHKeyWorkflow: Sendable {
 
     /// The server needs the new key in its `authorized_keys` before Hive can connect again. Returns nil
     /// when no server has that ID.
-    func makeNewKey(forServer id: UUID, by deviceID: UUID) throws -> ServerSSHKey? {
+    func makeNewKey(forServer id: UUID, isConfirmed: Bool, by deviceID: UUID) throws -> ServerSSHKey? {
         let key = try SealedSSHKey(SSHKeyPair(), sealer: sealer)
-        guard let replacement = try store.replaceKey(forServer: id, with: key, by: deviceID, at: now()) else { return nil }
+        guard let replacement = try store.replaceKey(forServer: id, with: key, isConfirmed: isConfirmed, by: deviceID, at: now()) else {
+            return nil
+        }
         let reasons = ConfirmationRequirement.reasons(replacingSSHKey: replacement.old)
-        Self.logger.notice("Made a new SSH key for a server (to confirm: \(ConfirmationRequirement.logged(reasons), privacy: .public))")
+        Self.logger.notice("Made a new SSH key for a server (confirmed: \(ConfirmationRequirement.logged(reasons), privacy: .public))")
         return try serverSSHKey(replacement.new)
     }
 

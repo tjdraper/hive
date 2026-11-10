@@ -4,6 +4,11 @@ import Foundation
 public struct HiveRequestError: Error, Equatable {
     public let status: Int
     public let body: Data
+
+    public init(status: Int, body: Data) {
+        self.status = status
+        self.body = body
+    }
 }
 
 /// A signed-in connection to one Hive. It signs in when it has no session or its session is about to run
@@ -65,9 +70,15 @@ public actor HiveSession {
         _ = try await checked(send(method: "DELETE", path: path))
     }
 
-    /// Any request, with whatever Hive answers. For the Developer window, which shows the answer as it is.
-    public func send(method: String, path: String, body: Data? = nil) async throws -> (status: Int, body: Data) {
-        let (data, response) = try await sendSignedIn(method: method, path: path, body: body)
+    /// Any request, with whatever Hive answers, such as for the Developer window, which shows the answer
+    /// as it is. `confirmation` is signed over exactly this method, path and body.
+    public func send(
+        method: String,
+        path: String,
+        body: Data? = nil,
+        confirmation: ConfirmationProof? = nil
+    ) async throws -> (status: Int, body: Data) {
+        let (data, response) = try await sendSignedIn(method: method, path: path, body: body, confirmation: confirmation)
         return (response.statusCode, data)
     }
 
@@ -97,11 +108,18 @@ public actor HiveSession {
         }
     }
 
-    private func sendSignedIn(method: String, path: String, body: Data?) async throws -> (Data, HTTPURLResponse) {
-        let first = try await connection.send(path: path, method: method, body: body, token: token())
+    /// A request turned away for its session never reaches its route, so its confirmation's nonce is
+    /// still unused when it's sent again.
+    private func sendSignedIn(
+        method: String,
+        path: String,
+        body: Data?,
+        confirmation: ConfirmationProof? = nil
+    ) async throws -> (Data, HTTPURLResponse) {
+        let first = try await connection.send(path: path, method: method, body: body, token: token(), confirmation: confirmation)
         guard first.1.statusCode == 401 else { return first }
         session = nil
-        return try await connection.send(path: path, method: method, body: body, token: token())
+        return try await connection.send(path: path, method: method, body: body, token: token(), confirmation: confirmation)
     }
 
     private func checked(_ answer: (status: Int, body: Data)) throws -> Data {

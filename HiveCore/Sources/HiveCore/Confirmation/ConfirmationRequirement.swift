@@ -1,17 +1,8 @@
 import Foundation
 import HiveKit
 
-/// Why a change needs the device's `.userPresence` key as well as its session: it would send a secret
-/// somewhere new, or lead to snapshots being deleted.
-enum ConfirmationReason: String, CaseIterable, Sendable {
-    case connectionChanged
-    case quotaLowered
-    case retentionLowered
-    case passwordReplaced
-    case hostKeyReplaced
-    case sshKeyReplaced
-}
-
+/// Which changes need the device's confirmation key as well as its session (§6). Each is checked against
+/// the stored values inside the change's write transaction, so a change made in between can't slip through.
 enum ConfirmationRequirement {
     static func reasons(from old: Server, to new: Server) -> Set<ConfirmationReason> {
         var reasons: Set<ConfirmationReason> = []
@@ -43,6 +34,12 @@ enum ConfirmationRequirement {
     /// A server's first key replaces nothing.
     static func reasons(replacingSSHKey old: OpenSSHPublicKey?) -> Set<ConfirmationReason> {
         old == nil ? [] : [.sshKeyReplaced]
+    }
+
+    /// Throws `ConfirmationError.required` when a change needing confirmation wasn't confirmed, which
+    /// rolls back the transaction it's called from.
+    static func check(_ reasons: Set<ConfirmationReason>, isConfirmed: Bool) throws {
+        if !reasons.isEmpty, !isConfirmed { throw ConfirmationError.required(reasons) }
     }
 
     /// For the system log, which holds kinds but never values.

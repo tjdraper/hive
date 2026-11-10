@@ -49,7 +49,7 @@ extension BackupRunFixture {
     func setQuota(_ bytes: Int64?) async throws {
         var draft = serverRecord.draft
         draft.quotaBytes = bytes
-        let answer = try await api.send(.put, HiveEndpoint.server(serverRecord.id), json: draft)
+        let answer = try await api.sendConfirmed(.put, HiveEndpoint.server(serverRecord.id), json: draft)
         guard answer.status == .ok else { throw APIFixtureError.unexpectedStatus(answer.status) }
     }
 
@@ -57,7 +57,7 @@ extension BackupRunFixture {
         let job = job ?? self.job
         var draft = job.draft
         draft.retention = RetentionTiers(dailySnapshots: daily, monthlySnapshots: monthly)
-        let answer = try await api.send(.put, HiveEndpoint.job(job.id), json: draft)
+        let answer = try await api.sendConfirmed(.put, HiveEndpoint.job(job.id), json: draft)
         guard answer.status == .ok else { throw APIFixtureError.unexpectedStatus(answer.status) }
     }
 

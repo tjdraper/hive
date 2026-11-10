@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import GRDB
 @testable import HiveCore
 import HiveKit
 import Hummingbird
@@ -199,6 +200,12 @@ struct APIFixture {
     let volumes = FakeVolumes()
     let sleepPrevention = FakeSleepPrevention()
     let pauses = FakePauses()
+    /// Where the fixture's Hive keeps its identity key, which regenerating replaces.
+    let keyFolder: TemporaryDirectory
+    let identityKeys: HiveKeyStore
+    let restart = HiveRestart(delay: .zero)
+    /// The fixture device's confirmation key, a software key in place of the Secure Enclave's.
+    let confirmationKey = P256.Signing.PrivateKey()
 
     static var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -223,6 +230,16 @@ struct APIFixture {
         let signIn = self.signIn
         settings = HiveSettingsStore(database: signIn.database, defaultPort: Self.defaultPort)
         auditLog = AuditLog(database: signIn.database)
+        keyFolder = try TemporaryDirectory()
+        identityKeys = HiveKeyStore(directory: keyFolder.url, factory: SoftwareKeyFactory(), owner: getuid())
+        _ = try identityKeys.loadOrCreate()
+        // Straight into the store, so tests' audit logs start with only what they do.
+        try signIn.database.writer.write { [confirmationKey] database in
+            try database.execute(
+                sql: "UPDATE device SET confirmationPublicKey = ? WHERE id = ?",
+                arguments: [confirmationKey.publicKey.x963Representation, signIn.device.id]
+            )
+        }
         let clock = signIn.clock
         api = HiveAPI(
             hiveID: signIn.hiveID,
@@ -231,6 +248,8 @@ struct APIFixture {
             settingsStore: settings,
             listeners: listeners,
             sealer: sealer,
+            identityKeys: identityKeys,
+            restart: restart,
             fullDiskAccess: { [fullDiskAccess] in FullDiskAccessProbe { _ in fullDiskAccess.openResult }.check() },
             ssh: ssh,
             hostKeyScanner: ssh,
@@ -275,10 +294,19 @@ struct APIFixture {
     }
 
     /// Sends a request as the fixture's device.
-    func send(_ method: HTTPRequest.Method, _ path: String, body: Data? = nil) async throws -> APIAnswer {
+    func send(
+        _ method: HTTPRequest.Method,
+        _ path: String,
+        body: Data? = nil,
+        confirmation: ConfirmationProof? = nil
+    ) async throws -> APIAnswer {
         let token = try token()
-        return try await application.test(.router) { client in
-            try await client.execute(uri: path, method: method, headers: headers(token: token), body: body.map { ByteBuffer(bytes: $0) }) {
+        var headers = headers(token: token)
+        if let confirmation, let name = HTTPFields.Element.Name(ConfirmationProof.headerName) {
+            headers[name] = confirmation.headerValue
+        }
+        return try await application.test(.router) { [headers] client in
+            try await client.execute(uri: path, method: method, headers: headers, body: body.map { ByteBuffer(bytes: $0) }) {
                 APIAnswer(status: $0.status, body: Data($0.body.readableBytesView))
             }
         }
@@ -286,6 +314,33 @@ struct APIFixture {
 
     func send(_ method: HTTPRequest.Method, _ path: String, json: some Encodable) async throws -> APIAnswer {
         try await send(method, path, body: JSONEncoder().encode(json))
+    }
+
+    /// Sends a request confirmed with the device's confirmation key.
+    func sendConfirmed(_ method: HTTPRequest.Method, _ path: String, body: Data? = nil) async throws -> APIAnswer {
+        try await send(method, path, body: body, confirmation: confirmation(method, path, body: body ?? Data()))
+    }
+
+    func sendConfirmed(_ method: HTTPRequest.Method, _ path: String, json: some Encodable) async throws -> APIAnswer {
+        try await sendConfirmed(method, path, body: JSONEncoder().encode(json))
+    }
+
+    /// A fresh nonce signed over the request by `key`, the device's confirmation key unless given.
+    func confirmation(
+        _ method: HTTPRequest.Method,
+        _ path: String,
+        body: Data,
+        key: P256.Signing.PrivateKey? = nil,
+        nonce: Data? = nil
+    ) throws -> ConfirmationProof {
+        let nonce = nonce ?? api.confirmations.issue().nonce
+        let statement = ConfirmationStatement.bytes(
+            hiveID: signIn.hiveID,
+            deviceID: signIn.device.id,
+            nonce: nonce,
+            request: ConfirmationStatement.Request(method: method.rawValue, path: path, body: body)
+        )
+        return ConfirmationProof(nonce: nonce, signature: try (key ?? confirmationKey).signature(for: statement).rawRepresentation)
     }
 }
 
@@ -295,6 +350,16 @@ struct APIAnswer {
 
     func decoded<Value: Decodable>(as _: Value.Type) throws -> Value {
         try JSONDecoder().decode(Value.self, from: body)
+    }
+
+    /// Why a 428 asked for confirmation.
+    var confirmationReasons: Set<ConfirmationReason> {
+        get throws { try Set(decoded(as: ConfirmationRequired.self).reasons) }
+    }
+
+    /// Why a 403 turned a confirmation down.
+    var confirmationRefusal: ConfirmationRefusalReason {
+        get throws { try decoded(as: ConfirmationRefusal.self).reason }
     }
 
     /// The problems in a 422 refusal.

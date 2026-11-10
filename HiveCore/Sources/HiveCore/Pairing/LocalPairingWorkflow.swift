@@ -13,6 +13,8 @@ public struct LocalPairingWorkflow: Sendable {
     /// Read at each pairing, since the port can change while Hive runs.
     let settings: HiveSettingsStore
     let devices: DeviceStore
+    /// True once Hive is restarting for a new identity, when `pin` names the old key.
+    let isRestarting: @Sendable () -> Bool
     let now: @Sendable () -> Date
 
     public init(
@@ -20,16 +22,20 @@ public struct LocalPairingWorkflow: Sendable {
         pin: PublicKeyPin,
         settings: HiveSettingsStore,
         devices: DeviceStore,
+        isRestarting: @escaping @Sendable () -> Bool,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.hiveID = hiveID
         self.pin = pin
         self.settings = settings
         self.devices = devices
+        self.isRestarting = isRestarting
         self.now = now
     }
 
     public func pair(_ request: LocalPairingRequest) -> LocalPairingResult {
+        // A device paired now would pin the key Hive is about to stop using. Beekeeper tries again once it's back.
+        guard !isRestarting() else { return refuse(.hiveUnavailable) }
         guard let publicKey = try? P256.Signing.PublicKey(x963Representation: request.devicePublicKey) else {
             return refuse(.invalidKey)
         }

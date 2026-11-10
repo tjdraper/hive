@@ -13,6 +13,8 @@ enum HiveLinkError: Error {
 final class HiveLink {
     enum Status: Equatable {
         case connecting
+        /// The Hive took a new identity and is restarting, and Beekeeper on its Mac is pairing again.
+        case pairingAgain
         case connected
         case offline
         /// Hive showed a key other than the pinned one. Beekeeper never accepts it without pairing again.
@@ -90,12 +92,44 @@ final class HiveLink {
         }
     }
 
+    /// A request whose change may need confirming, decoded. With a `reason` it asks for Touch ID or the
+    /// password first, saying that; without one it asks only if Hive says the change needs it.
+    func confirmed<Value: Decodable>(
+        _ method: String,
+        _ path: String,
+        body: (some Encodable)? = String?.none,
+        reason: String?,
+        as _: Value.Type = Value.self
+    ) async throws -> Value {
+        let data = try await confirmed(method, path, body: body, reason: reason)
+        do {
+            return try JSONDecoder().decode(Value.self, from: data)
+        } catch {
+            throw HiveConnectionError.unreadableResponse
+        }
+    }
+
+    /// For a request whose answer has no body.
+    @discardableResult
+    func confirmed(_ method: String, _ path: String, body: (some Encodable)? = String?.none, reason: String?) async throws -> Data {
+        let encoded = try body.map { try JSONEncoder().encode($0) }
+        let workflow = ConfirmationWorkflow(hiveID: hiveID, keychain: keychain)
+        return try await perform { try await workflow.send(method: method, path: path, body: encoded, reason: reason, on: $0) }
+    }
+
     /// The Hive's live updates, until it ends them, such as when the session runs out.
     func liveUpdates() async throws -> AsyncThrowingStream<LiveUpdate, any Error> {
         try await perform { try await $0.liveUpdates() }
     }
 
-    /// After this device revokes itself: its key is no use any more.
+    /// While Beekeeper on the Hive's Mac pairs again after a new identity. Pairing again connects it.
+    func startPairingAgain() {
+        session = nil
+        deviceID = nil
+        status = .pairingAgain
+    }
+
+    /// After this device revokes itself, or the Hive took a new identity: its key is no use any more.
     func forgetCredential() {
         try? keychain.delete(hiveID: hiveID)
         session = nil
@@ -113,14 +147,15 @@ final class HiveLink {
         // A request whose task was cancelled, such as by a view reloading, says nothing about the Hive.
         case let error as URLError where error.code == .cancelled: nil
         case is URLError: .offline
-        case is HiveRequestError, is CancellationError: nil
+        case is HiveRequestError, is CancellationError, is ConfirmationKeyError, is ConfirmationWorkflowError: nil
         default: .failed(error.localizedDescription)
         }
     }
 
     /// What to tell the person when a request fails.
     static func message(for error: any Error) -> String {
-        switch error {
+        if let message = ConfirmationWorkflow.message(for: error) { return message }
+        return switch error {
         case let refused as HiveRequestError:
             "The Hive turned the request down (\(refused.status))."
         case HiveConnectionError.wrongKey:

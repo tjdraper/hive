@@ -35,9 +35,10 @@ final class ServerList {
         return server
     }
 
-    func change(_ id: UUID, to draft: ServerDraft) async throws -> Server {
+    /// With a `reason`, asks for Touch ID or the password first, saying that.
+    func change(_ id: UUID, to draft: ServerDraft, confirming reason: String?) async throws -> Server {
         let old = self.server(id)
-        let server: Server = try await link.perform { try await $0.put(HiveEndpoint.server(id), body: draft) }
+        let server: Server = try await link.confirmed("PUT", HiveEndpoint.server(id), body: draft, reason: reason)
         update(server)
         // Hive clears the jobs' database passwords when the connection changes.
         if old?.connection != server.connection { await jobs.refresh() }
@@ -52,6 +53,12 @@ final class ServerList {
 
     func space(of id: UUID) async throws -> ServerSpace {
         try await link.perform { try await $0.get(HiveEndpoint.space(ofServer: id)) }
+    }
+
+    /// How many snapshots `quotaBytes` would remove that the server's saved quota doesn't.
+    func estimate(quotaBytes: Int64?, of id: UUID) async throws -> RemovalEstimate {
+        let request = QuotaEstimateRequest(quotaBytes: quotaBytes)
+        return try await link.perform { try await $0.post(HiveEndpoint.quotaEstimate(ofServer: id), body: request) }
     }
 
     /// Takes a server as Hive last sent it, such as after its host key was confirmed.

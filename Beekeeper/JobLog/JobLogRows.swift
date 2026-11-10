@@ -203,6 +203,7 @@ extension RemovalReason {
         case .outsideTiers: "No longer kept by the job's tiers"
         case .replacedPartial: "Incomplete, and a newer snapshot completed"
         case .quota: "The server was over its quota"
+        case .deletedByDevice: "Deleted from Beekeeper"
         }
     }
 }

@@ -15,4 +15,6 @@ References like §13 point to [00-Info.md](00-Info.md).
 - The password never appears in a response, the audit log or the system log
 - Changing the host clears the password
 
+- **From D4:** a confirmed route reads its request with `ConfirmedRequest.read` and checks `ConfirmationRequirement.check` inside the store's write transaction, against the stored values. Add the new `ConfirmationReason` to HiveKit, its Touch ID wording to `ConfirmationReason.prompt`, and a case to `ConfirmedRouteTests.cases`, which covers the refusals. In Beekeeper, send it with `HiveLink.confirmed(_:_:body:reason:)`, giving a `reason` when the change is known to need confirming.
+
 **Done when:** a test email sent from Beekeeper arrives through your own provider, and the tests pass.

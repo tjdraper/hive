@@ -56,6 +56,8 @@ struct HiveConnectionGate<Content: View>: View {
         case .connecting:
             ProgressView("Connecting…")
                 .task { await link.refresh() }
+        case .pairingAgain:
+            ProgressView("Pairing again with the Hive's new identity…")
         default:
             HiveProblemView(hive: hive, link: link)
         }
@@ -100,7 +102,7 @@ private struct HiveProblemView: View {
             if link.status != .identityChanged {
                 Button("Remove from Beekeeper…") { isConfirmingRemoval = true }
             }
-        case .connecting, .connected, .needsUpdate:
+        case .connecting, .pairingAgain, .connected, .needsUpdate:
             EmptyView()
         }
     }
@@ -115,7 +117,7 @@ private struct HiveProblemView: View {
         case .needsUpdate(.hive): "Update Hive"
         case .needsUpdate(.beekeeper): "Update Beekeeper"
         case .failed: "Something Went Wrong"
-        case .connecting, .connected: ""
+        case .connecting, .pairingAgain, .connected: ""
         }
     }
 
@@ -126,7 +128,7 @@ private struct HiveProblemView: View {
         case .notRecognized, .notPaired: "person.crop.circle.badge.questionmark"
         case .lockedOut: "lock"
         case .needsUpdate: "arrow.down.circle"
-        case .failed, .connecting, .connected: "exclamationmark.triangle"
+        case .failed, .connecting, .pairingAgain, .connected: "exclamationmark.triangle"
         }
     }
 
@@ -148,7 +150,7 @@ private struct HiveProblemView: View {
             "This Beekeeper is too old to work with this Hive."
         case .failed(let message):
             message
-        case .connecting, .connected:
+        case .connecting, .pairingAgain, .connected:
             ""
         }
     }

@@ -82,8 +82,17 @@ public final class HiveConnection: Sendable {
         }
     }
 
-    func send(path: String, method: String, body: Data? = nil, token: String? = nil) async throws -> (Data, HTTPURLResponse) {
-        let request = try request(path: path, method: method, body: body, token: token)
+    func send(
+        path: String,
+        method: String,
+        body: Data? = nil,
+        token: String? = nil,
+        confirmation: ConfirmationProof? = nil
+    ) async throws -> (Data, HTTPURLResponse) {
+        var request = try request(path: path, method: method, body: body, token: token)
+        if let confirmation {
+            request.setValue(confirmation.headerValue, forHTTPHeaderField: ConfirmationProof.headerName)
+        }
         let (data, response) = try await refusingWrongKey { try await session.data(for: request) }
         guard let response = response as? HTTPURLResponse else { throw HiveConnectionError.unexpectedStatus(0) }
         return (data, response)

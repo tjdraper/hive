@@ -26,6 +26,25 @@ extension AuditEvent {
             "Started a run of “\(jobName)” on “\(serverName)”"
         case .backupRunCancelled(_, let serverName, let jobName):
             "Cancelled the run of “\(jobName)” on “\(serverName)”"
+        case .snapshotsDeleted(let deletion):
+            deletion.summary
+        case .confirmationKeyRegistered:
+            "Set up confirming changes with Touch ID or the password"
+        case .identityRegenerated:
+            "Gave the Hive a new identity, unpairing every device"
+        }
+    }
+}
+
+extension SnapshotDeletion {
+    var summary: String {
+        switch self {
+        case .snapshot(_, let serverName, let jobName, let date):
+            "Deleted the snapshot of “\(jobName)” on “\(serverName)” from \(date.formatted(date: .abbreviated, time: .shortened))"
+        case .job(_, let serverName, let jobName, let count):
+            "Deleted \(SnapshotCount(count)) of “\(jobName)” on “\(serverName)”"
+        case .server(_, let serverName, let count):
+            "Deleted \(SnapshotCount(count)) of “\(serverName)”"
         }
     }
 }

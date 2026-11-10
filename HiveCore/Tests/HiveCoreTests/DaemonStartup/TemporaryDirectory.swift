@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-final class TemporaryDirectory {
+final class TemporaryDirectory: Sendable {
     let url: URL
 
     init() throws {

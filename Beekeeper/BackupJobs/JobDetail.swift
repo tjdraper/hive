@@ -41,7 +41,7 @@ struct JobDetail: View {
         Form {
             JobStatusSection(job: job, statuses: servers.statuses)
             JobSummary(job: job)
-            JobSnapshotsSection(hive: hive, link: link, job: job, statuses: servers.statuses)
+            JobSnapshotsSection(hive: hive, link: link, jobID: job.id, jobName: job.name, statuses: servers.statuses)
         }
         .formStyle(.grouped)
         .toolbar {

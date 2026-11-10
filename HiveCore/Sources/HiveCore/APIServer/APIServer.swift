@@ -34,7 +34,11 @@ public struct APIServer: Sendable {
             factory: TLSListenerFactory(responder: Self.responder(api: api), tlsConfiguration: tlsConfiguration)
         )
         let group = ServiceGroup(configuration: ServiceGroupConfiguration(
-            services: [service, SchedulingService(scheduler: api.scheduler, runs: api.runs)],
+            services: [
+                .init(service: service),
+                .init(service: SchedulingService(scheduler: api.scheduler, runs: api.runs)),
+                .init(service: RestartService(restart: api.restart), successTerminationBehavior: .gracefullyShutdownGroup),
+            ],
             gracefulShutdownSignals: [.sigterm, .sigint],
             logger: TLSListener.quietLogger
         ))
@@ -55,18 +59,22 @@ public struct APIServer: Sendable {
             macSleep: api.macSleep
         )
         DeviceRoutes.add(to: router, devices: api.devices, revocation: api.revocation)
+        ConfirmationRoutes.add(to: router, verifier: api.confirmations)
+        IdentityRoutes.add(to: router, workflow: api.identity, confirmations: api.confirmations)
         SettingsRoutes.add(to: router, workflow: api.settings)
         AuditLogRoutes.add(to: router, auditLog: api.auditLog)
-        ServerRoutes.add(to: router, workflow: api.servers)
+        ServerRoutes.add(to: router, workflow: api.servers, confirmations: api.confirmations)
         ServerSpaceRoutes.add(to: router, reader: api.serverSpace)
-        BackupJobRoutes.add(to: router, workflow: api.jobs)
-        SSHKeyRoutes.add(to: router, workflow: api.sshKeys)
-        HostKeyRoutes.add(to: router, workflow: api.hostKeys)
+        RemovalEstimateRoutes.add(to: router, estimator: api.removalEstimator)
+        BackupJobRoutes.add(to: router, workflow: api.jobs, confirmations: api.confirmations)
+        SSHKeyRoutes.add(to: router, workflow: api.sshKeys, confirmations: api.confirmations)
+        HostKeyRoutes.add(to: router, workflow: api.hostKeys, confirmations: api.confirmations)
         ConnectionTestRoutes.add(to: router, workflow: api.connectionTest)
         BackupDriveRoutes.add(to: router, workflow: api.backupDrive)
         BackupRunRoutes.add(to: router, coordinator: api.runs, statuses: api.jobStatus)
         JobLogRoutes.add(to: router, jobLog: api.jobLog)
-        SnapshotRoutes.add(to: router, reader: api.snapshots)
+        SnapshotRoutes.add(to: router, reader: api.snapshots, removedJobs: api.removedJobs)
+        SnapshotDeletionRoutes.add(to: router, store: api.snapshotDeletions, runs: api.runs, confirmations: api.confirmations)
         LiveUpdateRoutes.add(
             to: router,
             events: api.runs.events,
@@ -88,6 +96,17 @@ private struct ListeningService: Service {
 
     func run() async throws {
         try await listeners.run(with: factory)
+    }
+}
+
+/// Returns once a restart is asked for, which shuts the rest down gracefully, or when Hive is stopping anyway.
+private struct RestartService: Service {
+    let restart: HiveRestart
+
+    func run() async throws {
+        await cancelWhenGracefulShutdown {
+            await restart.wait()
+        }
     }
 }
 

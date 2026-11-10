@@ -34,6 +34,19 @@ public enum AuditEvent: Codable, Hashable, Sendable {
     case backupRunStarted(jobID: UUID, serverName: String, jobName: String)
     /// A waiting run was taken out of the queue, or a running one stopped.
     case backupRunCancelled(jobID: UUID, serverName: String, jobName: String)
+    /// Snapshots a device asked to delete, which Hive deletes between runs. The job log records each one removed.
+    case snapshotsDeleted(SnapshotDeletion)
+    /// The device registered the key it confirms changes with.
+    case confirmationKeyRegistered
+    /// Hive made a new identity key, and every device was unpaired.
+    case identityRegenerated
+}
+
+/// What a device asked to delete, with the names as they were, or for a removed job as last known.
+public enum SnapshotDeletion: Codable, Hashable, Sendable {
+    case snapshot(jobID: UUID, serverName: String, jobName: String, date: Date)
+    case job(jobID: UUID, serverName: String, jobName: String, count: Int)
+    case server(serverID: UUID, serverName: String, count: Int)
 }
 
 public enum ServerChange: Codable, Hashable, Sendable {

@@ -90,6 +90,38 @@ final class HiveListStore {
         hives.contains(where: \.isOnThisMac)
     }
 
+    /// After this Mac's Hive took a new identity, which unpaired this device and restarts Hive: pairs again
+    /// once Hive is back. Hive turns pairing away until it has restarted, so the pin is always the new key's.
+    func pairAgainAfterNewIdentity(_ id: UUID) {
+        guard let link = links[id] else { return }
+        link.startPairingAgain()
+        Task {
+            let deadline = ContinuousClock.now + Self.restartAllowance
+            while true {
+                do {
+                    _ = try await pairWithThisMac()
+                    return
+                } catch where Self.isRestarting(error) && ContinuousClock.now < deadline {
+                    try? await Task.sleep(for: .seconds(2))
+                } catch {
+                    Self.logger.error("Couldn't pair again after a new identity: \(String(describing: error), privacy: .public)")
+                    link.connect(to: hive(id)?.addresses.first)
+                    return
+                }
+            }
+        }
+    }
+
+    /// launchd waits up to 10 seconds before starting a daemon again, and Hive waits for its run to stop.
+    private static let restartAllowance = Duration.seconds(60)
+
+    private static func isRestarting(_ error: any Error) -> Bool {
+        switch error {
+        case LocalPairingError.unreachable, LocalPairingError.refused(.hiveUnavailable): true
+        default: false
+        }
+    }
+
     /// Pairs with this Mac's Hive, or again with it after this device was revoked, and returns its ID.
     func pairWithThisMac() async throws -> UUID {
         let pairing = try await LocalPairingWorkflow(keychain: keychain).pair()

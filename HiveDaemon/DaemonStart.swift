@@ -14,7 +14,8 @@ enum DaemonStart {
         do {
             let info = try DaemonInfo.read()
             let started = try DaemonStartupWorkflow(mode: mode).run()
-            let keys = try HiveKeyStore(directory: started.dataDirectory).loadOrCreate()
+            let keyStore = HiveKeyStore(directory: started.dataDirectory)
+            let keys = try keyStore.loadOrCreate()
             try HiveKeyCheck(directory: started.dataDirectory).run(keys)
             let certificate = try IdentityCertificateStore(directory: started.dataDirectory).loadOrIssue(for: keys.identity)
             let identity = TLSIdentity(key: keys.identity, certificate: certificate)
@@ -24,18 +25,16 @@ enum DaemonStart {
             let settings = HiveSettingsStore(database: database, defaultPort: APIServer.defaultPort(for: mode))
             let listeners = ListenerCoordinator(target: try settings.settings().listenTarget)
 
-            server = try APIServer(
-                api: HiveAPI(
-                    hiveID: hiveID,
-                    database: database,
-                    settings: settings,
-                    listeners: listeners,
-                    sealer: SecretSealer(key: keys.storage),
-                    rsync: bundledRsync()
-                ),
-                identity: identity,
-                listeners: listeners
+            let api = HiveAPI(
+                hiveID: hiveID,
+                database: database,
+                settings: settings,
+                listeners: listeners,
+                sealer: SecretSealer(key: keys.storage),
+                identityKeys: keyStore,
+                rsync: bundledRsync()
             )
+            server = try APIServer(api: api, identity: identity, listeners: listeners)
             pairing = try LocalPairingListener(
                 machService: info.pairingMachService,
                 beekeeperSigningIdentifier: info.beekeeperSigningIdentifier,
@@ -43,7 +42,8 @@ enum DaemonStart {
                     hiveID: hiveID,
                     pin: PublicKeyPin(publicKey: keys.identity.publicKey),
                     settings: settings,
-                    devices: DeviceStore(database: database)
+                    devices: DeviceStore(database: database),
+                    isRestarting: { api.isRestarting }
                 )
             )
         } catch DaemonStartupError.nobodyLoggedIn {
@@ -82,6 +82,7 @@ enum DaemonStart {
         Task {
             do {
                 try await server.run()
+                // launchd's KeepAlive starts it again, which is how a restart Hive asks for takes effect.
                 logger.notice("The API server stopped")
                 exit(EXIT_SUCCESS)
             } catch {

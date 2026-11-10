@@ -6,6 +6,8 @@ struct RetentionFields: View {
     @Binding var retention: RetentionTiers
     /// The job's tiers as Hive has them, or nil for a new job.
     let saved: RetentionTiers?
+    /// What lower tiers would delete, once Hive has worked it out.
+    let estimate: RemovalEstimate?
     let problems: JobFieldProblems
 
     var body: some View {
@@ -20,11 +22,21 @@ struct RetentionFields: View {
                     Text("The newest from each of the last ^[\(retention.monthlySnapshots) month](inflect: true) with a snapshot.")
                 }
             }
-            if let saved, retention.dailySnapshots < saved.dailySnapshots || retention.monthlySnapshots < saved.monthlySnapshots {
-                Label(
-                    "Lowering these deletes the snapshots they no longer keep, at Hive's next retention pass.",
-                    systemImage: "exclamationmark.triangle.fill"
-                )
+            if retention.isLowered(from: saved) {
+                Label {
+                    switch estimate?.snapshotCount {
+                    case nil:
+                        Text("Lowering these deletes the snapshots they no longer keep, at Hive's next retention pass.")
+                    case 0:
+                        Text("These still keep every snapshot the job has, so none are deleted now. Saving asks you to confirm.")
+                    case .some(let count):
+                        Text(
+                            "Lowering these deletes ^[\(count) snapshot](inflect: true) they no longer keep, at Hive's next retention pass."
+                        )
+                    }
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                }
                 .foregroundStyle(.orange)
             }
         } header: {
@@ -58,5 +70,13 @@ struct RetentionFields: View {
                 FieldProblemText(problem)
             }
         }
+    }
+}
+
+extension RetentionTiers {
+    /// Lower in either tier than `saved`. Hive asks for confirmation of that.
+    func isLowered(from saved: RetentionTiers?) -> Bool {
+        guard let saved else { return false }
+        return dailySnapshots < saved.dailySnapshots || monthlySnapshots < saved.monthlySnapshots
     }
 }

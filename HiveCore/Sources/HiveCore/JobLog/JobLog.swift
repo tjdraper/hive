@@ -36,7 +36,7 @@ struct JobLog: Sendable {
         return JobLogPage(entries: entries, nextBefore: rows.count > limit ? entries.last?.id : nil)
     }
 
-    /// One entry for the job, when anything was removed or couldn't be.
+    /// One entry for the job, when anything was removed or couldn't be, a removed job's included.
     @discardableResult
     func recordRemovals(
         ofJob jobID: UUID,
@@ -46,7 +46,7 @@ struct JobLog: Sendable {
     ) throws -> RemovalLogEntry? {
         guard !removed.isEmpty || !notRemoved.isEmpty else { return nil }
         return try database.writer.write { database in
-            guard let names = try JobNames.fetch(jobID: jobID, in: database) else { return nil }
+            guard let names = try JobNames.lastKnown(jobID: jobID, in: database) else { return nil }
             var record = RemovalLogRecord(
                 id: nil,
                 jobID: jobID,

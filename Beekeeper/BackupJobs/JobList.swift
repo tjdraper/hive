@@ -32,8 +32,9 @@ final class JobList {
         return job
     }
 
-    func change(_ id: UUID, to draft: BackupJobDraft) async throws -> BackupJob {
-        let job: BackupJob = try await link.perform { try await $0.put(HiveEndpoint.job(id), body: draft) }
+    /// With a `reason`, asks for Touch ID or the password first, saying that.
+    func change(_ id: UUID, to draft: BackupJobDraft, confirming reason: String?) async throws -> BackupJob {
+        let job: BackupJob = try await link.confirmed("PUT", HiveEndpoint.job(id), body: draft, reason: reason)
         update(job)
         return job
     }
@@ -41,6 +42,11 @@ final class JobList {
     func remove(_ id: UUID) async throws {
         try await link.perform { try await $0.delete(HiveEndpoint.job(id)) }
         jobs.removeAll { $0.id == id }
+    }
+
+    /// How many snapshots `tiers` would remove that the job's saved tiers don't.
+    func estimate(tiers: RetentionTiers, of id: UUID) async throws -> RemovalEstimate {
+        try await link.perform { try await $0.post(HiveEndpoint.retentionEstimate(ofJob: id), body: tiers) }
     }
 
     /// Hive removes a server's jobs with it.

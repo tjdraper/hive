@@ -47,10 +47,12 @@ struct BackupJobStore: Sendable {
         }
     }
 
-    /// Returns nil when no job has that ID.
+    /// Throws `ConfirmationError.required`, changing nothing, when the change needs confirming and
+    /// isn't confirmed. Returns nil when no job has that ID.
     func change(
         id: UUID,
         to sealed: SealedJobDraft,
+        isConfirmed: Bool = false,
         by deviceID: UUID,
         at date: Date,
         schedule: ScheduleCalendar
@@ -71,6 +73,10 @@ struct BackupJobStore: Sendable {
             )
             try replacement.replace(in: database)
             let new = try replacement.backupJob()
+            try ConfirmationRequirement.check(
+                ConfirmationRequirement.reasons(from: old, to: new, passwordsEnteredAt: sealed.passwordPositions),
+                isConfirmed: isConfirmed
+            )
             try ScheduleStore.reschedule(jobID: id, times: new.times, from: date, schedule: schedule, in: database)
 
             let serverName = try Self.serverName(stored.job.serverID, in: database)

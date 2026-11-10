@@ -29,6 +29,13 @@ struct ServerDetail: View {
         ])
     }
 
+    /// When any of the server's jobs last failed because the server showed another host key.
+    private func hostKeyChange(of server: Server) -> HostKeyChange? {
+        let statuses = servers.jobs.jobs(onServer: server.id).compactMap { servers.statuses.status(of: $0.id) }
+        guard statuses.contains(where: { $0.lastRun?.run.failure == .hostKeyChanged }) else { return nil }
+        return HostKeyChange(lastBackup: statuses.compactMap(\.lastSnapshotAt).max())
+    }
+
     private func page(_ server: Server) -> some View {
         Form {
             ServerJobsSection(
@@ -42,10 +49,10 @@ struct ServerDetail: View {
                 LabeledContent("Port", value: String(server.connection.port))
                 LabeledContent("SSH user", value: server.connection.user)
             }
-            ServerQuotaSection(servers: servers, server: server)
+            ServerQuotaSection(link: link, servers: servers, server: server)
             // A new identity, so a changed connection starts the checks over rather than showing an old result.
             Group {
-                HostKeyCheck(link: link, servers: servers, server: server)
+                HostKeyCheck(link: link, servers: servers, server: server, change: hostKeyChange(of: server))
                 AuthorizedKeySetup(link: link, server: server)
                 ConnectionTestCheck(link: link, server: server)
             }

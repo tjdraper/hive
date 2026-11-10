@@ -25,15 +25,18 @@ struct QuotaField: View {
     @Binding var quotaBytes: Int64?
     let saved: Int64?
     let space: ServerSpace?
+    /// What a lower quota would delete, once Hive has worked it out.
+    let estimate: RemovalEstimate?
     let problem: String?
 
     @State private var amount: Double
     @State private var unit: Unit
 
-    init(quotaBytes: Binding<Int64?>, saved: Int64?, space: ServerSpace?, problem: String?) {
+    init(quotaBytes: Binding<Int64?>, saved: Int64?, space: ServerSpace?, estimate: RemovalEstimate?, problem: String?) {
         _quotaBytes = quotaBytes
         self.saved = saved
         self.space = space
+        self.estimate = estimate
         self.problem = problem
         let bytes = quotaBytes.wrappedValue ?? Self.smallestSuggested
         let unit: Unit = bytes >= Unit.terabytes.rawValue && bytes % Unit.terabytes.rawValue == 0 ? .terabytes : .gigabytes
@@ -62,11 +65,23 @@ struct QuotaField: View {
                 }
             }
             LabeledContent("Uses now", value: ServerSpace.describe(space))
-            if isLowered {
-                Label(
-                    "A lower quota deletes this server's oldest daily snapshots until it fits, at Hive's next retention pass.",
-                    systemImage: "exclamationmark.triangle.fill"
-                )
+            if Self.isLowered(from: saved, to: quotaBytes) {
+                Label {
+                    switch estimate?.snapshotCount {
+                    case nil:
+                        Text("A lower quota deletes this server's oldest daily snapshots until it fits, at Hive's next retention pass.")
+                    case 0:
+                        Text("Its snapshots fit the lower quota, so none are deleted now. Saving asks you to confirm.")
+                    case .some(let count):
+                        // One literal, which `Text` localizes and inflects. Joining two with `+` makes a plain `String`.
+                        Text("""
+                        A lower quota deletes up to ^[\(count) snapshot](inflect: true), the server's oldest daily ones, \
+                        at Hive's next retention pass.
+                        """)
+                    }
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                }
                 .foregroundStyle(.orange)
             }
         } header: {
@@ -105,8 +120,9 @@ struct QuotaField: View {
         return max(hundred, (doubled + hundred - 1) / hundred * hundred)
     }
 
-    private var isLowered: Bool {
-        switch (saved, quotaBytes) {
+    /// No quota is the highest. Hive asks for confirmation of any lower one.
+    static func isLowered(from saved: Int64?, to new: Int64?) -> Bool {
+        switch (saved, new) {
         case (nil, .some): true
         case (.some(let saved), .some(let new)): new < saved
         case (_, nil): false

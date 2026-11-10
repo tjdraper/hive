@@ -56,7 +56,7 @@ struct SignInWorkflowTests {
     func expiredChallengeIsRefused() throws {
         // Arrange
         let request = try fixture.request()
-        fixture.clock.advance(by: SignInChallenges.lifetime + 1)
+        fixture.clock.advance(by: SignInWorkflow.challengeLifetime + 1)
 
         // Act
         let outcome = fixture.workflow.signIn(request, from: address)

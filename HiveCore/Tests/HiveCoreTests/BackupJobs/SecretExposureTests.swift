@@ -39,7 +39,7 @@ struct SecretExposureTests {
         moved.connection.host = "elsewhere.example.com"
 
         // Act
-        answers.append(try await fixture.send(.put, HiveEndpoint.job(job.id), json: replacing))
+        answers.append(try await fixture.sendConfirmed(.put, HiveEndpoint.job(job.id), json: replacing))
         answers.append(try await fixture.send(.put, HiveEndpoint.job(job.id), json: refusedPassword))
         answers.append(try await fixture.send(.put, HiveEndpoint.job(job.id), json: refusedOther))
         answers.append(try await fixture.send(.post, HiveEndpoint.jobs(onServer: server.id), json: unknownID))
@@ -48,7 +48,7 @@ struct SecretExposureTests {
         answers.append(try await fixture.send(.get, HiveEndpoint.job(job.id)))
         answers.append(try await fixture.send(.get, HiveEndpoint.jobs))
         answers.append(try await fixture.send(.get, HiveEndpoint.jobs(onServer: server.id)))
-        answers.append(try await fixture.send(.put, HiveEndpoint.server(server.id), json: moved))
+        answers.append(try await fixture.sendConfirmed(.put, HiveEndpoint.server(server.id), json: moved))
         answers.append(try await fixture.send(.get, HiveEndpoint.auditLog))
         answers.append(try await fixture.send(.delete, HiveEndpoint.job(job.id)))
 
@@ -71,7 +71,7 @@ struct SecretExposureTests {
         let job = try await fixture.addJob(ConfigurationSamples.job(password: Self.secret), to: server)
         var draft = job.draft
         draft.databases[0].password = "\(Self.secret)-2"
-        _ = try await fixture.send(.put, HiveEndpoint.job(job.id), json: draft)
+        _ = try await fixture.sendConfirmed(.put, HiveEndpoint.job(job.id), json: draft)
 
         // Assert
         let sealed = try #require(try await fixture.signIn.database.writer.read { database in

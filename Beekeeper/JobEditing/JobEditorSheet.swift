@@ -1,7 +1,8 @@
 import HiveKit
 import SwiftUI
 
-/// Adding a job to a server, or changing one, whole: what it backs up, when, and what it keeps.
+/// Adding a job to a server, or changing one, whole: what it backs up, when, and what it keeps. Lowering
+/// what it keeps or replacing a database password asks for Touch ID or the password on Save.
 struct JobEditorSheet: View {
     let jobs: JobList
     let serverID: UUID
@@ -14,6 +15,7 @@ struct JobEditorSheet: View {
     @State private var problems = JobFieldProblems()
     @State private var isSaving = false
     @State private var failure: String?
+    @State private var retentionEstimate: RemovalEstimate?
 
     init(jobs: JobList, serverID: UUID, job: BackupJob?, onSaved: ((BackupJob) -> Void)? = nil) {
         self.jobs = jobs
@@ -36,7 +38,7 @@ struct JobEditorSheet: View {
                 DirectoryFields(directories: $draft.directories, problems: problems)
                 DatabaseFields(databases: $draft.databases, problems: problems)
                 ScheduleFields(times: $draft.times, problems: problems)
-                RetentionFields(retention: $draft.retention, saved: job?.retention, problems: problems)
+                RetentionFields(retention: $draft.retention, saved: job?.retention, estimate: retentionEstimate, problems: problems)
             }
             .formStyle(.grouped)
             Divider()
@@ -60,6 +62,34 @@ struct JobEditorSheet: View {
         .frame(width: 640, height: 680)
         // Hive's problems name rows by their place in the list it was sent, which adding or removing one changes.
         .onChange(of: draft.rowIDs) { problems = JobFieldProblems() }
+        .task(id: draft.retention) { await estimateRetention() }
+    }
+
+    /// Once the tiers stop changing.
+    private func estimateRetention() async {
+        retentionEstimate = nil
+        guard let job, draft.retention.isLowered(from: job.retention) else { return }
+        try? await Task.sleep(for: .milliseconds(300))
+        guard !Task.isCancelled else { return }
+        retentionEstimate = try? await jobs.estimate(tiers: draft.retention, of: job.id)
+    }
+
+    /// What Touch ID or the password prompt says, or nil when the change needs no confirming.
+    private var confirmationReason: String? {
+        guard let job else { return nil }
+        var parts: [String] = []
+        if draft.retention.isLowered(from: job.retention) {
+            let deleting = switch retentionEstimate?.snapshotCount {
+            case nil: ", which deletes snapshots"
+            case 0: ""
+            case .some(let count): ", deleting \(SnapshotCount(count))"
+            }
+            parts.append("lower what “\(job.name)” keeps\(deleting)")
+        }
+        if draft.databases.contains(where: { $0.hasSavedPassword && $0.newPassword != nil }) {
+            parts.append("replace a database password of “\(job.name)”")
+        }
+        return parts.isEmpty ? nil : parts.formatted(.list(type: .and))
     }
 
     private var isUnchanged: Bool {
@@ -72,12 +102,14 @@ struct JobEditorSheet: View {
         defer { isSaving = false }
         do {
             let saved = if let job {
-                try await jobs.change(job.id, to: draft.draft)
+                try await jobs.change(job.id, to: draft.draft, confirming: confirmationReason)
             } else {
                 try await jobs.add(draft.draft, toServer: serverID)
             }
             onSaved?(saved)
             dismiss()
+        } catch ConfirmationKeyError.cancelled {
+            // Left as it was, to change or cancel.
         } catch {
             if let refused = JobFieldProblems(error) {
                 problems = refused

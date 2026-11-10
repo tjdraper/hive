@@ -11,6 +11,7 @@ struct LocalPairingWorkflowTests {
     private let devices: DeviceStore
     private let workflow: LocalPairingWorkflow
     private let deviceKey = P256.Signing.PrivateKey().publicKey.x963Representation
+    private let restart = HiveRestart(delay: .seconds(60))
 
     init() throws {
         database = try HiveDatabase.inMemory()
@@ -19,8 +20,22 @@ struct LocalPairingWorkflowTests {
             hiveID: hiveID,
             pin: pin,
             settings: HiveSettingsStore(database: database, defaultPort: 4483),
-            devices: devices
+            devices: devices,
+            isRestarting: { [restart] in restart.isRequested }
         )
+    }
+
+    @Test("While Hive restarts for a new identity, nothing pairs with the old one")
+    func refusesWhileRestarting() throws {
+        // Arrange
+        restart.request()
+
+        // Act
+        let result = workflow.pair(LocalPairingRequest(devicePublicKey: deviceKey, deviceName: "Studio Mac"))
+
+        // Assert
+        #expect(result == .refused(.hiveUnavailable))
+        #expect(try devices.all().isEmpty)
     }
 
     @Test("Pairing records the device and answers with the Hive ID, its key's pin, the port and the device's ID")

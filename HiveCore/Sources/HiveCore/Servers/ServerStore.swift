@@ -33,15 +33,22 @@ struct ServerStore: Sendable {
 
     /// Changing where Hive connects clears the server's host key and its jobs' database passwords, so
     /// they have to be confirmed and entered again before anything is sent there. Hive's SSH key stays,
-    /// since only its public half is ever sent. Returns nil when no
-    /// server has that ID.
-    func change(id: UUID, to draft: ServerDraft, by deviceID: UUID, at date: Date) throws -> (old: Server, new: Server)? {
+    /// since only its public half is ever sent. Throws `ConfirmationError.required`, changing nothing,
+    /// when the change needs confirming and isn't confirmed. Returns nil when no server has that ID.
+    func change(
+        id: UUID,
+        to draft: ServerDraft,
+        isConfirmed: Bool,
+        by deviceID: UUID,
+        at date: Date
+    ) throws -> (old: Server, new: Server)? {
         try database.writer.write { database in
             guard var record = try ServerRecord.fetchOne(database, key: id) else { return nil }
             let old = record.server
             try Self.checkNameIsFree(draft.name, except: id, in: database)
 
             record.apply(draft)
+            try ConfirmationRequirement.check(ConfirmationRequirement.reasons(from: old, to: record.server), isConfirmed: isConfirmed)
             if record.connection != old.connection {
                 record.hostKey = nil
                 try database.execute(

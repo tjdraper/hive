@@ -4,16 +4,18 @@ import SwiftUI
 import AppKit
 #endif
 
-/// The job's snapshots on the backup drive, newest first, with what each takes of its own, and on the
-/// Hive's Mac, a way to find them in Finder.
+/// The job's snapshots on the backup drive, newest first, with what each takes of its own, deleting
+/// them, and on the Hive's Mac, a way to find them in Finder. A removed job's are shown the same way.
 struct JobSnapshotsSection: View {
     let hive: KnownHive
     let link: HiveLink
-    let job: BackupJob
+    let jobID: UUID
+    let jobName: String
     let statuses: JobStatusStore
 
     @State private var snapshots: JobSnapshots?
     @State private var failure: String?
+    @State private var deletion: SnapshotDeletionRequest?
 
     var body: some View {
         Section {
@@ -26,7 +28,14 @@ struct JobSnapshotsSection: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(snapshots.snapshots) { snapshot in
-                    SnapshotRow(snapshot: snapshot, folder: snapshotFolder(snapshot, in: snapshots))
+                    SnapshotRow(snapshot: snapshot, folder: snapshotFolder(snapshot, in: snapshots)) {
+                        deletion = SnapshotDeletionRequest(scope: .snapshot(snapshot), name: jobName)
+                    }
+                }
+                if deletable > 1 {
+                    Button("Delete All Snapshots…", systemImage: "trash", role: .destructive) {
+                        deletion = SnapshotDeletionRequest(scope: .job(id: jobID, count: deletable), name: jobName)
+                    }
                 }
             } else {
                 ProgressView()
@@ -48,6 +57,12 @@ struct JobSnapshotsSection: View {
             }
         }
         .task(id: statuses.logRevision) { await load() }
+        .snapshotDeletion($deletion, link: link) { Task { await load() } }
+    }
+
+    /// Those not being deleted already.
+    private var deletable: Int {
+        snapshots?.snapshots.count { $0.state != .removing } ?? 0
     }
 
     private func footer(_ snapshots: JobSnapshots) -> some View {
@@ -72,7 +87,7 @@ struct JobSnapshotsSection: View {
 
     private func load() async {
         do {
-            snapshots = try await link.perform { try await $0.get(HiveEndpoint.snapshots(ofJob: job.id)) }
+            snapshots = try await link.perform { try await $0.get(HiveEndpoint.snapshots(ofJob: jobID)) }
             failure = nil
         } catch where !Task.isCancelled {
             failure = HiveLink.message(for: error)
@@ -85,6 +100,8 @@ struct JobSnapshotsSection: View {
 struct SnapshotRow: View {
     let snapshot: SnapshotSummary
     let folder: URL?
+    /// Nil where it can't be deleted from, such as in a preview.
+    var onDelete: (() -> Void)?
 
     var body: some View {
         HStack {
@@ -118,6 +135,12 @@ struct SnapshotRow: View {
                 .help("Show in Finder")
             }
             #endif
+            if let onDelete, snapshot.state != .removing {
+                Button("Delete…", systemImage: "trash", role: .destructive, action: onDelete)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .help("Delete this snapshot")
+            }
         }
     }
 }

@@ -69,7 +69,7 @@ struct SSHKeyRoutesTests {
         let old = try storedKey(of: server).publicKey
 
         // Act
-        let answer = try await fixture.send(.post, HiveEndpoint.sshKey(onServer: server.id))
+        let answer = try await fixture.sendConfirmed(.post, HiveEndpoint.sshKey(onServer: server.id))
 
         // Assert
         #expect(answer.status == .created)

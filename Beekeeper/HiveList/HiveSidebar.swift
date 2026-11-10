@@ -184,6 +184,7 @@ struct HiveStatusBadge: View {
     private var label: String {
         switch status {
         case .connecting: "Connecting"
+        case .pairingAgain: "Pairing again"
         case .connected: "Connected"
         case .offline: "Offline"
         case .identityChanged: "Identity changed"
@@ -197,7 +198,7 @@ struct HiveStatusBadge: View {
     private var color: Color {
         switch status {
         case .connected: .green
-        case .connecting, .offline: .secondary
+        case .connecting, .pairingAgain, .offline: .secondary
         case .identityChanged, .notRecognized, .failed: .red
         case .notPaired, .lockedOut, .needsUpdate: .orange
         }

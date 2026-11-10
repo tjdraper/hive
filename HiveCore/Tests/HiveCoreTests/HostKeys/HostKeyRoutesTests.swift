@@ -17,8 +17,14 @@ struct HostKeyRoutesTests {
         return try await fixture.send(.post, HiveEndpoint.hostKeyScan(onServer: server.id))
     }
 
-    private func confirm(_ server: Server, fingerprint: String = ConfigurationSamples.hostKey.fingerprint) async throws -> APIAnswer {
-        try await fixture.send(.put, HiveEndpoint.hostKey(onServer: server.id), json: HostKeyConfirmation(fingerprint: fingerprint))
+    private func confirm(
+        _ server: Server,
+        fingerprint: String = ConfigurationSamples.hostKey.fingerprint,
+        confirmed: Bool = false
+    ) async throws -> APIAnswer {
+        let confirmation = HostKeyConfirmation(fingerprint: fingerprint)
+        let path = HiveEndpoint.hostKey(onServer: server.id)
+        return try await confirmed ? fixture.sendConfirmed(.put, path, json: confirmation) : fixture.send(.put, path, json: confirmation)
     }
 
     private func storedHostKey(of server: Server) throws -> String? {
@@ -99,7 +105,7 @@ struct HostKeyRoutesTests {
         _ = try await scan(server)
         var draft = server.draft
         draft.connection.host = "elsewhere.example.com"
-        _ = try await fixture.send(.put, HiveEndpoint.server(server.id), json: draft)
+        _ = try await fixture.sendConfirmed(.put, HiveEndpoint.server(server.id), json: draft)
 
         // Act
         let answer = try await confirm(server)
@@ -148,7 +154,7 @@ struct HostKeyRoutesTests {
         _ = try await scan(server, finding: newKey)
 
         // Act
-        let answer = try await confirm(server, fingerprint: newKey.fingerprint)
+        let answer = try await confirm(server, fingerprint: newKey.fingerprint, confirmed: true)
 
         // Assert
         #expect(answer.status == .ok)

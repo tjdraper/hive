@@ -41,8 +41,9 @@ struct HostKeyWorkflow: Sendable {
         }
     }
 
-    /// Nil when no server has that ID.
-    func confirm(serverID: UUID, fingerprint: String, by deviceID: UUID) throws -> HostKeyConfirmationOutcome? {
+    /// Nil when no server has that ID. A scan refused for want of confirmation stays, so the same
+    /// request can be sent again confirmed.
+    func confirm(serverID: UUID, fingerprint: String, isConfirmed: Bool, by deviceID: UUID) throws -> HostKeyConfirmationOutcome? {
         guard let scan = pending.scan(forServer: serverID, at: now()) else {
             return try servers.server(id: serverID) == nil ? nil : .refused(.noScan)
         }
@@ -51,7 +52,7 @@ struct HostKeyWorkflow: Sendable {
             return .refused(.fingerprintMismatch)
         }
 
-        switch try store.record(scan.key, forServer: serverID, scannedOn: scan.connection, by: deviceID, at: now()) {
+        switch try store.record(scan, forServer: serverID, isConfirmed: isConfirmed, by: deviceID, at: now()) {
         case .noServer:
             pending.remove(forServer: serverID)
             return nil
@@ -64,7 +65,7 @@ struct HostKeyWorkflow: Sendable {
             let reasons = ConfirmationRequirement.reasons(replacingHostKey: old, with: scan.key)
             let logged = ConfirmationRequirement.logged(reasons)
             let keyType = scan.key.keyType
-            Self.logger.notice("Recorded a confirmed host key: \(keyType, privacy: .public) (to confirm: \(logged, privacy: .public))")
+            Self.logger.notice("Recorded a confirmed host key: \(keyType, privacy: .public) (confirmed: \(logged, privacy: .public))")
             return .confirmed(server)
         }
     }

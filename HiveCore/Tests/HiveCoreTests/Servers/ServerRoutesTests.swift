@@ -79,7 +79,7 @@ struct ServerRoutesTests {
         )
 
         // Act
-        let answer = try await fixture.send(.put, HiveEndpoint.server(server.id), json: draft)
+        let answer = try await fixture.sendConfirmed(.put, HiveEndpoint.server(server.id), json: draft)
 
         // Assert
         #expect(answer.status == .ok)
@@ -238,7 +238,7 @@ struct ServerRoutesTests {
         draft.connection = connection
 
         // Act
-        let answer = try await fixture.send(.put, HiveEndpoint.server(server.id), json: draft)
+        let answer = try await fixture.sendConfirmed(.put, HiveEndpoint.server(server.id), json: draft)
 
         // Assert
         #expect(answer.status == .ok)
@@ -263,10 +263,10 @@ struct ServerRoutesTests {
         draft.quotaBytes = 1_000
 
         // Act
-        _ = try await fixture.send(.put, HiveEndpoint.server(server.id), json: draft)
+        _ = try await fixture.sendConfirmed(.put, HiveEndpoint.server(server.id), json: draft)
         var otherDraft = otherServer.draft
         otherDraft.connection.host = "mail.example.com"
-        _ = try await fixture.send(.put, HiveEndpoint.server(otherServer.id), json: otherDraft)
+        _ = try await fixture.sendConfirmed(.put, HiveEndpoint.server(otherServer.id), json: otherDraft)
 
         // Assert
         #expect(try fixture.servers.server(id: server.id)?.confirmedHostKey == ConfigurationSamples.hostKey.hostKeyFingerprint)

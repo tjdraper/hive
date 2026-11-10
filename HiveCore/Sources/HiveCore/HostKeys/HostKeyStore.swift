@@ -13,18 +13,21 @@ enum HostKeyRecording {
 struct HostKeyStore: Sendable {
     let database: HiveDatabase
 
-    /// Records `key` with an audit entry, as long as the server still connects where it was scanned.
+    /// Records the key `scan` found with an audit entry, as long as the server still connects where it
+    /// was scanned. Throws `ConfirmationError.required` when it would replace another key without confirmation.
     func record(
-        _ key: OpenSSHPublicKey,
+        _ scan: PendingHostKeyScans.Scan,
         forServer id: UUID,
-        scannedOn connection: ServerConnection,
+        isConfirmed: Bool,
         by deviceID: UUID,
         at date: Date
     ) throws -> HostKeyRecording {
-        try database.writer.write { database in
+        let key = scan.key
+        return try database.writer.write { database in
             guard var record = try ServerRecord.fetchOne(database, key: id) else { return .noServer }
-            guard record.connection == connection else { return .connectionChanged }
+            guard record.connection == scan.connection else { return .connectionChanged }
             let old = record.hostKey.flatMap(OpenSSHPublicKey.init(line:))
+            try ConfirmationRequirement.check(ConfirmationRequirement.reasons(replacingHostKey: old, with: key), isConfirmed: isConfirmed)
             if old != key {
                 record.hostKey = key.line
                 try record.update(database)

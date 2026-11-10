@@ -152,7 +152,7 @@ struct BackupJobRoutesTests {
         draft.databases[0].password = "a new password"
 
         // Act
-        let answer = try await fixture.send(.put, HiveEndpoint.job(job.id), json: draft)
+        let answer = try await fixture.sendConfirmed(.put, HiveEndpoint.job(job.id), json: draft)
 
         // Assert
         #expect(answer.status == .ok)

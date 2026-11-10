@@ -49,6 +49,15 @@ struct OwnerOnlyFile {
     /// Never replaces an existing file. A crash part way leaves only a partial file, which the next
     /// attempt removes, so a half-written file is never read back as whole.
     func create(_ data: Data) throws {
+        try write(data, replacing: false)
+    }
+
+    /// Replaces the file whole, so a crash part way leaves the old one.
+    func replace(_ data: Data) throws {
+        try write(data, replacing: true)
+    }
+
+    private func write(_ data: Data, replacing: Bool) throws {
         if unlink(partialPath) != 0, errno != ENOENT { throw OwnerOnlyFileError.unwritable(errno: errno) }
 
         let descriptor = open(partialPath, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
@@ -65,7 +74,7 @@ struct OwnerOnlyFile {
             throw error as? OwnerOnlyFileError ?? .unwritable(errno: EIO)
         }
 
-        if renamex_np(partialPath, url.fileSystemPath, UInt32(RENAME_EXCL)) != 0 {
+        if renamex_np(partialPath, url.fileSystemPath, replacing ? 0 : UInt32(RENAME_EXCL)) != 0 {
             let renameError = errno
             unlink(partialPath)
             if renameError == EEXIST { throw OwnerOnlyFileError.alreadyExists }

@@ -30,6 +30,7 @@ struct HiveOverviewView: View {
             } else {
                 ServerOverviewList(servers: servers, onSelect: onSelectServer)
             }
+            RemovedJobsSection(hive: hive, link: link, statuses: servers.statuses)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

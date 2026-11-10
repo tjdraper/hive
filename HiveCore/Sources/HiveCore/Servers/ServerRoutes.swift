@@ -5,7 +5,7 @@ import Hummingbird
 enum ServerRoutes {
     static let serverPath = RouterPath("\(HiveEndpoint.servers)/:id")
 
-    static func add(to router: Router<HiveRequestContext>, workflow: ServerWorkflow) {
+    static func add(to router: Router<HiveRequestContext>, workflow: ServerWorkflow, confirmations: ConfirmationVerifier) {
         router.get(RouterPath(HiveEndpoint.servers)) { _, _ in
             try JSONResponse(workflow.store.all())
         }
@@ -26,9 +26,11 @@ enum ServerRoutes {
 
         router.put(serverPath) { request, context in
             guard let id = context.idParameter else { return JSONResponse(status: .notFound) }
-            let draft = try await JSONRequest.decode(ServerDraft.self, from: request)
+            let confirmed = try await ConfirmedRequest.read(request, context: context, verifier: confirmations)
+            let draft = try confirmed.decode(ServerDraft.self)
             return try await ConfigurationChangeError.answering {
-                guard let server = try workflow.change(id: id, to: draft, by: context.requireDevice()) else {
+                let deviceID = try context.requireDevice()
+                guard let server = try workflow.change(id: id, to: draft, isConfirmed: confirmed.isConfirmed, by: deviceID) else {
                     return JSONResponse(status: .notFound)
                 }
                 return try JSONResponse(server)

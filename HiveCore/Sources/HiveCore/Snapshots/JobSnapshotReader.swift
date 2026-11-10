@@ -2,22 +2,42 @@ import Foundation
 import GRDB
 import HiveKit
 
-/// A job's snapshots on the chosen backup drive, as the catalog has them, for Beekeeper's list.
+/// A job's snapshots on the chosen backup drive, as the catalog has them, for Beekeeper's list. A
+/// removed job's are listed too, while it has any.
 struct JobSnapshotReader: Sendable {
+    private struct Read {
+        let records: [SnapshotRecord]
+        let usedBytes: Int64?
+        /// Waiting for the queue to delete them.
+        let deleting: Set<UUID>
+    }
+
     let database: HiveDatabase
     let drives: BackupDriveLocator
 
-    /// Nil when no job has that ID.
+    /// Nil when no job has that ID and the catalog has no snapshots of one that had.
     func snapshots(ofJob jobID: UUID) throws -> JobSnapshots? {
-        let read = try database.writer.read { database -> (records: [SnapshotRecord], usedBytes: Int64?)? in
-            guard try BackupJobRecord.exists(database, key: jobID) else { return nil }
-            guard let drive = try BackupDriveStore.chosen(in: database) else { return ([], nil) }
+        let read = try database.writer.read { database -> Read? in
+            let exists = try BackupJobRecord.exists(database, key: jobID)
+            guard let drive = try BackupDriveStore.chosen(in: database) else {
+                return exists ? Read(records: [], usedBytes: nil, deleting: []) : nil
+            }
             let driveUUID = drive.volumeUUID.uuidString
             let records = try SnapshotRecord
                 .filter(Column("jobID") == jobID && Column("driveUUID") == driveUUID)
                 .order(SQL("COALESCE(completedAt, startedAt) DESC"))
                 .fetchAll(database)
-            return (records, try SnapshotSpaceStore.usedBytes(ofJob: jobID, onDrive: driveUUID, in: database))
+            guard exists || !records.isEmpty else { return nil }
+            let deleting = try UUID.fetchAll(
+                database,
+                sql: "SELECT snapshotID FROM snapshotDeletion JOIN snapshot ON snapshot.id = snapshotID WHERE snapshot.jobID = ?",
+                arguments: [jobID]
+            )
+            return Read(
+                records: records,
+                usedBytes: try SnapshotSpaceStore.usedBytes(ofJob: jobID, onDrive: driveUUID, in: database),
+                deleting: Set(deleting)
+            )
         }
         guard let read else { return nil }
 
@@ -26,7 +46,7 @@ struct JobSnapshotReader: Sendable {
                 SnapshotSummary(
                     id: record.id,
                     date: record.date,
-                    state: Self.state(of: record),
+                    state: read.deleting.contains(record.id) ? .removing : Self.state(of: record),
                     folder: record.folder,
                     freesBytes: record.freesBytes
                 )

@@ -60,8 +60,22 @@ enum HiveDatabaseMigrator {
         migrator.registerMigration("Add the backup drive and the snapshot catalog", migrate: addBackupDriveAndSnapshots)
         migrator.registerMigration("Add schedules, the job queue and the job log", migrate: addQueueAndJobLog)
         migrator.registerMigration("Add retention and counting space", migrate: addRetention)
+        migrator.registerMigration("Add confirmation keys and snapshot deletions", migrate: addConfirmation)
 
         return migrator
+    }
+
+    private static func addConfirmation(_ database: Database) throws {
+        try database.alter(table: "device") { table in
+            // The X9.63 form of the key the device confirms changes with. Empty until it registers one.
+            table.add(column: "confirmationPublicKey", .blob)
+        }
+
+        // Kept until the queue gets to them, so a restart in between doesn't forget a deletion that was asked for.
+        try database.create(table: "snapshotDeletion") { table in
+            table.primaryKey("snapshotID", .blob).references("snapshot", onDelete: .cascade)
+            table.column("requestedAt", .datetime).notNull()
+        }
     }
 
     private static func addRetention(_ database: Database) throws {

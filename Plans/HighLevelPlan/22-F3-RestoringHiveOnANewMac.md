@@ -31,4 +31,7 @@ Built with you:
 
 With a second Mac if one's available. Otherwise, remove Hive from this Mac completely, including its data directory, reinstall, and restore. Back up and remove only from the test server and the test drive.
 
+- **From D4:** a confirmed route reads its request with `ConfirmedRequest.read` and checks `ConfirmationRequirement.check` inside the store's write transaction, against the stored values. Add the new `ConfirmationReason` to HiveKit, its Touch ID wording to `ConfirmationReason.prompt`, and a case to `ConfirmedRouteTests.cases`, which covers the refusals. In Beekeeper, send it with `HiveLink.confirmed(_:_:body:reason:)`, giving a `reason` when the change is known to need confirming.
+- **From D4:** `POST /servers/<id>/ssh-key` already refuses to replace a key without confirmation, so rotation's own route needs its own `ConfirmationReason`.
+
 **Done when:** a restored Hive has the same Hive ID, configuration and snapshots, and backs up the test server without any key being added to it; nothing is removed until retention is started again; the old Beekeeper key is refused and Beekeeper says the identity changed; rotating SSH keys leaves the test server with only the new key; and the tests pass.

@@ -24,7 +24,8 @@ struct LocalPairingListenerTests {
             hiveID: UUID(),
             pin: PublicKeyPin(publicKey: P256.Signing.PrivateKey().publicKey),
             settings: HiveSettingsStore(database: database, defaultPort: 4483),
-            devices: devices
+            devices: devices,
+            isRestarting: { false }
         )
     }
 

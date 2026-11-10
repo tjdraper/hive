@@ -4,7 +4,8 @@ import os
 
 /// Runs the queue (§11): one job at a time, keeping the Mac awake meanwhile, recording each run in the
 /// job log as it goes and telling listeners about it. Retention runs on the queue too, after each run and
-/// once a day, so it never touches a snapshot being written (§10).
+/// once a day, and so do deletions devices ask for, ahead of waiting runs, so neither ever touches a
+/// snapshot being written (§10).
 actor BackupRunCoordinator {
     private static let logger = Logger(subsystem: HiveLog.subsystem, category: "Backup")
 
@@ -19,6 +20,7 @@ actor BackupRunCoordinator {
 
     private let workflow: BackupRunWorkflow
     private let retention: RetentionWorkflow
+    private let deletions: SnapshotDeletionWorkflow
     private let queue: BackupQueue
     private let sleep: any SleepPreventing
     private let driveWait: StartupDriveWait
@@ -26,6 +28,7 @@ actor BackupRunCoordinator {
     private var draining: Task<Void, Never>?
     private var retentionPass: Task<[RemovalLogEntry], Never>?
     private var retentionWaiting = false
+    private var deletionsWaiting = false
     private var stopping = false
 
     /// Runs within `startupDriveGrace` of now wait for the backup drive to mount, using `pause`.
@@ -38,6 +41,12 @@ actor BackupRunCoordinator {
     ) {
         self.workflow = workflow
         self.retention = retention
+        deletions = SnapshotDeletionWorkflow(
+            database: workflow.database,
+            drives: workflow.drives,
+            remover: retention.remover,
+            now: workflow.now
+        )
         queue = BackupQueue(database: workflow.database)
         self.sleep = sleep
         driveWait = StartupDriveWait(
@@ -50,15 +59,24 @@ actor BackupRunCoordinator {
     }
 
     /// Once, when Hive starts, before anything else uses the queue: marks the runs a restart cut short
-    /// as interrupted, then runs whatever is waiting.
+    /// as interrupted, then runs whatever is waiting, deletions asked for before the restart included.
     func start() throws {
         let interrupted = try queue.recoverInterruptedRuns(at: workflow.now())
         if interrupted > 0 { Self.logger.notice("Marked \(interrupted, privacy: .public) runs interrupted by a restart") }
+        deletionsWaiting = true
         kick()
     }
 
-    /// A pass over every server, once the runs waiting have gone.
+    /// A pass over every server, once the runs waiting have gone. Deletions still waiting for the drive go first.
     func requestRetentionPass() {
+        retentionWaiting = true
+        deletionsWaiting = true
+        kick()
+    }
+
+    /// The deletions devices asked for, once the run going now finishes, then a pass that counts what's left.
+    func requestDeletions() {
+        deletionsWaiting = true
         retentionWaiting = true
         kick()
     }
@@ -133,13 +151,16 @@ actor BackupRunCoordinator {
     /// before it stops, since the actor runs nothing else between the last check and stopping.
     private func drain() async {
         while !stopping {
-            if let next = nextInQueue() {
+            if deletionsWaiting {
+                deletionsWaiting = false
+                await runRemovals { [deletions] in await deletions.run() }
+            } else if let next = nextInQueue() {
                 // A store that can't start a run would otherwise give back the same run forever. What's
                 // waiting goes once something is queued again, or Hive restarts.
                 guard await run(next) else { break }
             } else if retentionWaiting {
                 retentionWaiting = false
-                await runRetention { await $0.pass() }
+                await runRemovals { [retention] in await retention.pass() }
             } else {
                 break
             }
@@ -147,8 +168,8 @@ actor BackupRunCoordinator {
         draining = nil
     }
 
-    private func runRetention(_ pass: @escaping @Sendable (RetentionWorkflow) async -> [RemovalLogEntry]) async {
-        let task = Task { [retention] in await pass(retention) }
+    private func runRemovals(_ pass: @escaping @Sendable () async -> [RemovalLogEntry]) async {
+        let task = Task { await pass() }
         retentionPass = task
         for entry in await task.value {
             events.send(.removed(entry))
@@ -210,7 +231,7 @@ actor BackupRunCoordinator {
             Self.logger.error("Couldn't record the finished run: \(String(describing: type(of: error)), privacy: .public)")
         }
         if let entry = finished.entry { events.send(.finished(entry)) }
-        if !stopping { await runRetention { await $0.pass(afterRunOf: queued.jobID) } }
+        if !stopping { await runRemovals { [retention] in await retention.pass(afterRunOf: queued.jobID) } }
         return true
     }
 

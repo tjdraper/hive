@@ -23,6 +23,16 @@ public enum HiveEndpoint {
     public static let jobLog = "/job-log"
     /// A response that stays open, one `LiveUpdate` per line, until the session ends.
     public static let liveUpdates = "/live-updates"
+    /// `POST` gives a `ConfirmationChallenge` for one confirmed request.
+    public static let confirmationChallenge = "/confirmation/challenge"
+    /// `PUT` registers the signed-in device's `ConfirmationKeyRegistration`.
+    public static let confirmationKey = "/confirmation/key"
+    /// `POST` makes Hive a new identity key, unpairs every device and restarts Hive. Confirmed.
+    public static let identityRegeneration = "/identity/regenerate"
+    /// A snapshot is deleted with `snapshot(_:)`.
+    public static let snapshots = "/snapshots"
+    /// `GET` lists the `RemovedJob`s whose snapshots stayed on the chosen backup drive.
+    public static let removedJobs = "/removed-jobs"
 
     public static func device(_ id: UUID) -> String {
         "\(devices)/\(id.uuidString)"
@@ -71,8 +81,28 @@ public enum HiveEndpoint {
         "\(job(id))/run"
     }
 
-    /// `GET` reads the job's `JobSnapshots`.
+    /// `GET` reads the job's `JobSnapshots`, for a removed job's too. `DELETE` deletes them all. Confirmed.
     public static func snapshots(ofJob id: UUID) -> String {
         "\(job(id))/snapshots"
+    }
+
+    /// `DELETE` deletes every snapshot of the server's, its removed jobs' included. Confirmed.
+    public static func snapshots(ofServer id: UUID) -> String {
+        "\(server(id))/snapshots"
+    }
+
+    /// `DELETE` deletes one snapshot. Confirmed.
+    public static func snapshot(_ id: UUID) -> String {
+        "\(snapshots)/\(id.uuidString)"
+    }
+
+    /// `POST` a `QuotaEstimateRequest` for the `RemovalEstimate` of changing the server's quota.
+    public static func quotaEstimate(ofServer id: UUID) -> String {
+        "\(server(id))/quota-estimate"
+    }
+
+    /// `POST` `RetentionTiers` for the `RemovalEstimate` of changing the job's tiers.
+    public static func retentionEstimate(ofJob id: UUID) -> String {
+        "\(job(id))/retention-estimate"
     }
 }

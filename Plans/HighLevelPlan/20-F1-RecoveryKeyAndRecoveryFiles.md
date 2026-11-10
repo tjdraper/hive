@@ -25,4 +25,6 @@ Built with you:
 - A file written after a new key doesn't open with the old one
 - A mistyped recovery key code is caught by its check digit
 
+- **From D4:** a confirmed route reads its request with `ConfirmedRequest.read` and checks `ConfirmationRequirement.check` inside the store's write transaction, against the stored values. Add the new `ConfirmationReason` to HiveKit, its Touch ID wording to `ConfirmationReason.prompt`, and a case to `ConfirmedRouteTests.cases`, which covers the refusals. In Beekeeper, send it with `HiveLink.confirmed(_:_:body:reason:)`, giving a `reason` when the change is known to need confirming.
+
 **Done when:** in the installed builds, the existing Hive gets its recovery key through Beekeeper; a recovery file appears in the data directory and is replaced after a configuration change; and the tests pass.

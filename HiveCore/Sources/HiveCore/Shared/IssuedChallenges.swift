@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import HiveKit
 import Synchronization
 
 enum ChallengeCheck: Equatable {
@@ -13,9 +12,8 @@ enum ChallengeCheck: Equatable {
 /// Challenges Hive can recognize without remembering them: each carries its expiry and a MAC under a
 /// key made at start. Issuing one stores nothing, so anyone may ask for as many as they like.
 /// Only a challenge a paired device has signed is remembered, until it expires, so it can't be used twice.
-final class SignInChallenges: Sendable {
-    static let lifetime: TimeInterval = 60
-
+/// Signing in and confirming each have their own, so a challenge issued for one is never valid for the other.
+final class IssuedChallenges: Sendable {
     private static let version: UInt8 = 1
     private static let randomLength = 16
     private static let macLength = 32
@@ -23,16 +21,22 @@ final class SignInChallenges: Sendable {
     private static let bodyLength = 1 + 8 + randomLength
     static let length = bodyLength + macLength
 
+    let lifetime: TimeInterval
     private let key = SymmetricKey(size: .bits256)
     private let used = Mutex<[Data: Date]>([:])
 
-    func issue(at now: Date) -> SignInChallenge {
-        let expiry = UInt64(now.addingTimeInterval(Self.lifetime).timeIntervalSince1970.rounded(.up))
+    init(lifetime: TimeInterval) {
+        self.lifetime = lifetime
+    }
+
+    /// The challenge, and how many seconds it lasts.
+    func issue(at now: Date) -> (challenge: Data, expiresInSeconds: Int) {
+        let expiry = UInt64(now.addingTimeInterval(lifetime).timeIntervalSince1970.rounded(.up))
         var body = Data([Self.version])
         withUnsafeBytes(of: expiry.bigEndian) { body.append(contentsOf: $0) }
         body.append(SymmetricKey(size: .bits128).withUnsafeBytes { Data($0) })
         let mac = HMAC<SHA256>.authenticationCode(for: body, using: key)
-        return SignInChallenge(challenge: body + Data(mac), expiresInSeconds: Int(Self.lifetime))
+        return (body + Data(mac), Int(lifetime))
     }
 
     func check(_ challenge: Data, at now: Date) -> ChallengeCheck {

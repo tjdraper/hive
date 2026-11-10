@@ -94,6 +94,20 @@ struct RsyncResultReaderTests {
         #expect(RsyncResultReader.listing(in: Self.result(255, error: SSHFailureReaderTests.changedKey)) == .failed(.hostKeyChanged))
     }
 
+    @Test("ssh's failure is read whether rsync passes on ssh's status or reports its own protocol error")
+    func sshFailureWithEitherStatus() {
+        // Arrange
+        let protocolError = "rsync error: error in rsync protocol data stream (code 12) at io.c(303) [Receiver=3.5.2]\n"
+        let changedKey = SSHFailureReaderTests.changedKey
+
+        // Act, Assert
+        #expect(RsyncResultReader.listing(in: Self.result(12, error: changedKey + protocolError)) == .failed(.hostKeyChanged))
+        #expect(RsyncResultReader.pull(Self.result(12, error: changedKey + protocolError)).failure == .hostKeyChanged)
+        #expect(RsyncResultReader.listing(in: Self.result(12, error: "root@127.0.0.1: Permission denied (publickey).\n" + protocolError))
+            == .failed(.loginRefused))
+        #expect(RsyncResultReader.listing(in: Self.result(12, error: protocolError)) == .failed(.failed))
+    }
+
     @Test("A pull's failures are read from its status and messages")
     func pullFailures() {
         // Act, Assert

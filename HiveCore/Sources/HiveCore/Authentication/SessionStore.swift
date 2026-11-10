@@ -41,6 +41,10 @@ public final class SessionStore: Sendable {
         }
     }
 
+    func endAllSessions() {
+        sessions.withLock { $0 = [:] }
+    }
+
     private static func hash(_ token: String) -> Data {
         Data(SHA256.hash(data: Data(token.utf8)))
     }
