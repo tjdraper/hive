@@ -98,21 +98,34 @@ final class DriveFolder {
         var tally = SpaceTally()
         var info = stat()
         guard fstat(descriptor, &info) == 0 else { throw DriveFolderError.couldNotRead(errno: errno) }
+        var volume = statfs()
+        guard fstatfs(descriptor, &volume) == 0 else { throw DriveFolderError.couldNotRead(errno: errno) }
         tally.singleBytes += Int64(info.st_blocks) * 512
-        try Self.tallyContents(of: descriptor, device: device, into: &tally)
+        try Self.tallyContents(of: descriptor, device: device, blockSize: Int64(volume.f_bsize), into: &tally)
         return tally
     }
 
-    private static func tallyContents(of folder: Int32, device: dev_t, into tally: inout SpaceTally) throws {
+    /// What a file keeps on the drive. APFS gives a file written slowly in pieces, as rsync writes one
+    /// over the network, space past its end, and takes it back only some time later. Counted then, it
+    /// would stay in the job's space for good, so a file counts no more than its size in whole blocks.
+    /// A sparse file has less than that, and counts what it has.
+    static func keptBytes(of info: stat, blockSize: Int64) -> Int64 {
+        let allocated = Int64(info.st_blocks) * 512
+        guard info.st_mode & S_IFMT == S_IFREG, blockSize > 0 else { return allocated }
+        let wholeBlocks = (Int64(info.st_size) + blockSize - 1) / blockSize * blockSize
+        return min(allocated, wholeBlocks)
+    }
+
+    private static func tallyContents(of folder: Int32, device: dev_t, blockSize: Int64, into tally: inout SpaceTally) throws {
         for name in try entries(of: folder) {
             try Task.checkCancellation()
             let info = try status(of: name, in: folder, device: device)
-            let bytes = Int64(info.st_blocks) * 512
+            let bytes = keptBytes(of: info, blockSize: blockSize)
             if info.st_mode & S_IFMT == S_IFDIR {
                 tally.singleBytes += bytes
                 let child = try openFolder(name, in: folder, info: info)
                 defer { close(child) }
-                try tallyContents(of: child, device: device, into: &tally)
+                try tallyContents(of: child, device: device, blockSize: blockSize, into: &tally)
             } else if info.st_nlink <= 1 {
                 tally.singleBytes += bytes
             } else {

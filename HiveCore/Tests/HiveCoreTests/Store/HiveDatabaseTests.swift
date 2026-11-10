@@ -197,4 +197,23 @@ struct HiveDatabaseTests {
         #expect(try SnapshotSpaceStore(database: database).usedBytes(ofJob: jobID, onDrive: "drive") == nil)
         #expect(try !RetentionStore(database: database).isPaused())
     }
+
+    @Test("A store from before space set aside was left out has each job counted whole again")
+    func migratesFromConfirmationSchema() throws {
+        // Arrange
+        let writer = try HiveDatabase.inMemory(migratedUpTo: "Add confirmation keys and snapshot deletions")
+        let jobID = UUID()
+        try writer.write { database in
+            try database.execute(
+                sql: "INSERT INTO jobSpace (driveUUID, jobID, usedBytes) VALUES ('drive', ?, 678916096)",
+                arguments: [jobID]
+            )
+        }
+
+        // Act
+        let database = try HiveDatabase.migrate(writer, defaultHiveName: "Ignored")
+
+        // Assert
+        #expect(try SnapshotSpaceStore(database: database).usedBytes(ofJob: jobID, onDrive: "drive") == nil)
+    }
 }

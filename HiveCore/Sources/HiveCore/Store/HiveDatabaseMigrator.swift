@@ -61,6 +61,11 @@ enum HiveDatabaseMigrator {
         migrator.registerMigration("Add schedules, the job queue and the job log", migrate: addQueueAndJobLog)
         migrator.registerMigration("Add retention and counting space", migrate: addRetention)
         migrator.registerMigration("Add confirmation keys and snapshot deletions", migrate: addConfirmation)
+        // Space counted before files' space set aside past their end was left out stayed in each job's
+        // total, so every job is counted whole again at the next pass.
+        migrator.registerMigration("Count every job's space again") { database in
+            try database.execute(sql: "UPDATE jobSpace SET usedBytes = NULL")
+        }
 
         return migrator
     }
