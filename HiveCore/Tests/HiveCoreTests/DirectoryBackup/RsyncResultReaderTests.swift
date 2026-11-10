@@ -128,7 +128,7 @@ struct RsyncResultReaderTests {
         #expect(outcome.vanishedFiles)
     }
 
-    @Test("What was transferred is read from rsync's statistics, with or without thousands separators")
+    @Test("What was transferred, and the directory's whole size, are read from rsync's statistics, with or without thousands separators")
     func statistics() {
         // Act
         let plain = RsyncResultReader.statistics(in: Data(Self.statistics.utf8))
@@ -137,7 +137,7 @@ struct RsyncResultReaderTests {
         )
 
         // Assert
-        #expect(plain == PullStatistics(filesTransferred: 7, bytesTransferred: 300_059, bytesReceived: 300_920))
+        #expect(plain == PullStatistics(filesTransferred: 7, bytesTransferred: 300_059, bytesReceived: 300_920, totalBytes: 300_059))
         #expect(separated == PullStatistics(filesTransferred: 1024, bytesTransferred: 0, bytesReceived: 1_300_920))
     }
 }

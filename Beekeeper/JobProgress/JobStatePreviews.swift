@@ -34,6 +34,7 @@ private enum PreviewStates {
             filesTransferred: 3,
             bytesTransferred: 2_400_000,
             bytesReceived: 400_000,
+            totalBytes: 180_000_000,
             vanishedFiles: false,
             failure: failure
         )

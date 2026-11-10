@@ -42,7 +42,7 @@ Check off a slice here when its "done when" is true.
 ### Phase E — Email
 
 - [x] [E1. Sending email](18-E1-SendingEmail.md) — Mixed, 1 session
-- [ ] [E2. Alerts](19-E2-Alerts.md) — Engine, 1 session
+- [x] [E2. Alerts](19-E2-Alerts.md) — Engine, 1 session
 
 ### Phase F — Recovery
 
@@ -245,12 +245,14 @@ As AGENTS.md describes:
   - a backup failed, including lost Full Disk Access
   - the backup drive is missing, as one email, not one for each job
   - a job is overdue: no complete snapshot for longer than its schedule allows
-  - a snapshot much smaller than the one before (§9)
+  - a snapshot much smaller than the one before (§9): a directory or database under half its size in the one before, leaving out those under 1 MB
   - a server's host key changed, with the old and new fingerprints and the last successful backup, repeated daily until resolved
   - a server is over its quota with only monthly and newest snapshots left (§10)
-  - the backup drive is filling up, or the quotas add up to more than it holds
+  - the backup drive is filling up (under 10% free), or the quotas add up to more than it holds
   - an iPhone or iPad build is about to expire (§16)
 - **A job that keeps failing** emails on the first failure, then once a day, and once more when it succeeds again. Email is never sent once per failed run.
+- **Repeats:** failures, a missing drive, overdue jobs and changed host keys are emailed again each day until resolved. Space warnings are sent once, and again only after they've cleared, since backups still run meanwhile (E2).
+- **Covered once:** a run failing because of the drive or a changed host key sends that alert, not one for the job, and a job whose runs fail isn't also emailed about as overdue (E2).
 
 ## §14. Recovery
 

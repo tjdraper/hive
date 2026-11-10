@@ -216,4 +216,27 @@ struct HiveDatabaseTests {
         // Assert
         #expect(try SnapshotSpaceStore(database: database).usedBytes(ofJob: jobID, onDrive: "drive") == nil)
     }
+
+    @Test("A store from before alerts sends none for the runs it already has")
+    func migratesToAlerts() throws {
+        // Arrange
+        let writer = try HiveDatabase.inMemory(migratedUpTo: "Add email settings")
+        try writer.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO jobLogEntry (id, kind, jobID, serverID, serverName, jobName, "trigger", startedAt, finishedAt, failure,
+                    pickedUpPartialSnapshot, directories, databases)
+                VALUES (7, 'run', ?, ?, 'Web', 'Site', 'scheduled', ?, ?, 'unreachable', 0, '[]', '[]')
+                """,
+                arguments: [UUID(), UUID(), Date(), Date()]
+            )
+        }
+
+        // Act
+        let database = try HiveDatabase.migrate(writer, defaultHiveName: "Ignored")
+
+        // Assert
+        #expect(try AlertStore(database: database).checkedThrough() == 7)
+        #expect(try AlertStore(database: database).all().isEmpty)
+    }
 }

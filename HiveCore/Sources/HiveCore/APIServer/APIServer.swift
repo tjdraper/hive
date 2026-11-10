@@ -37,6 +37,7 @@ public struct APIServer: Sendable {
             services: [
                 .init(service: service),
                 .init(service: SchedulingService(scheduler: api.scheduler, runs: api.runs)),
+                .init(service: AlertService(monitor: api.alerts)),
                 .init(service: RestartService(restart: api.restart), successTerminationBehavior: .gracefullyShutdownGroup),
             ],
             gracefulShutdownSignals: [.sigterm, .sigint],
@@ -107,6 +108,16 @@ private struct RestartService: Service {
     func run() async throws {
         await cancelWhenGracefulShutdown {
             await restart.wait()
+        }
+    }
+}
+
+private struct AlertService: Service {
+    let monitor: AlertMonitor
+
+    func run() async throws {
+        await cancelWhenGracefulShutdown {
+            await monitor.run()
         }
     }
 }

@@ -8,26 +8,7 @@ enum HiveDatabaseMigrator {
     static func migrator(defaultHiveName: String) -> DatabaseMigrator {
         var migrator = DatabaseMigrator()
 
-        migrator.registerMigration("Create the Hive and its devices") { database in
-            try database.create(table: "hive") { table in
-                // One row, ever.
-                table.primaryKey("singleton", .integer).check { $0 == 1 }
-                table.column("id", .blob).notNull()
-                table.column("createdAt", .datetime).notNull()
-            }
-            try database.execute(
-                sql: "INSERT INTO hive (singleton, id, createdAt) VALUES (1, ?, ?)",
-                arguments: [UUID(), Date()]
-            )
-
-            try database.create(table: "device") { table in
-                table.primaryKey("id", .blob)
-                table.column("name", .text).notNull()
-                table.column("publicKey", .blob).notNull().unique()
-                table.column("pairedAt", .datetime).notNull()
-                table.column("lastSeenAt", .datetime)
-            }
-        }
+        migrator.registerMigration("Create the Hive and its devices", migrate: createHiveAndDevices)
 
         migrator.registerMigration("Add the Hive's settings and the audit log") { database in
             try database.alter(table: "hive") { table in
@@ -67,8 +48,47 @@ enum HiveDatabaseMigrator {
             try database.execute(sql: "UPDATE jobSpace SET usedBytes = NULL")
         }
         migrator.registerMigration("Add email settings", migrate: addEmailSettings)
+        migrator.registerMigration("Add alerts", migrate: addAlerts)
 
         return migrator
+    }
+
+    private static func createHiveAndDevices(_ database: Database) throws {
+        try database.create(table: "hive") { table in
+            // One row, ever.
+            table.primaryKey("singleton", .integer).check { $0 == 1 }
+            table.column("id", .blob).notNull()
+            table.column("createdAt", .datetime).notNull()
+        }
+        try database.execute(
+            sql: "INSERT INTO hive (singleton, id, createdAt) VALUES (1, ?, ?)",
+            arguments: [UUID(), Date()]
+        )
+
+        try database.create(table: "device") { table in
+            table.primaryKey("id", .blob)
+            table.column("name", .text).notNull()
+            table.column("publicKey", .blob).notNull().unique()
+            table.column("pairedAt", .datetime).notNull()
+            table.column("lastSeenAt", .datetime)
+        }
+    }
+
+    private static func addAlerts(_ database: Database) throws {
+        try database.create(table: "alert") { table in
+            table.primaryKey("key", .text)
+            table.column("facts", .text).notNull()
+            table.column("openedAt", .datetime).notNull()
+            table.column("emailOwed", .text)
+            // Set as each try starts, so a restart part way through sends it again rather than never.
+            table.column("lastEmailAt", .datetime)
+        }
+
+        try database.alter(table: "hive") { table in
+            table.add(column: "alertsCheckedThrough", .integer).notNull().defaults(to: 0)
+        }
+        // Runs from before alerts existed don't send any.
+        try database.execute(sql: "UPDATE hive SET alertsCheckedThrough = (SELECT IFNULL(MAX(id), 0) FROM jobLogEntry)")
     }
 
     private static func addEmailSettings(_ database: Database) throws {

@@ -12,6 +12,8 @@ struct PullStatistics: Equatable {
     var filesTransferred = 0
     var bytesTransferred: Int64 = 0
     var bytesReceived: Int64 = 0
+    /// Nil when rsync didn't get as far as counting.
+    var totalBytes: Int64?
 }
 
 struct PullOutcome: Equatable {
@@ -92,6 +94,7 @@ enum RsyncResultReader {
             case "Number of regular files transferred": statistics.filesTransferred = Int(value)
             case "Total transferred file size": statistics.bytesTransferred = value
             case "Total bytes received": statistics.bytesReceived = value
+            case "Total file size": statistics.totalBytes = value
             default: break
             }
         }

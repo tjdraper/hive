@@ -45,6 +45,8 @@ public struct DirectoryRun: Codable, Hashable, Sendable {
     public let bytesTransferred: Int64
     /// What came over the network, which rsync's delta transfer can keep well below `bytesTransferred`.
     public let bytesReceived: Int64
+    /// Every file in the directory, changed or not. Nil for runs recorded before Hive counted it.
+    public let totalBytes: Int64?
     /// Files that disappeared on the server while they were being copied. A warning, not a failure.
     public let vanishedFiles: Bool
     public let failure: BackupFailure?
@@ -55,6 +57,7 @@ public struct DirectoryRun: Codable, Hashable, Sendable {
         filesTransferred: Int,
         bytesTransferred: Int64,
         bytesReceived: Int64,
+        totalBytes: Int64?,
         vanishedFiles: Bool,
         failure: BackupFailure?
     ) {
@@ -63,6 +66,7 @@ public struct DirectoryRun: Codable, Hashable, Sendable {
         self.filesTransferred = filesTransferred
         self.bytesTransferred = bytesTransferred
         self.bytesReceived = bytesReceived
+        self.totalBytes = totalBytes
         self.vanishedFiles = vanishedFiles
         self.failure = failure
     }

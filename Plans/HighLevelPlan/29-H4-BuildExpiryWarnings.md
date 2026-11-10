@@ -10,6 +10,8 @@ References like §16 point to [00-Info.md](00-Info.md). Read the brainstorm's "W
 - **The device list** shows each device's build and expiry, and marks expired ones
 - **The setting to turn warnings off** for each Hive
 
+- **From E2:** alerts live in `HiveCore/Alerts/`. A warning is a notice: add an `AlertFacts` case whose `key` names the device, build and warning, so it's sent once and a restart can't send it twice, open it with `AlertStore.apply([.open(...)], at:)`, and write its email in `AlertMessageBuilder`. `AlertMailer` sends it with the rest. The daily check can run from `AlertMonitor.check()`.
+
 ## Tests
 
 - Reading `ExpirationDate` from a sample provisioning profile

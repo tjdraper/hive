@@ -20,6 +20,7 @@ public struct HiveAPI: Sendable {
     let confirmations: ConfirmationVerifier
     /// Sends what Hive writes on its own, such as alerts.
     let emailDelivery: EmailDelivery
+    let alerts: AlertMonitor
     let identityKeys: HiveKeyStore
     let restart: HiveRestart
     /// How often an open live updates response gets a line when nothing else is happening.
@@ -205,6 +206,10 @@ public struct HiveAPI: Sendable {
         confirmations = ConfirmationVerifier(hiveID: hiveID, database: database, now: now)
         let mail = EmailSender(database: database, settings: settingsStore, sealer: sealer, connector: smtp, calendar: calendar, now: now)
         emailDelivery = EmailDelivery(sender: mail, pause: pause, now: now)
+        alerts = AlertMonitor(
+            database: database, drives: drives, statuses: jobStatus, scanner: hostKeyScanner,
+            fullDiskAccess: fullDiskAccess, delivery: emailDelivery, calendar: calendar, now: now
+        )
         self.identityKeys = identityKeys
         self.restart = restart
     }

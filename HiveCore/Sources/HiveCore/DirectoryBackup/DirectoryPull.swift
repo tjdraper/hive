@@ -45,6 +45,7 @@ struct DirectoryPull: Sendable {
             filesTransferred: statistics.filesTransferred,
             bytesTransferred: statistics.bytesTransferred,
             bytesReceived: statistics.bytesReceived,
+            totalBytes: statistics.totalBytes,
             vanishedFiles: outcome.vanishedFiles,
             failure: failure
         )
