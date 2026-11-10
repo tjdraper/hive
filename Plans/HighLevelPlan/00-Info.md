@@ -36,7 +36,7 @@ Check off a slice here when its "done when" is true.
 
 - [x] [D1. Servers in Beekeeper](14-D1-ServersInBeekeeper.md) — UI, 1 session
 - [x] [D2. Editing backup jobs](15-D2-EditingBackupJobs.md) — UI, 1 session
-- [ ] [D3. Progress, snapshots and logs](16-D3-ProgressSnapshotsAndLogs.md) — Mixed, 1–2 sessions
+- [x] [D3. Progress, snapshots and logs](16-D3-ProgressSnapshotsAndLogs.md) — Mixed, 1–2 sessions
 - [ ] [D4. Confirming destructive actions](17-D4-ConfirmingDestructiveActions.md) — Mixed, 1–2 sessions, installed build
 
 ### Phase E — Email
@@ -115,12 +115,12 @@ Check off a slice here when its "done when" is true.
   - **`Beekeeper`:** one multiplatform app target for Mac, iPad and iPhone.
   - **`HiveKit`:** a Swift package with the API types, the XPC pairing messages and the client. Beekeeper uses it on every platform, and Hive uses its API types. Nothing else goes in it (`Architecture/README.md`).
   - **`HiveCore`:** a Swift package with everything Hive does that can be tested without running the daemon: the store, the HTTP routes, signing in, the backup engine, retention and scheduling. macOS only. The daemon's executable connects it to the real Secure Enclave, network and processes.
-- **The server is Hummingbird 2** on SwiftNIO, for TLS, routing and WebSockets. Routes are tested with Hummingbird's test client, which never opens a port.
+- **The server is Hummingbird 2** on SwiftNIO, for TLS and routing. Routes are tested with Hummingbird's test client, which never opens a port.
 - **Hive's store is SQLite through GRDB.** It works from a daemon off the main actor, its migrations are explicit, and nothing about it needs syncing. It holds the configuration, the job queue, the catalog of snapshots, the job log and the audit log.
 - **Beekeeper's store is a small file on each device,** never synced: the list of Hives and, for each, its name and addresses. Each device pairs on its own. The pinned key hash isn't in the file: any program running as you could change it to point Beekeeper at its own key and pass the sign-in on to the real Hive (B3).
 - **Beekeeper's key for each Hive** is a Secure Enclave key whose saved form, with the device ID Hive gave it and the Hive's pinned key hash, is kept in the data protection keychain under Beekeeper's own access group, never synced (B2). Any program on the Mac can use a Secure Enclave key's saved form, so it can't be in a file. `keychain-access-groups` is a restricted entitlement on macOS: macOS kills a program that claims Beekeeper's group without a provisioning profile Apple issued to Beekeeper's team, so Beekeeper's Mac builds carry one. Debug builds can be attached to with a debugger, so this protection is for installed builds.
 - **Debug builds have their own bundle IDs:** `<prefix>.Hive.Debug` and `<prefix>.HiveBeekeeper.Debug`, so TCC, the keychain and the XPC check never treat them as the installed apps. A Debug Beekeeper pairs only with the development daemon.
-- **The API is HTTPS with JSON** for commands, plus a **WebSocket** for live progress and logs.
+- **The API is HTTPS with JSON** for commands, plus **live updates** for progress and logs: a response Hive keeps open, one JSON line per change, until the session ends. It goes through the same sign-in check as every other request, which a WebSocket's upgrade wouldn't, and can be tested without opening a port (D3).
 - **Concurrency:** Hive and both packages are nonisolated by default, and Beekeeper is main-actor by default (AGENTS.md).
 - **Names:** bundle IDs are built from the prefix in the gitignored `.xcconfig` (§17). The log subsystems are fixed in code: `com.buzzingpixel.Hive` and `com.buzzingpixel.HiveBeekeeper`.
 - **SwiftLint** runs through the SwiftLintPlugins package, with Locus Write's `.swiftlint.yml` and a rule that keeps AppKit, UIKit and SwiftUI out of HiveKit, HiveCore and the daemon.
@@ -158,7 +158,7 @@ Read the brainstorm's "Authentication: a key per device, with no passwords" and 
 - **Each device creates a P-256 key in its Secure Enclave for each Hive.** Hive records its public key and a device name. Every paired device has full access, with no roles. Two Hives can't tell that the same device is paired with both.
 - **The first device is Beekeeper on the Hive Mac,** paired over XPC through the daemon's Mach service. Hive checks the caller's code signature from its audit token: the same team ID as Hive, and Beekeeper's bundle ID. XPC is used only for pairing. Afterwards that Beekeeper uses the HTTPS API on `127.0.0.1` like every other device. Being on the same Mac never skips signing in.
 - **More devices** pair through a window opened by a paired Beekeeper: a QR code, or a pairing code to copy, single-use and expiring in about 5 minutes, carrying the Hive ID, the address options, the key hash and a one-time token (G1).
-- **Signing in:** Hive sends a challenge with a nonce and an expiry, Beekeeper signs it, and Hive returns a short-lived session token for HTTP and the WebSocket. The signature isn't bound to the TLS connection, because SwiftNIO's TLS doesn't expose the TLS exporter that needs (checked 2026-11-04). The key pin, the fresh nonce and short-lived session tokens protect signing in instead. Beekeeper reports its build details at the same time (§16).
+- **Signing in:** Hive sends a challenge with a nonce and an expiry, Beekeeper signs it, and Hive returns a short-lived session token for every request, live updates included. The signature isn't bound to the TLS connection, because SwiftNIO's TLS doesn't expose the TLS exporter that needs (checked 2026-11-04). The key pin, the fresh nonce and short-lived session tokens protect signing in instead. Beekeeper reports its build details at the same time (§16).
 - **Actions that need confirmation** use a second Secure Enclave key protected by `.userPresence`, so Face ID, Touch ID or the account password is asked even in an open session:
   - deleting snapshots
   - lowering a server's quota or a job's retention tiers, which would delete snapshots

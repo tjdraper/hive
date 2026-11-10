@@ -24,7 +24,7 @@ actor BackupRunCoordinator {
     private let driveWait: StartupDriveWait
     private var live: Live?
     private var draining: Task<Void, Never>?
-    private var retentionPass: Task<Void, Never>?
+    private var retentionPass: Task<[RemovalLogEntry], Never>?
     private var retentionWaiting = false
     private var stopping = false
 
@@ -147,10 +147,12 @@ actor BackupRunCoordinator {
         draining = nil
     }
 
-    private func runRetention(_ pass: @escaping @Sendable (RetentionWorkflow) async -> Void) async {
+    private func runRetention(_ pass: @escaping @Sendable (RetentionWorkflow) async -> [RemovalLogEntry]) async {
         let task = Task { [retention] in await pass(retention) }
         retentionPass = task
-        await task.value
+        for entry in await task.value {
+            events.send(.removed(entry))
+        }
         retentionPass = nil
     }
 

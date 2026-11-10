@@ -11,6 +11,7 @@ final class HiveListStore {
     private(set) var hives: [KnownHive]
     private var links: [UUID: HiveLink] = [:]
     private var serverLists: [UUID: ServerList] = [:]
+    private var liveUpdates: [UUID: Task<Void, Never>] = [:]
     private let file: HiveListFile
     private let keychain = DeviceKeychain()
 
@@ -54,7 +55,9 @@ final class HiveListStore {
     private func track(_ hive: KnownHive) {
         let link = HiveLink(hive: hive, keychain: keychain)
         links[hive.id] = link
-        serverLists[hive.id] = ServerList(link: link)
+        let servers = ServerList(link: link)
+        serverLists[hive.id] = servers
+        liveUpdates[hive.id] = Task { await servers.statuses.follow() }
     }
 
     /// Keeps the name the Hive gives itself, so the list reads right while it's offline.
@@ -77,6 +80,7 @@ final class HiveListStore {
         hives.removeAll { $0.id == id }
         links[id] = nil
         serverLists[id] = nil
+        liveUpdates.removeValue(forKey: id)?.cancel()
         try? keychain.delete(hiveID: id)
         file.save(hives)
     }

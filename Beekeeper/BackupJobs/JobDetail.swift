@@ -1,7 +1,8 @@
 import HiveKit
 import SwiftUI
 
-/// One backup job: what it backs up, when, and what it keeps, with editing and removing it.
+/// One backup job: where it stands, what it backs up, when, what it keeps and its snapshots, with
+/// running, editing and removing it.
 struct JobDetail: View {
     let hive: KnownHive
     let link: HiveLink
@@ -38,7 +39,9 @@ struct JobDetail: View {
 
     private func page(_ job: BackupJob) -> some View {
         Form {
+            JobStatusSection(job: job, statuses: servers.statuses)
             JobSummary(job: job)
+            JobSnapshotsSection(hive: hive, link: link, job: job, statuses: servers.statuses)
         }
         .formStyle(.grouped)
         .toolbar {

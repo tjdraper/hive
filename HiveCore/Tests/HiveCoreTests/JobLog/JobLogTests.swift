@@ -61,6 +61,43 @@ struct JobLogTests {
         #expect(unreadable.status == .badRequest)
     }
 
+    @Test("The job log can keep to problems: failed runs but not cancelled ones, and removals that left a snapshot behind")
+    func problemsOnly() async throws {
+        // Arrange
+        let fixture = try await BackupRunFixture.withDatabase()
+        _ = try await fixture.run()
+        fixture.databaseServer.hold()
+        _ = try await fixture.runNow()
+        try await fixture.waitUntilRunning(BackupRunFixture.dumping)
+        _ = try await fixture.api.send(.delete, HiveEndpoint.run(ofJob: fixture.job.id))
+        await fixture.runs.waitUntilIdle()
+        fixture.databaseServer.release()
+        fixture.databaseServer.answer(output: Data(), error: RecordedDumpOutput.mariadbWrongPassword, status: 2)
+        let failed = try await fixture.runEntry()
+        let jobLog = JobLog(database: fixture.api.signIn.database)
+        let (snapshot, date) = (UUID(), fixture.clock.now)
+        try jobLog.recordRemovals(
+            ofJob: fixture.job.id,
+            removed: [RemovedSnapshot(snapshotID: snapshot, date: date, wasComplete: true, reason: .outsideTiers, bytesFreed: 1)],
+            notRemoved: [],
+            at: date
+        )
+        let leftBehind = try #require(try jobLog.recordRemovals(
+            ofJob: fixture.job.id,
+            removed: [],
+            notRemoved: [UnremovedSnapshot(snapshotID: snapshot, date: date, wasComplete: true, reason: .quota, problem: .couldNotRemove)],
+            at: date
+        ))
+
+        // Act
+        let everything = try await fixture.jobLog()
+        let problems = try await fixture.jobLog("?problems=true")
+
+        // Assert
+        #expect(everything.entries.count == 5)
+        #expect(problems.entries == [.removal(leftBehind), .run(failed)])
+    }
+
     @Test("A job's entries outlive it, with the names it had")
     func outlivesTheJob() async throws {
         // Arrange
@@ -96,6 +133,7 @@ struct JobLogTests {
             case .progress(let entry): seen.append("progress \(entry.run.directories.count) \(entry.run.databases.count)")
             case .finished(let entry): seen.append("finished \(entry.run.failure == nil)")
             case .leftQueue: seen.append("left queue")
+            case .removed: seen.append("removed")
             }
             if seen.last?.hasPrefix("finished") == true { break }
         }

@@ -15,6 +15,9 @@ struct HiveOverviewView: View {
                 FullDiskAccessWarning(isOnThisMac: hive.isOnThisMac)
             }
             BackupDriveWarning(link: link, onOpenSettings: onOpenSettings)
+            if case .afterIdle(let minutes) = link.overview?.macSleep {
+                MacSleepWarning(minutes: minutes, isOnThisMac: hive.isOnThisMac)
+            }
             if servers.servers.isEmpty {
                 ContentUnavailableView {
                     Label("No Servers Yet", systemImage: "server.rack")
@@ -25,7 +28,7 @@ struct HiveOverviewView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ServerOverviewList(servers: servers.servers, onSelect: onSelectServer)
+                ServerOverviewList(servers: servers, onSelect: onSelectServer)
             }
         }
         .padding()
@@ -38,20 +41,19 @@ struct HiveOverviewView: View {
 }
 
 private struct ServerOverviewList: View {
-    let servers: [Server]
+    let servers: ServerList
     let onSelect: (UUID) -> Void
 
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(servers) { server in
+                ForEach(servers.servers) { server in
                     Button { onSelect(server.id) } label: {
                         HStack {
                             Label(server.name, systemImage: "server.rack")
                             Spacer()
                             if server.isSetUp {
-                                Text(server.connection.host)
-                                    .foregroundStyle(.secondary)
+                                ServerHealthLabel(jobs: servers.jobs.jobs(onServer: server.id), statuses: servers.statuses)
                             } else {
                                 Label("Not set up yet", systemImage: "exclamationmark.circle")
                                     .foregroundStyle(.orange)
@@ -63,7 +65,7 @@ private struct ServerOverviewList: View {
                         .padding(.vertical, 6)
                     }
                     .buttonStyle(.plain)
-                    if server.id != servers.last?.id {
+                    if server.id != servers.servers.last?.id {
                         Divider()
                     }
                 }
@@ -72,6 +74,44 @@ private struct ServerOverviewList: View {
         } label: {
             Text("Servers")
         }
+    }
+}
+
+/// The server's most pressing job status, or when it was last backed up.
+private struct ServerHealthLabel: View {
+    let jobs: [BackupJob]
+    let statuses: JobStatusStore
+
+    var body: some View {
+        let health = JobHealth(jobs: jobs, in: statuses)
+        HStack(spacing: 6) {
+            JobHealthBadge(health: health)
+            if jobs.isEmpty {
+                Text("No backup jobs")
+            } else if health == .fine, let last = lastSnapshot {
+                // Each minute, and without seconds, so it never sits on a stale "47 seconds ago".
+                TimelineView(.everyMinute) { _ in
+                    Text("Backed up \(last.formatted(Self.ago))")
+                }
+                .help(last.spoken)
+            } else {
+                Text(health.label)
+            }
+        }
+        .foregroundStyle(.secondary)
+    }
+
+    private static var ago: Date.RelativeFormatStyle {
+        var style = Date.RelativeFormatStyle(presentation: .named, unitsStyle: .wide)
+        style.allowedFields = [.year, .month, .week, .day, .hour, .minute]
+        return style
+    }
+
+    /// The oldest of its jobs' last snapshots, since the server is only as backed up as that.
+    private var lastSnapshot: Date? {
+        let dates = jobs.map { statuses.status(of: $0.id)?.lastSnapshotAt }
+        guard !dates.contains(nil) else { return nil }
+        return dates.compactMap(\.self).min()
     }
 }
 

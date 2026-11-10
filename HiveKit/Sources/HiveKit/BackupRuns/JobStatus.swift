@@ -64,4 +64,6 @@ public enum RunEvent: Codable, Hashable, Sendable {
     /// A directory or database finished.
     case progress(RunLogEntry)
     case finished(RunLogEntry)
+    /// Retention removed snapshots from a job, or couldn't remove some, and logged it.
+    case removed(RemovalLogEntry)
 }

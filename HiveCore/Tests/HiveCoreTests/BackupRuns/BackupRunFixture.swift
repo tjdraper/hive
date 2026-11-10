@@ -39,10 +39,15 @@ struct BackupRunFixture {
         directories: [(folder: String, source: String)] = [("site", "srv/site")],
         databases: [BackupDatabaseDraft] = [],
         chooseDrive: Bool = true,
-        startupDriveGrace: TimeInterval = 0
+        startupDriveGrace: TimeInterval = 0,
+        liveUpdateHeartbeat: Duration = .seconds(15)
     ) async throws {
         databaseServer = try FakeDatabaseServer()
-        api = try APIFixture(dumpSearchPath: databaseServer.searchPath, startupDriveGrace: startupDriveGrace)
+        api = try APIFixture(
+            dumpSearchPath: databaseServer.searchPath,
+            startupDriveGrace: startupDriveGrace,
+            liveUpdateHeartbeat: liveUpdateHeartbeat
+        )
         temporary = try TemporaryDirectory()
         volume = temporary.url.appending(path: "Volume", directoryHint: .isDirectory)
         server = temporary.url.appending(path: "Server", directoryHint: .isDirectory)

@@ -17,9 +17,12 @@ public enum HiveEndpoint {
     public static let backupDrive = "/backup-drive"
     /// Every job's `JobStatus`.
     public static let jobStatus = "/job-status"
-    /// Newest first. `?before=<entry ID>` gives the page after one already shown, and `?job=<ID>` or
-    /// `?server=<ID>` keeps only that job's or server's runs.
+    /// Newest first. `?before=<entry ID>` gives the page after one already shown, `?job=<ID>` or
+    /// `?server=<ID>` keeps only that job's or server's entries, and `?problems=true` keeps only runs
+    /// that failed and removals that left a snapshot behind.
     public static let jobLog = "/job-log"
+    /// A response that stays open, one `LiveUpdate` per line, until the session ends.
+    public static let liveUpdates = "/live-updates"
 
     public static func device(_ id: UUID) -> String {
         "\(devices)/\(id.uuidString)"
@@ -66,5 +69,10 @@ public enum HiveEndpoint {
     /// waiting or running run. `GET` reads its `JobStatus`.
     public static func run(ofJob id: UUID) -> String {
         "\(job(id))/run"
+    }
+
+    /// `GET` reads the job's `JobSnapshots`.
+    public static func snapshots(ofJob id: UUID) -> String {
+        "\(job(id))/snapshots"
     }
 }

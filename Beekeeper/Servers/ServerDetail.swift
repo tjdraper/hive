@@ -31,7 +31,12 @@ struct ServerDetail: View {
 
     private func page(_ server: Server) -> some View {
         Form {
-            ServerJobsSection(jobs: servers.jobs.jobs(onServer: server.id), onAddJob: onAddJob, onSelectJob: onSelectJob)
+            ServerJobsSection(
+                jobs: servers.jobs.jobs(onServer: server.id),
+                statuses: servers.statuses,
+                onAddJob: onAddJob,
+                onSelectJob: onSelectJob
+            )
             Section("Connection") {
                 LabeledContent("Host", value: server.connection.host)
                 LabeledContent("Port", value: String(server.connection.port))

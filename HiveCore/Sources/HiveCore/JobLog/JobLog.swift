@@ -10,14 +10,21 @@ struct JobLog: Sendable {
 
     let database: HiveDatabase
 
+    /// A run that failed for a reason other than being cancelled, or a removal that left a snapshot behind.
+    private static let isProblem = SQL("""
+    (kind = 'run' AND failure IS NOT NULL AND failure != \(BackupFailure.cancelled.rawValue)) \
+    OR (kind = \(RemovalLogRecord.kind) AND json_array_length(notRemoved) > 0)
+    """)
+
     /// Newest first, starting after the entry `before` when given.
-    func page(before: Int64?, limit: Int, jobID: UUID? = nil, serverID: UUID? = nil) throws -> JobLogPage {
+    func page(before: Int64?, limit: Int, jobID: UUID? = nil, serverID: UUID? = nil, problemsOnly: Bool = false) throws -> JobLogPage {
         let limit = min(max(limit, 1), Self.largestPage)
         let rows = try database.writer.read { database in
             var request = JobLogRecord.order(Column("id").desc).limit(limit + 1)
             if let before { request = request.filter(Column("id") < before) }
             if let jobID { request = request.filter(Column("jobID") == jobID) }
             if let serverID { request = request.filter(Column("serverID") == serverID) }
+            if problemsOnly { request = request.filter(Self.isProblem) }
             return try Row.fetchAll(database, request)
         }
         let entries = try rows.prefix(limit).compactMap { row -> JobLogEntry? in
@@ -30,15 +37,16 @@ struct JobLog: Sendable {
     }
 
     /// One entry for the job, when anything was removed or couldn't be.
+    @discardableResult
     func recordRemovals(
         ofJob jobID: UUID,
         removed: [RemovedSnapshot],
         notRemoved: [UnremovedSnapshot],
         at date: Date
-    ) throws {
-        guard !removed.isEmpty || !notRemoved.isEmpty else { return }
-        try database.writer.write { database in
-            guard let names = try JobNames.fetch(jobID: jobID, in: database) else { return }
+    ) throws -> RemovalLogEntry? {
+        guard !removed.isEmpty || !notRemoved.isEmpty else { return nil }
+        return try database.writer.write { database in
+            guard let names = try JobNames.fetch(jobID: jobID, in: database) else { return nil }
             var record = RemovalLogRecord(
                 id: nil,
                 jobID: jobID,
@@ -51,6 +59,7 @@ struct JobLog: Sendable {
                 notRemoved: notRemoved
             )
             try record.insert(database)
+            return record.entry
         }
     }
 

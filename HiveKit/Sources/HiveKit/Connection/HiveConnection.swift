@@ -83,6 +83,21 @@ public final class HiveConnection: Sendable {
     }
 
     func send(path: String, method: String, body: Data? = nil, token: String? = nil) async throws -> (Data, HTTPURLResponse) {
+        let request = try request(path: path, method: method, body: body, token: token)
+        let (data, response) = try await refusingWrongKey { try await session.data(for: request) }
+        guard let response = response as? HTTPURLResponse else { throw HiveConnectionError.unexpectedStatus(0) }
+        return (data, response)
+    }
+
+    /// A `GET` whose body is read as it arrives.
+    func stream(path: String, token: String) async throws -> (URLSession.AsyncBytes, HTTPURLResponse) {
+        let request = try request(path: path, method: "GET", body: nil, token: token)
+        let (bytes, response) = try await refusingWrongKey { try await session.bytes(for: request) }
+        guard let response = response as? HTTPURLResponse else { throw HiveConnectionError.unexpectedStatus(0) }
+        return (bytes, response)
+    }
+
+    private func request(path: String, method: String, body: Data?, token: String?) throws -> URLRequest {
         guard let url = address.url(path: path) else { throw HiveConnectionError.invalidAddress }
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -93,16 +108,15 @@ public final class HiveConnection: Sendable {
             request.httpBody = body
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
+        return request
+    }
 
-        let data: Data
-        let response: URLResponse
+    /// URLSession reports a refused key as a cancelled request.
+    private func refusingWrongKey<Value>(_ load: () async throws -> Value) async throws -> Value {
         do {
-            (data, response) = try await session.data(for: request)
+            return try await load()
         } catch let error as URLError where error.code == .cancelled && delegate.refusedKey {
             throw HiveConnectionError.wrongKey
         }
-
-        guard let response = response as? HTTPURLResponse else { throw HiveConnectionError.unexpectedStatus(0) }
-        return (data, response)
     }
 }

@@ -1,13 +1,17 @@
 import HiveKit
 import Synchronization
 
-/// Passes each run event to everyone listening, for D3's WebSocket.
+/// Passes each run event to everyone listening, such as each device's live updates.
 final class RunEventBroadcaster: Sendable {
     /// A listener that falls this far behind loses the oldest events rather than holding the rest up.
     private static let buffered = 200
 
     private let listeners = Mutex<[Int: AsyncStream<RunEvent>.Continuation]>([:])
     private let nextID = Mutex(0)
+
+    var listenerCount: Int {
+        listeners.withLock { $0.count }
+    }
 
     /// Events from now on, until the stream is dropped.
     func listen() -> AsyncStream<RunEvent> {

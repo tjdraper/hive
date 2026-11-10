@@ -2,16 +2,19 @@ import Foundation
 import HiveKit
 import Observation
 
-/// One Hive's servers, as it last listed them, kept in step with what this device changes, with their jobs.
+/// One Hive's servers, as it last listed them, kept in step with what this device changes, with their
+/// jobs and where each stands.
 @Observable
 final class ServerList {
     private(set) var servers: [Server] = []
     let jobs: JobList
+    let statuses: JobStatusStore
     private let link: HiveLink
 
     init(link: HiveLink) {
         self.link = link
         jobs = JobList(link: link)
+        statuses = JobStatusStore(link: link)
     }
 
     func server(_ id: UUID) -> Server? {
@@ -23,6 +26,7 @@ final class ServerList {
         guard let listed: [Server] = try? await link.perform({ try await $0.get(HiveEndpoint.servers) }) else { return }
         servers = Self.sorted(listed)
         await jobs.refresh()
+        await statuses.refresh()
     }
 
     func add(_ draft: ServerDraft) async throws -> Server {

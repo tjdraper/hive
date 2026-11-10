@@ -27,7 +27,7 @@ public struct SignInRequest: Codable, Sendable {
 }
 
 public struct SignInSession: Codable, Sendable {
-    /// Sent as `Authorization: Bearer <token>` on HTTP requests and when opening the WebSocket.
+    /// Sent as `Authorization: Bearer <token>` on every request, live updates included.
     public let token: String
     public let expiresInSeconds: Int
     public let hiveAPIVersions: APIVersions

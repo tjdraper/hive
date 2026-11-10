@@ -46,6 +46,7 @@ struct RequestGate<Next: HTTPResponder>: HTTPResponder where Next.Context == Hiv
 
         var context = context
         context.signedInDeviceID = deviceID
+        context.sessionToken = token
         return try await next.respond(to: request, context: context)
     }
 

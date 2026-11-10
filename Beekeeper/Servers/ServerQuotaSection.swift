@@ -13,7 +13,8 @@ struct ServerQuotaSection: View {
             LabeledContent("Quota", value: server.quotaBytes.map { $0.formatted(.byteCount(style: .file)) } ?? "No limit")
             LabeledContent("Uses now", value: ServerSpace.describe(space))
         }
-        .task(id: server.quotaBytes) {
+        // After a run or a removal too, which change what the server's snapshots take.
+        .task(id: [server.quotaBytes, Int64(servers.statuses.logRevision)]) {
             space = try? await servers.space(of: server.id)
         }
     }

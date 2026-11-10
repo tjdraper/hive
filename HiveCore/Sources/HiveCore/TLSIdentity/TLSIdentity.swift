@@ -1,3 +1,4 @@
+import NIOCore
 import NIOSSL
 import SwiftASN1
 import X509
@@ -21,6 +22,10 @@ public struct TLSIdentity {
             privateKey: .privateKey(NIOSSLPrivateKey(customPrivateKey: IdentityTLSKey(key: key)))
         )
         configuration.minimumTLSVersion = .tlsv13
+        // How long a closing connection waits for the client's close_notify. URLSession keeps a finished
+        // connection open without sending one, and with the default 5 seconds a connection open when
+        // Hive stops held it up until launchd killed it, cutting short a run's cleanup.
+        configuration.shutdownTimeout = .seconds(1)
         return configuration
     }
 }

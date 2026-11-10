@@ -60,7 +60,7 @@ struct HiveSidebar: View {
     private func serverRow(_ server: Server, in servers: ServerList, hiveID: UUID) -> some View {
         let jobs = servers.jobs.jobs(onServer: server.id)
         let link = NavigationLink(value: SidebarItem.server(hiveID: hiveID, serverID: server.id)) {
-            ServerSidebarRow(server: server)
+            ServerSidebarRow(server: server, health: JobHealth(jobs: jobs, in: servers.statuses))
         }
         .contextMenu {
             Button("Add Job…") { onAddJob(server.id, hiveID) }
@@ -77,8 +77,12 @@ struct HiveSidebar: View {
             DisclosureGroup(isExpanded: expanded(server: server.id, hiveID: hiveID)) {
                 ForEach(jobs) { job in
                     NavigationLink(value: SidebarItem.job(hiveID: hiveID, serverID: server.id, jobID: job.id)) {
-                        Label(job.name, systemImage: "archivebox")
-                            .lineLimit(1)
+                        HStack(spacing: 6) {
+                            Label(job.name, systemImage: "archivebox")
+                                .lineLimit(1)
+                            Spacer()
+                            JobHealthBadge(health: JobHealth(servers.statuses.status(of: job.id)))
+                        }
                     }
                     .contextMenu {
                         Button("Edit…") { jobEditRequest = JobEditRequest(action: .edit, job: job, jobs: servers.jobs) }
@@ -142,6 +146,7 @@ private struct HiveSidebarRow: View {
 
 private struct ServerSidebarRow: View {
     let server: Server
+    let health: JobHealth
 
     var body: some View {
         HStack(spacing: 6) {
@@ -153,6 +158,8 @@ private struct ServerSidebarRow: View {
                     .foregroundStyle(.orange)
                     .help("Not set up yet")
                     .accessibilityLabel("Not set up yet")
+            } else {
+                JobHealthBadge(health: health)
             }
         }
     }

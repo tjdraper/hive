@@ -18,14 +18,26 @@ public struct HiveAPI: Sendable {
     let backupDrive: BackupDriveWorkflow
     let runs: BackupRunCoordinator
     let jobStatus: JobStatusReader
-    let jobLog: JobLog
     let scheduler: BackupScheduler
+    /// How often an open live updates response gets a line when nothing else is happening.
+    let liveUpdateHeartbeat: Duration
     /// Checked on every request, since it can be turned off while Hive runs.
     let fullDiskAccess: @Sendable () -> FullDiskAccess
     let macSleep: @Sendable () async -> MacSleep
 
     var serverSpace: ServerSpaceReader {
         ServerSpaceReader(database: servers.store.database)
+    }
+
+    var jobLog: JobLog {
+        JobLog(database: servers.store.database)
+    }
+
+    var snapshots: JobSnapshotReader {
+        JobSnapshotReader(
+            database: servers.store.database,
+            drives: BackupDriveLocator(store: backupDrive.store, volumes: backupDrive.volumes, hiveID: hiveID)
+        )
     }
 
     public init(
@@ -57,6 +69,7 @@ public struct HiveAPI: Sendable {
             macSleep: { await SleepSettingReader().read() },
             startupDriveGrace: 5 * 60,
             pause: { try await Task.sleep(for: $0) },
+            liveUpdateHeartbeat: .seconds(15),
             now: Date.init
         )
     }
@@ -81,6 +94,7 @@ public struct HiveAPI: Sendable {
         macSleep: @escaping @Sendable () async -> MacSleep,
         startupDriveGrace: TimeInterval,
         pause: @escaping @Sendable (Duration) async throws -> Void,
+        liveUpdateHeartbeat: Duration,
         now: @escaping @Sendable () -> Date
     ) {
         self.hiveID = hiveID
@@ -129,7 +143,7 @@ public struct HiveAPI: Sendable {
             pause: pause
         )
         jobStatus = JobStatusReader(database: database, runs: runs, schedule: schedule, now: now)
-        jobLog = JobLog(database: database)
+        self.liveUpdateHeartbeat = liveUpdateHeartbeat
         scheduler = BackupScheduler(database: database, schedule: schedule, runs: runs, now: now)
         self.fullDiskAccess = fullDiskAccess
         self.macSleep = macSleep

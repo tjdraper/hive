@@ -6,7 +6,7 @@ References like §12 point to [00-Info.md](00-Info.md).
 
 ## Engine
 
-- **The WebSocket** (§3): job states, progress and new job log entries, sent as they happen, after signing in with the session token. Beekeeper reconnects on its own, and keeps one for each connected Hive.
+- **Live updates** (§3): job states, progress and new job log entries, sent as they happen, after signing in with the session token. Beekeeper reconnects on its own, and keeps one for each connected Hive.
 - **Snapshots through the API:** each job's snapshots with their date, whether complete, and how much removing each would free (C6), plus each server's total against its quota
 
 - **From C3:** the catalog is the `snapshot` table, and `GET /jobs/<id>/run` gives the latest run until C5's job log.
@@ -26,5 +26,18 @@ Built with you:
 
 - **From D2:** `GET /servers/<id>/space` already gives a server's total on the chosen drive as `ServerSpace`, nil while a job with snapshots there isn't counted. The server page and the server editor show it beside the quota. The job page (`JobDetail`) shows only the job's configuration, with room for its status and snapshots, and the server page lists its jobs in `ServerJobsSection`.
 - **From D1:** the sidebar's server rows and the Overview's server list show only "Not set up yet" for now; status goes beside them. The Overview polls `/backup-drive` every 15 seconds for its warning, and `MainWindow` refreshes every Hive every 30, both of which the WebSocket can replace.
+
+**Decisions (2026-11-09):**
+
+- **Live updates are a response Hive keeps open,** `GET /live-updates`, one `LiveUpdate` JSON line at a time, in place of a WebSocket. It passes through `RequestGate` like every other request, and Hummingbird's test client can test it without a port. Hummingbird's WebSocket channel would also have dropped the listener's 30-second cutoff for a connection that never sends a request. The first line is every job's `JobStatus`, then `RunEvent`s as they happen, with the job's status after it's queued, leaves the queue, starts or finishes, and a heartbeat every 15 seconds. Each line is checked against the session first: the response ends within a heartbeat once the session runs out, a revoked device gets nothing more, and Hive stopping ends it at once. Retention's removals are a `RunEvent` too.
+- **TLS waits a second, not five, for a closing client's close_notify.** URLSession never sends one, so with live updates open the daemon couldn't stop within launchd's 5 seconds and was killed, which would also cut short a run's cleanup.
+- **Snapshots:** `GET /jobs/<id>/snapshots` lists the job's snapshots on the chosen drive, newest first, with each one's state and what removing it frees, the job's total, and its folder on the Hive Mac while the drive is mounted. `GET /job-log?problems=true` keeps failed runs, but not cancelled ones, and removals that left a snapshot behind.
+- **In Beekeeper,** the job page starts with its status: what the run is doing, with a progress bar over its directories and databases, the last and next runs, overdue, and Run Now or Cancel. Its snapshots end the page, each with what it alone takes, Incomplete and Being removed tags, and on the Hive Mac a Show in Finder button with the reminder to copy files out. The Job Log is a Hive page beside the Audit Log, filtered by server, job and problems, with each run's directories and databases on request. The sidebar, the server page and the Overview mark a job or server only when it needs a look: running, waiting, failed or overdue.
+- **Times are shown as times** ("Today at 7:15 PM"), except the Overview's "Backed up 2 hours ago" per server, which updates each minute and shows the time on hover.
+- **A cancelled request no longer marks a Hive offline.** URLSession reports a request cancelled by a view reloading as a `URLError`, which `HiveLink` took for the Hive being unreachable.
+- **`JobStatePreviews.swift`** previews every job status, badge and snapshot row with made-up runs.
+- **A job's directories are stacked in its editor,** each path on a full-width line that wraps above its folder, since long paths were cut off in half-width columns.
+
+**Result (2026-11-09):** the tests pass. In the installed builds, Run Now showed its progress live and landed in the job log, Cancel stopped it, Beekeeper picked up again after the daemon restarted, and the job's snapshots matched the drive.
 
 **Done when:** in the installed builds, a run started with Run Now shows its progress live in Beekeeper and lands in the job log; Cancel stops it; Beekeeper picks up again after the daemon restarts; and a job's snapshots list matches the test drive.

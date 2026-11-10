@@ -21,6 +21,7 @@ struct HiveDetail: View {
                     onOpenSettings: { page = .settings },
                     onSelectServer: { selection = .server(hiveID: hive.id, serverID: $0) }
                 )
+            case .jobLog: JobLogView(link: link, servers: servers)
             case .devices: DeviceListView(hive: hive, link: link)
             case .auditLog: AuditLogView(link: link)
             case .settings: HiveSettingsView(hive: hive, link: link)

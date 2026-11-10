@@ -41,6 +41,15 @@ struct TLSHandshakeTests {
         #expect(throws: (any Error).self) { try handshake(client: client, server: server) }
     }
 
+    @Test("A closing connection waits at most a second for the client, so it can't hold up Hive stopping")
+    func shortShutdown() throws {
+        // Act
+        let configuration = try identity.serverConfiguration()
+
+        // Assert
+        #expect(configuration.shutdownTimeout <= .seconds(1))
+    }
+
     private func makeServer() throws -> EmbeddedChannel {
         let context = try NIOSSLContext(configuration: identity.serverConfiguration())
         let channel = EmbeddedChannel(handler: NIOSSLServerHandler(context: context))

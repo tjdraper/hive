@@ -4,8 +4,9 @@ import SwiftUI
 /// A Hive's own pages, switched in the toolbar when the Hive is selected in the sidebar.
 enum HivePage: String, CaseIterable, Identifiable {
     case overview
-    case devices
+    case jobLog
     case auditLog
+    case devices
     case settings
 
     var id: Self {
@@ -15,6 +16,7 @@ enum HivePage: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .overview: "Overview"
+        case .jobLog: "Job Log"
         case .devices: "Devices"
         case .auditLog: "Audit Log"
         case .settings: "Settings"

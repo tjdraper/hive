@@ -214,7 +214,8 @@ struct APIFixture {
         signIn: SignInFixture? = nil,
         sealer: SecretSealer? = nil,
         dumpSearchPath: String = "/usr/bin:/bin",
-        startupDriveGrace: TimeInterval = 0
+        startupDriveGrace: TimeInterval = 0,
+        liveUpdateHeartbeat: Duration = .seconds(15)
     ) throws {
         self.signIn = try signIn ?? SignInFixture()
         let sealer = sealer ?? SecretSealer(key: P256.KeyAgreement.PrivateKey())
@@ -247,6 +248,7 @@ struct APIFixture {
                 clock.advance(by: TimeInterval($0.components.seconds))
                 try await pauses.pause()
             },
+            liveUpdateHeartbeat: liveUpdateHeartbeat,
             now: { clock.now }
         )
     }

@@ -4,6 +4,7 @@ import SwiftUI
 /// The server's backup jobs, each opening its own page, and adding another.
 struct ServerJobsSection: View {
     let jobs: [BackupJob]
+    let statuses: JobStatusStore
     let onAddJob: () -> Void
     let onSelectJob: (UUID) -> Void
 
@@ -18,6 +19,7 @@ struct ServerJobsSection: View {
                     HStack {
                         Label(job.name, systemImage: "archivebox")
                         Spacer()
+                        JobHealthBadge(health: JobHealth(statuses.status(of: job.id)))
                         Text(job.times.map(\.formatted).formatted(.list(type: .and)))
                             .foregroundStyle(.secondary)
                         Image(systemName: "chevron.forward")

@@ -27,6 +27,7 @@ References like §6 point to [00-Info.md](00-Info.md). Read the brainstorm's "Ha
 - Each confirmed route refuses a request without a signature, with one for a different action or object, and with a reused nonce
 - Lowering a quota without confirmation removes nothing
 
+- **From D3:** a job's snapshots are listed in `JobSnapshotsSection`, from `GET /jobs/<id>/snapshots`, which is where deleting one goes. Snapshots of removed jobs have no page yet: the route answers 404 once the job is gone. A removal shows in the Job Log as a `RemovalLogEntry` and reaches live updates as `RunEvent.removed`.
 - **From D2:** `QuotaField` and `RetentionFields` already warn when the quota or a tier is lowered, and `DatabasePasswordField` replaces a saved password through Change; their confirmations go on Save in `EditServerSheet` and `JobEditorSheet`.
 - **From D1:** `EditServerSheet` already warns when the host, port or user changes; the confirmation goes on its Save. The server page offers "Make Hive's Key" only for a server with no key, which needs no confirmation.
 

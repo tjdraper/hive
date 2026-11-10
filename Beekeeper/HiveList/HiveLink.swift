@@ -90,6 +90,11 @@ final class HiveLink {
         }
     }
 
+    /// The Hive's live updates, until it ends them, such as when the session runs out.
+    func liveUpdates() async throws -> AsyncThrowingStream<LiveUpdate, any Error> {
+        try await perform { try await $0.liveUpdates() }
+    }
+
     /// After this device revokes itself: its key is no use any more.
     func forgetCredential() {
         try? keychain.delete(hiveID: hiveID)
@@ -105,6 +110,8 @@ final class HiveLink {
         case HiveConnectionError.signInRefused: .notRecognized
         case HiveConnectionError.lockedOut: .lockedOut
         case HiveConnectionError.incompatible(let outdated): .needsUpdate(outdated)
+        // A request whose task was cancelled, such as by a view reloading, says nothing about the Hive.
+        case let error as URLError where error.code == .cancelled: nil
         case is URLError: .offline
         case is HiveRequestError, is CancellationError: nil
         default: .failed(error.localizedDescription)

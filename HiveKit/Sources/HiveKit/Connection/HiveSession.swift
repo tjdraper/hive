@@ -71,6 +71,32 @@ public actor HiveSession {
         return (response.statusCode, data)
     }
 
+    /// Hive's live updates, as they come, until Hive ends the response, such as when the session runs out.
+    public func liveUpdates() async throws -> AsyncThrowingStream<LiveUpdate, any Error> {
+        var (bytes, response) = try await connection.stream(path: HiveEndpoint.liveUpdates, token: token())
+        if response.statusCode == 401 {
+            session = nil
+            (bytes, response) = try await connection.stream(path: HiveEndpoint.liveUpdates, token: token())
+        }
+        guard response.statusCode == 200 else { throw HiveRequestError(status: response.statusCode, body: Data()) }
+
+        let lines = bytes.lines
+        let connection = connection
+        return AsyncThrowingStream { continuation in
+            let reading = Task {
+                do {
+                    for try await line in lines {
+                        continuation.yield(try connection.decode(LiveUpdate.self, from: Data(line.utf8)))
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in reading.cancel() }
+        }
+    }
+
     private func sendSignedIn(method: String, path: String, body: Data?) async throws -> (Data, HTTPURLResponse) {
         let first = try await connection.send(path: path, method: method, body: body, token: token())
         guard first.1.statusCode == 401 else { return first }

@@ -64,21 +64,24 @@ struct RetentionWorkflow: Sendable {
         SnapshotSpaceCounter(space: space, store: store)
     }
 
-    /// After a run of the job: its server's jobs and quota.
-    @concurrent func pass(afterRunOf jobID: UUID) async {
-        guard let serverID = try? store.serverID(ofJob: jobID) else { return }
-        await pass(servers: [serverID])
+    /// After a run of the job: its server's jobs and quota. Returns what it logged.
+    @discardableResult
+    @concurrent func pass(afterRunOf jobID: UUID) async -> [RemovalLogEntry] {
+        guard let serverID = try? store.serverID(ofJob: jobID) else { return [] }
+        return await pass(servers: [serverID])
     }
 
     /// Every server, or only those in `servers`. Stops between steps once the task is cancelled, leaving
-    /// a removal cut short for the next pass to finish.
-    @concurrent func pass(servers: Set<UUID>? = nil) async {
+    /// a removal cut short for the next pass to finish. Returns what it logged.
+    @discardableResult
+    @concurrent func pass(servers: Set<UUID>? = nil) async -> [RemovalLogEntry] {
         let clock = ContinuousClock.now
         guard case .ready(let drive) = (try? drives.locate()) ?? .unavailable(.failed) else {
             Self.logger.notice("Skipped retention: the backup drive isn't available")
-            return
+            return []
         }
         var outcomes: [UUID: JobOutcome] = [:]
+        var logged: [RemovalLogEntry] = []
         do {
             let hiveFolder = try DriveFolder(at: drive.hiveFolder)
             let driveUUID = drive.identity.volumeUUID.uuidString
@@ -86,7 +89,7 @@ struct RetentionWorkflow: Sendable {
             if paused {
                 Self.logger.notice("Retention is paused after a restore: counting only")
             } else {
-                try RemovalRecovery(store: store, removals: removals, remover: remover, jobLog: jobLog, now: now)
+                logged += try RemovalRecovery(store: store, removals: removals, remover: remover, jobLog: jobLog, now: now)
                     .finish(onDrive: driveUUID, in: hiveFolder)
             }
             for server in try store.servers(servers) {
@@ -102,7 +105,8 @@ struct RetentionWorkflow: Sendable {
         let removed = outcomes.values.flatMap(\.removed)
         for (jobID, outcome) in outcomes {
             do {
-                try jobLog.recordRemovals(ofJob: jobID, removed: outcome.removed, notRemoved: outcome.notRemoved, at: now())
+                let entry = try jobLog.recordRemovals(ofJob: jobID, removed: outcome.removed, notRemoved: outcome.notRemoved, at: now())
+                logged += entry.map { [$0] } ?? []
             } catch {
                 Self.logger.error("Couldn't record removals in the job log: \(Self.described(error), privacy: .public)")
             }
@@ -113,6 +117,7 @@ struct RetentionWorkflow: Sendable {
         Retention removed \(removed.count, privacy: .public) snapshots, freeing \(freedBytes, privacy: .public) bytes, \
         in \(seconds, privacy: .public)s
         """)
+        return logged
     }
 
     /// A job whose folder is open on the drive, and which no run is writing to.

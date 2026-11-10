@@ -66,6 +66,14 @@ public struct APIServer: Sendable {
         BackupDriveRoutes.add(to: router, workflow: api.backupDrive)
         BackupRunRoutes.add(to: router, coordinator: api.runs, statuses: api.jobStatus)
         JobLogRoutes.add(to: router, jobLog: api.jobLog)
+        SnapshotRoutes.add(to: router, reader: api.snapshots)
+        LiveUpdateRoutes.add(
+            to: router,
+            events: api.runs.events,
+            statuses: api.jobStatus,
+            signIn: api.signIn,
+            heartbeat: api.liveUpdateHeartbeat
+        )
         return router
     }
 
