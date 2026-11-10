@@ -1,4 +1,4 @@
-/// Sent with 422 when Hive turns down a server or a job, which then changes nothing. It lists every
+/// Sent with 422 when Hive turns down a server, a job or the email settings, which then changes nothing. It lists every
 /// problem found, so Beekeeper can show each beside its field. A problem never repeats the value sent.
 public struct ConfigurationRefusal: Codable, Hashable, Sendable {
     public let problems: [ConfigurationProblem]
@@ -40,6 +40,12 @@ public enum ConfigurationField: String, Codable, Hashable, Sendable {
     case time
     case dailySnapshots
     case monthlySnapshots
+    case senderAddress
+    /// The email settings' list of recipients as a whole, such as when it's empty.
+    case recipients
+    /// One of the email settings' recipients.
+    case recipient
+    case password
 }
 
 public enum ConfigurationProblemReason: String, Codable, Hashable, Sendable {
@@ -60,7 +66,7 @@ public enum ConfigurationProblemReason: String, Codable, Hashable, Sendable {
     case insideAnother
     /// A database ID the job doesn't have.
     case unknown
-    /// A job with no times to run.
+    /// A job with no times to run, email with no recipients, or a username with no password.
     case missing
     /// A job with neither directories nor databases.
     case nothingToBackUp

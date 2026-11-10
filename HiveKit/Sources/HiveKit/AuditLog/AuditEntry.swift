@@ -40,6 +40,17 @@ public enum AuditEvent: Codable, Hashable, Sendable {
     case confirmationKeyRegistered
     /// Hive made a new identity key, and every device was unpaired.
     case identityRegenerated
+    case email(EmailChange)
+}
+
+public enum EmailChange: Codable, Hashable, Sendable {
+    case setUp(EmailSettings)
+    /// A changed host also cleared the password, unless a new one was entered with it.
+    case changed(old: EmailSettings, new: EmailSettings)
+    /// A password was entered. Its value is never recorded.
+    case passwordEntered
+    /// Email was turned off, and its password cleared.
+    case turnedOff
 }
 
 /// What a device asked to delete, with the names as they were, or for a removed job as last known.

@@ -9,7 +9,8 @@ public struct HiveAPI: Sendable {
     let settings: HiveSettingsWorkflow
     let servers: ServerWorkflow
     let jobs: BackupJobWorkflow
-    let sshKeys: ServerSSHKeyWorkflow
+    /// The Hive Mac's addresses, read fresh each time.
+    let addresses: @Sendable () -> [NetworkInterfaceAddress]
     let hostKeys: HostKeyWorkflow
     let connectionTest: ConnectionTestWorkflow
     let backupDrive: BackupDriveWorkflow
@@ -17,6 +18,8 @@ public struct HiveAPI: Sendable {
     let jobStatus: JobStatusReader
     let scheduler: BackupScheduler
     let confirmations: ConfirmationVerifier
+    /// Sends what Hive writes on its own, such as alerts.
+    let emailDelivery: EmailDelivery
     let identityKeys: HiveKeyStore
     let restart: HiveRestart
     /// How often an open live updates response gets a line when nothing else is happening.
@@ -24,6 +27,20 @@ public struct HiveAPI: Sendable {
     /// Checked on every request, since it can be turned off while Hive runs.
     let fullDiskAccess: @Sendable () -> FullDiskAccess
     let macSleep: @Sendable () async -> MacSleep
+
+    var sshKeys: ServerSSHKeyWorkflow {
+        ServerSSHKeyWorkflow(
+            store: ServerSSHKeyStore(database: servers.store.database),
+            sealer: servers.sealer,
+            settings: settingsStore,
+            addresses: addresses,
+            now: signIn.now
+        )
+    }
+
+    var email: EmailSettingsWorkflow {
+        EmailSettingsWorkflow(sender: emailDelivery.sender, now: signIn.now)
+    }
 
     var serverSpace: ServerSpaceReader {
         ServerSpaceReader(database: servers.store.database)
@@ -99,6 +116,7 @@ public struct HiveAPI: Sendable {
             sealer: sealer,
             identityKeys: identityKeys,
             restart: HiveRestart(delay: .seconds(1)),
+            smtp: NIOSMTPConnector(),
             fullDiskAccess: { FullDiskAccessProbe().check() },
             ssh: SSHRunner(),
             hostKeyScanner: HostKeyScanner(),
@@ -126,6 +144,7 @@ public struct HiveAPI: Sendable {
         sealer: SecretSealer,
         identityKeys: HiveKeyStore,
         restart: HiveRestart,
+        smtp: any SMTPConnecting,
         fullDiskAccess: @escaping @Sendable () -> FullDiskAccess,
         ssh: any SSHRunning,
         hostKeyScanner: any HostKeyScanning,
@@ -150,13 +169,7 @@ public struct HiveAPI: Sendable {
         self.servers = ServerWorkflow(store: servers, sealer: sealer, now: now)
         let schedule = ScheduleCalendar(calendar: calendar)
         jobs = BackupJobWorkflow(store: BackupJobStore(database: database), sealer: sealer, schedule: schedule, now: now)
-        sshKeys = ServerSSHKeyWorkflow(
-            store: ServerSSHKeyStore(database: database),
-            sealer: sealer,
-            settings: settingsStore,
-            addresses: addresses,
-            now: now
-        )
+        self.addresses = addresses
         hostKeys = HostKeyWorkflow(
             store: HostKeyStore(database: database),
             servers: servers,
@@ -190,6 +203,8 @@ public struct HiveAPI: Sendable {
         self.fullDiskAccess = fullDiskAccess
         self.macSleep = macSleep
         confirmations = ConfirmationVerifier(hiveID: hiveID, database: database, now: now)
+        let mail = EmailSender(database: database, settings: settingsStore, sealer: sealer, connector: smtp, calendar: calendar, now: now)
+        emailDelivery = EmailDelivery(sender: mail, pause: pause, now: now)
         self.identityKeys = identityKeys
         self.restart = restart
     }

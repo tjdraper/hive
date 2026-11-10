@@ -78,7 +78,7 @@ struct SecretExposureTests {
             try Data.fetchOne(database, sql: "SELECT sealedPassword FROM backupDatabase WHERE jobID = ?", arguments: [job.id])
         })
         #expect(try fixture.sealer.open(SealedSecret(data: sealed)) == Data("\(Self.secret)-2".utf8))
-        for (table, value) in try everyStoredValue() {
+        for (table, value) in try fixture.everyStoredValue() {
             #expect(value.range(of: Data(Self.secret.utf8)) == nil, "\(table)")
         }
     }
@@ -94,24 +94,6 @@ struct SecretExposureTests {
         // Assert
         for text in printed {
             #expect(!text.contains(Self.secret))
-        }
-    }
-
-    /// Every text and blob value in every table, as bytes.
-    private func everyStoredValue() throws -> [(table: String, value: Data)] {
-        try fixture.signIn.database.writer.read { database in
-            let tables = try String.fetchAll(database, sql: "SELECT name FROM sqlite_master WHERE type = 'table'")
-            return try tables.flatMap { table in
-                try Row.fetchAll(database, sql: "SELECT * FROM \(table.quotedDatabaseIdentifier)").flatMap { row in
-                    row.databaseValues.compactMap { value -> (String, Data)? in
-                        switch value.storage {
-                        case .string(let text): (table, Data(text.utf8))
-                        case .blob(let data): (table, data)
-                        default: nil
-                        }
-                    }
-                }
-            }
         }
     }
 }

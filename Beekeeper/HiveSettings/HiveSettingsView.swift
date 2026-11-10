@@ -75,6 +75,8 @@ struct HiveSettingsView: View {
                 }
             }
 
+            EmailSection(hive: hive, link: link)
+
             IdentitySection(hive: hive, link: link)
         }
         .formStyle(.grouped)

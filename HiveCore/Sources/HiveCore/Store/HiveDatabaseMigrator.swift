@@ -66,8 +66,24 @@ enum HiveDatabaseMigrator {
         migrator.registerMigration("Count every job's space again") { database in
             try database.execute(sql: "UPDATE jobSpace SET usedBytes = NULL")
         }
+        migrator.registerMigration("Add email settings", migrate: addEmailSettings)
 
         return migrator
+    }
+
+    private static func addEmailSettings(_ database: Database) throws {
+        try database.create(table: "emailSettings") { table in
+            // One row while email is set up.
+            table.primaryKey("singleton", .integer).check { $0 == 1 }
+            table.column("host", .text).notNull()
+            table.column("port", .integer).notNull()
+            table.column("security", .text).notNull()
+            table.column("username", .text).notNull()
+            table.column("senderAddress", .text).notNull()
+            // A JSON array.
+            table.column("recipients", .text).notNull()
+            table.column("sealedPassword", .blob)
+        }
     }
 
     private static func addConfirmation(_ database: Database) throws {

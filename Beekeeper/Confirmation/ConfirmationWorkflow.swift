@@ -150,6 +150,7 @@ extension ConfirmationReason {
         case .sshKeyReplaced: "replace Hive's SSH key for a server"
         case .snapshotsDeleted: "delete snapshots"
         case .identityRegenerated: "give the Hive a new identity"
+        case .emailHostChanged: "change the mail server Hive sends email through"
         }
     }
 }

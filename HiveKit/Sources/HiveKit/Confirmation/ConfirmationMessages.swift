@@ -63,6 +63,7 @@ public enum ConfirmationReason: String, Codable, CaseIterable, Hashable, Sendabl
     case sshKeyReplaced
     case snapshotsDeleted
     case identityRegenerated
+    case emailHostChanged
 }
 
 /// Sent with 428 when a change needs confirming and the request carried none.

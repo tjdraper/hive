@@ -94,4 +94,27 @@ struct ConfirmationRequirementTests {
         #expect(ConfirmationRequirement.reasons(replacingSSHKey: nil).isEmpty)
         #expect(ConfirmationRequirement.reasons(replacingSSHKey: first) == [.sshKeyReplaced])
     }
+
+    @Test("Only a new SMTP host needs confirming, never setting email up")
+    func emailReasons() {
+        // Arrange
+        let old = EmailRoutesTests.settings
+        var newHost = old
+        newHost.host = "smtp.elsewhere.example"
+        var otherChanges = old
+        otherChanges.port = 465
+        otherChanges.security = .implicitTLS
+        otherChanges.username = "other@example.com"
+        otherChanges.recipients = ["three@example.net"]
+
+        // Act
+        let setUp = ConfirmationRequirement.reasons(from: nil, to: old)
+        let moved = ConfirmationRequirement.reasons(from: old, to: newHost)
+        let other = ConfirmationRequirement.reasons(from: old, to: otherChanges)
+
+        // Assert
+        #expect(setUp.isEmpty)
+        #expect(moved == [.emailHostChanged])
+        #expect(other.isEmpty)
+    }
 }

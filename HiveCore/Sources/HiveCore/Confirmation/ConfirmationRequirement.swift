@@ -36,6 +36,13 @@ enum ConfirmationRequirement {
         old == nil ? [] : [.sshKeyReplaced]
     }
 
+    /// Setting email up replaces nothing. A new host is sent the username and every alert from then on,
+    /// though the password is cleared and has to be entered again.
+    static func reasons(from old: EmailSettings?, to new: EmailSettings) -> Set<ConfirmationReason> {
+        guard let old, old.host != new.host else { return [] }
+        return [.emailHostChanged]
+    }
+
     /// Throws `ConfirmationError.required` when a change needing confirmation wasn't confirmed, which
     /// rolls back the transaction it's called from.
     static func check(_ reasons: Set<ConfirmationReason>, isConfirmed: Bool) throws {

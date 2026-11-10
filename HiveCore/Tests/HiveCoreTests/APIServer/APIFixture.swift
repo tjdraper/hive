@@ -196,6 +196,7 @@ struct APIFixture {
     let fullDiskAccess = FakeFullDiskAccess()
     let sealer: SecretSealer
     let ssh = FakeSSH()
+    let smtp = FakeSMTP()
     let addresses = FakeMacAddresses()
     let volumes = FakeVolumes()
     let sleepPrevention = FakeSleepPrevention()
@@ -250,6 +251,7 @@ struct APIFixture {
             sealer: sealer,
             identityKeys: identityKeys,
             restart: restart,
+            smtp: smtp,
             fullDiskAccess: { [fullDiskAccess] in FullDiskAccessProbe { _ in fullDiskAccess.openResult }.check() },
             ssh: ssh,
             hostKeyScanner: ssh,

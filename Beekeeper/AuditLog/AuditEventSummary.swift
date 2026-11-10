@@ -32,6 +32,25 @@ extension AuditEvent {
             "Set up confirming changes with Touch ID or the password"
         case .identityRegenerated:
             "Gave the Hive a new identity, unpairing every device"
+        case .email(let change):
+            change.summary
+        }
+    }
+}
+
+extension EmailChange {
+    var summary: String {
+        switch self {
+        case .setUp(let settings):
+            "Set up email through \(settings.host):\(settings.port) to \(settings.recipients.formatted(.list(type: .and)))"
+        case .changed(let old, let new) where old.host != new.host:
+            "Changed the mail server from \(old.host) to \(new.host), sending to \(new.recipients.formatted(.list(type: .and)))"
+        case .changed(_, let new):
+            "Changed email to send through \(new.host):\(new.port) to \(new.recipients.formatted(.list(type: .and)))"
+        case .passwordEntered:
+            "Entered the email password"
+        case .turnedOff:
+            "Turned email off"
         }
     }
 }

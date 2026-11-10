@@ -39,6 +39,7 @@ let package = Package(
                 .product(name: "HummingbirdTLS", package: "hummingbird"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
                 .product(name: "SwiftASN1", package: "swift-asn1"),

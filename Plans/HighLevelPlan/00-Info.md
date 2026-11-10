@@ -41,7 +41,7 @@ Check off a slice here when its "done when" is true.
 
 ### Phase E — Email
 
-- [ ] [E1. Sending email](18-E1-SendingEmail.md) — Mixed, 1 session
+- [x] [E1. Sending email](18-E1-SendingEmail.md) — Mixed, 1 session
 - [ ] [E2. Alerts](19-E2-Alerts.md) — Engine, 1 session
 
 ### Phase F — Recovery
@@ -240,7 +240,7 @@ As AGENTS.md describes:
 
 ## §13. Email and alerts
 
-- **SMTP with your own provider:** host, port, STARTTLS or implicit TLS, username and password (write-only), and one or more recipients. A "send test email" action.
+- **SMTP with your own provider:** host, port, STARTTLS or implicit TLS, username and password (write-only), a From address, and one or more recipients. A "send test email" action. The host is a name, never an address, and its certificate has to be one the Mac trusts for that name. Nothing is sent before TLS is up, and a server that doesn't offer STARTTLS gets nothing more (E1).
 - **Alerts:**
   - a backup failed, including lost Full Disk Access
   - the backup drive is missing, as one email, not one for each job
@@ -314,7 +314,7 @@ Each gets its own plan once this one is done. Until then, features not in Part 1
 - [x] Owners and groups of backed-up files: kept with rsync's `--fake-super` (§9)
 - [x] How long the job log is kept: a year, pruned daily (C5)
 - [x] Default retention tiers and quota: 30 daily and 12 monthly snapshots, and no quota, which stays allowed (C6)
-- [ ] An SMTP library, or a small client of Hive's own over SwiftNIO (E1)
+- [x] An SMTP library, or a small client of Hive's own over SwiftNIO: Hive's own, over SwiftNIO and NIOSSL, which Hive already uses. SMTP for sending is small, and owning it keeps certificate checks, what's logged and the order commands go out in Hive's hands (§13, E1)
 - [ ] How Hive updates itself (G2). `Hive.app` isn't running most of the time, and the daemon has to restart from the new bundle.
 - [ ] The license (I1). The other open-source Locus apps use MIT.
 

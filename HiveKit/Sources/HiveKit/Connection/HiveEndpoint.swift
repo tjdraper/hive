@@ -29,6 +29,11 @@ public enum HiveEndpoint {
     public static let confirmationKey = "/confirmation/key"
     /// `POST` makes Hive a new identity key, unpairs every device and restarts Hive. Confirmed.
     public static let identityRegeneration = "/identity/regenerate"
+    /// `GET` reads the `EmailSettingsState`, `PUT` an `EmailSettingsChange` sets it up or changes it, and
+    /// `DELETE` turns email off. Changing the host is confirmed.
+    public static let email = "/email"
+    /// `POST` sends a test email to every recipient, once, and answers with its `TestEmailOutcome`.
+    public static let testEmail = "/email/test"
     /// A snapshot is deleted with `snapshot(_:)`.
     public static let snapshots = "/snapshots"
     /// `GET` lists the `RemovedJob`s whose snapshots stayed on the chosen backup drive.

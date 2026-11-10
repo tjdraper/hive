@@ -94,6 +94,19 @@ struct ConfirmedRouteTests {
                 accepted: .accepted
             )
         },
+        ConfirmedRequestCase(testDescription: "changing the SMTP host", reason: .emailHostChanged) { fixture in
+            let settings = EmailRoutesTests.settings
+            _ = try await fixture.send(.put, HiveEndpoint.email, json: EmailSettingsChange(settings: settings, password: "password"))
+            var moved = settings
+            moved.host = "smtp.elsewhere.example"
+            return ConfirmedRequestCase.Request(
+                method: .put,
+                path: HiveEndpoint.email,
+                body: try JSONEncoder().encode(EmailSettingsChange(settings: moved, password: "another password")),
+                otherPath: HiveEndpoint.email + "/",
+                accepted: .ok
+            )
+        },
     ]
 
     private static func serverChange(_ server: Server, _ draft: ServerDraft) throws -> ConfirmedRequestCase.Request {
