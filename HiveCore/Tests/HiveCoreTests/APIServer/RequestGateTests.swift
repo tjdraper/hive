@@ -69,6 +69,7 @@ struct RequestGateTests {
             HiveEndpoint.run(ofJob: UUID()),
             HiveEndpoint.jobStatus,
             HiveEndpoint.jobLog,
+            HiveEndpoint.recoveryKey,
         ]
     )
     func otherPathsAreRefused(path: String) async throws {

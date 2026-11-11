@@ -9,10 +9,17 @@ struct HiveOverviewView: View {
     let onOpenSettings: () -> Void
     let onSelectServer: (UUID) -> Void
 
+    @Environment(HiveListStore.self) private var store
+    @State private var recoveryKey: RecoveryKeyState?
+    @State private var isSettingUpRecoveryKey = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if let overview = link.overview, overview.fullDiskAccess != .granted {
                 FullDiskAccessWarning(isOnThisMac: hive.isOnThisMac)
+            }
+            if let recoveryKey, !recoveryKey.hasKey {
+                RecoveryKeyWarning { isSettingUpRecoveryKey = true }
             }
             BackupDriveWarning(link: link, onOpenSettings: onOpenSettings)
             if case .afterIdle(let minutes) = link.overview?.macSleep {
@@ -34,9 +41,22 @@ struct HiveOverviewView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .sheet(isPresented: $isSettingUpRecoveryKey) {
+            RecoveryKeySheet(hiveName: hive.name, link: link) { recoveryKey = $0 }
+        }
         .task {
             await link.refresh()
+            await loadRecoveryKey()
             await servers.refresh()
+        }
+    }
+
+    /// A Hive just paired goes on to its recovery key, since its setup isn't finished without one.
+    private func loadRecoveryKey() async {
+        guard let loaded = await RecoveryKeyWarning.load(from: link) else { return }
+        recoveryKey = loaded
+        if store.takeNewlyPaired(hive.id), !loaded.hasKey {
+            isSettingUpRecoveryKey = true
         }
     }
 }

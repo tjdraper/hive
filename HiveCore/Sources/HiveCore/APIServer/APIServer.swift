@@ -38,6 +38,7 @@ public struct APIServer: Sendable {
                 .init(service: service),
                 .init(service: SchedulingService(scheduler: api.scheduler, runs: api.runs)),
                 .init(service: AlertService(monitor: api.alerts)),
+                .init(service: RecoveryFileService(writer: api.recoveryFiles)),
                 .init(service: RestartService(restart: api.restart), successTerminationBehavior: .gracefullyShutdownGroup),
             ],
             gracefulShutdownSignals: [.sigterm, .sigint],
@@ -64,6 +65,7 @@ public struct APIServer: Sendable {
         IdentityRoutes.add(to: router, workflow: api.identity, confirmations: api.confirmations)
         SettingsRoutes.add(to: router, workflow: api.settings)
         EmailRoutes.add(to: router, workflow: api.email, confirmations: api.confirmations)
+        RecoveryKeyRoutes.add(to: router, workflow: api.recoveryKey, confirmations: api.confirmations)
         AuditLogRoutes.add(to: router, auditLog: api.auditLog)
         ServerRoutes.add(to: router, workflow: api.servers, confirmations: api.confirmations)
         ServerSpaceRoutes.add(to: router, reader: api.serverSpace)
@@ -118,6 +120,16 @@ private struct AlertService: Service {
     func run() async throws {
         await cancelWhenGracefulShutdown {
             await monitor.run()
+        }
+    }
+}
+
+private struct RecoveryFileService: Service {
+    let writer: RecoveryFileWriter
+
+    func run() async throws {
+        await cancelWhenGracefulShutdown {
+            await writer.run()
         }
     }
 }

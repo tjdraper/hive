@@ -151,6 +151,7 @@ extension ConfirmationReason {
         case .snapshotsDeleted: "delete snapshots"
         case .identityRegenerated: "give the Hive a new identity"
         case .emailHostChanged: "change the mail server Hive sends email through"
+        case .recoveryKeyChanged: "save a recovery key, which opens the Hive's recovery files"
         }
     }
 }

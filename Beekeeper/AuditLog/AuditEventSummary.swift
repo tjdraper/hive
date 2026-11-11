@@ -34,6 +34,10 @@ extension AuditEvent {
             "Gave the Hive a new identity, unpairing every device"
         case .email(let change):
             change.summary
+        case .recoveryKeySaved(replacedAnother: false):
+            "Saved the Hive's recovery key"
+        case .recoveryKeySaved(replacedAnother: true):
+            "Saved a new recovery key. Recovery files written before still open with the old one"
         }
     }
 }

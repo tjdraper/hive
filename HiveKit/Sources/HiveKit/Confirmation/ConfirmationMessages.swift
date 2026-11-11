@@ -64,6 +64,8 @@ public enum ConfirmationReason: String, Codable, CaseIterable, Hashable, Sendabl
     case snapshotsDeleted
     case identityRegenerated
     case emailHostChanged
+    /// The first key as well as a new one, since whoever holds it can open every secret in the recovery files.
+    case recoveryKeyChanged
 }
 
 /// Sent with 428 when a change needs confirming and the request carried none.

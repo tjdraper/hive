@@ -15,7 +15,7 @@ References like §14 point to [00-Info.md](00-Info.md). Read the brainstorm's "R
 
 Built with you:
 
-- **Setup on a new Hive** shows the recovery key once, and doesn't finish until part of it is entered back
+- **Setup on a new Hive** shows the recovery key once, and saves it when you say you've saved it. Entering part of it back was built and dropped: saying it's saved is enough
 - **A Hive set up before this slice** shows a warning in Beekeeper until its recovery key has been saved
 
 ## Tests
@@ -26,5 +26,12 @@ Built with you:
 - A mistyped recovery key code is caught by its check digit
 
 - **From D4:** a confirmed route reads its request with `ConfirmedRequest.read` and checks `ConfirmationRequirement.check` inside the store's write transaction, against the stored values. Add the new `ConfirmationReason` to HiveKit, its Touch ID wording to `ConfirmationReason.prompt`, and a case to `ConfirmedRouteTests.cases`, which covers the refusals. In Beekeeper, send it with `HiveLink.confirmed(_:_:body:reason:)`, giving a `reason` when the change is known to need confirming.
+
+## How it was built
+
+- **Beekeeper makes the key,** not Hive, and sends Hive only the public half once you say you've saved it. The private half never passes through the daemon. Saving a key is always confirmed (`ConfirmationReason.recoveryKeyChanged`), the first one included: whoever holds the private half can open every secret in the recovery files, and F2 hands those files to every device.
+- **The code** is HiveKit's `RecoveryKey`: 31 random Crockford base32 characters and a Luhn mod 32 check character, in 8 groups of 4. HKDF-SHA256 stretches the 155 random bits into an X25519 key. `RecoveryKeyTests.knownCode` pins the derivation, so a change that would stop old codes opening old files fails a test.
+- **The file** is `recovery.hiverecovery` in the data directory, `0600`, replaced whole. `RecoveryFile` is a magic string, a version byte, the recovery public key, HPKE's encapsulated key (X25519, ChaCha20-Poly1305), then the ciphertext, with the header authenticated. Inside is `RecoveryContents` format 1 as JSON, its fields following the store's columns, snapshot folder names included.
+- **When it's written:** `RecoveryFileWriter` checks every 30 seconds and writes when a hash of the configuration with its secrets still sealed has changed, when the file is a day old or gone, and on every start. A new key removes the old file first, so a file for the old key never stays behind.
 
 **Done when:** in the installed builds, the existing Hive gets its recovery key through Beekeeper; a recovery file appears in the data directory and is replaced after a configuration change; and the tests pass.

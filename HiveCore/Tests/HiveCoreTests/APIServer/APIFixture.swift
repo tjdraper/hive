@@ -201,7 +201,8 @@ struct APIFixture {
     let volumes = FakeVolumes()
     let sleepPrevention = FakeSleepPrevention()
     let pauses = FakePauses()
-    /// Where the fixture's Hive keeps its identity key, which regenerating replaces.
+    /// The fixture's data directory: where its Hive keeps its identity key, which regenerating replaces,
+    /// and writes its recovery file.
     let keyFolder: TemporaryDirectory
     let identityKeys: HiveKeyStore
     let restart = HiveRestart(delay: .zero)
@@ -245,6 +246,7 @@ struct APIFixture {
         api = HiveAPI(
             hiveID: signIn.hiveID,
             database: signIn.database,
+            dataDirectory: keyFolder.url,
             signIn: signIn.workflow,
             settingsStore: settings,
             listeners: listeners,

@@ -49,6 +49,14 @@ enum HiveDatabaseMigrator {
         }
         migrator.registerMigration("Add email settings", migrate: addEmailSettings)
         migrator.registerMigration("Add alerts", migrate: addAlerts)
+        migrator.registerMigration("Add the recovery key") { database in
+            try database.alter(table: "hive") { table in
+                // The raw form of the X25519 public key. Hive never has the private half.
+                table.add(column: "recoveryPublicKey", .blob)
+                table.add(column: "recoveryKeySavedAt", .datetime)
+                table.add(column: "recoveryFileWrittenAt", .datetime)
+            }
+        }
 
         return migrator
     }

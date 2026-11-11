@@ -107,6 +107,15 @@ struct ConfirmedRouteTests {
                 accepted: .ok
             )
         },
+        ConfirmedRequestCase(testDescription: "saving a recovery key", reason: .recoveryKeyChanged) { _ in
+            ConfirmedRequestCase.Request(
+                method: .put,
+                path: HiveEndpoint.recoveryKey,
+                body: try JSONEncoder().encode(RecoveryKeyChange(publicKey: RecoveryKey().publicKey.rawRepresentation)),
+                otherPath: HiveEndpoint.recoveryKey + "/",
+                accepted: .ok
+            )
+        },
     ]
 
     private static func serverChange(_ server: Server, _ draft: ServerDraft) throws -> ConfirmedRequestCase.Request {

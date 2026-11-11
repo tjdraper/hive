@@ -28,6 +28,7 @@ enum DaemonStart {
             let api = HiveAPI(
                 hiveID: hiveID,
                 database: database,
+                dataDirectory: started.dataDirectory,
                 settings: settings,
                 listeners: listeners,
                 sealer: SecretSealer(key: keys.storage),

@@ -12,6 +12,8 @@ final class HiveListStore {
     private var links: [UUID: HiveLink] = [:]
     private var serverLists: [UUID: ServerList] = [:]
     private var liveUpdates: [UUID: Task<Void, Never>] = [:]
+    /// Hives first paired since Beekeeper opened, whose setup goes on to their recovery key.
+    private var newlyPaired: Set<UUID> = []
     private let file: HiveListFile
     private let keychain = DeviceKeychain()
 
@@ -58,6 +60,11 @@ final class HiveListStore {
         let servers = ServerList(link: link)
         serverLists[hive.id] = servers
         liveUpdates[hive.id] = Task { await servers.statuses.follow() }
+    }
+
+    /// True once for a Hive first paired since Beekeeper opened.
+    func takeNewlyPaired(_ id: UUID) -> Bool {
+        newlyPaired.remove(id) != nil
     }
 
     /// Keeps the name the Hive gives itself, so the list reads right while it's offline.
@@ -134,6 +141,7 @@ final class HiveListStore {
             let hive = KnownHive(id: pairing.hiveID, name: "This Mac's Hive", addresses: [address], isOnThisMac: true)
             hives.append(hive)
             track(hive)
+            newlyPaired.insert(hive.id)
         }
         file.save(hives)
         Self.logger.notice("Saved this Mac's Hive in the list")

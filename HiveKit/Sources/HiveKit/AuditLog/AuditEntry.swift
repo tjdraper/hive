@@ -41,6 +41,9 @@ public enum AuditEvent: Codable, Hashable, Sendable {
     /// Hive made a new identity key, and every device was unpaired.
     case identityRegenerated
     case email(EmailChange)
+    /// Hive was given a recovery key, replacing an older one when `replacedAnother`. Files written with
+    /// the older key still open with it.
+    case recoveryKeySaved(replacedAnother: Bool)
 }
 
 public enum EmailChange: Codable, Hashable, Sendable {

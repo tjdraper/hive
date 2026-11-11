@@ -34,6 +34,9 @@ public enum HiveEndpoint {
     public static let email = "/email"
     /// `POST` sends a test email to every recipient, once, and answers with its `TestEmailOutcome`.
     public static let testEmail = "/email/test"
+    /// `GET` reads the `RecoveryKeyState`, and `PUT` a `RecoveryKeyChange` gives the Hive a recovery key
+    /// or replaces its old one. Confirmed.
+    public static let recoveryKey = "/recovery-key"
     /// A snapshot is deleted with `snapshot(_:)`.
     public static let snapshots = "/snapshots"
     /// `GET` lists the `RemovedJob`s whose snapshots stayed on the chosen backup drive.

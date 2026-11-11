@@ -23,6 +23,7 @@ public struct HiveAPI: Sendable {
     let alerts: AlertMonitor
     let identityKeys: HiveKeyStore
     let restart: HiveRestart
+    let recoveryFiles: RecoveryFileWriter
     /// How often an open live updates response gets a line when nothing else is happening.
     let liveUpdateHeartbeat: Duration
     /// Checked on every request, since it can be turned off while Hive runs.
@@ -78,6 +79,10 @@ public struct HiveAPI: Sendable {
         restart.isRequested
     }
 
+    var recoveryKey: RecoveryKeyWorkflow {
+        RecoveryKeyWorkflow(store: RecoveryKeyStore(database: servers.store.database), files: recoveryFiles, now: signIn.now)
+    }
+
     var removalEstimator: RemovalEstimator {
         RemovalEstimator(database: servers.store.database, calendar: jobs.schedule.calendar)
     }
@@ -97,10 +102,12 @@ public struct HiveAPI: Sendable {
         )
     }
 
-    /// `identityKeys` is where the identity key is saved, for regenerating it.
+    /// `identityKeys` is where the identity key is saved, for regenerating it. The recovery file is
+    /// written in `dataDirectory`.
     public init(
         hiveID: UUID,
         database: HiveDatabase,
+        dataDirectory: URL,
         settings: HiveSettingsStore,
         listeners: ListenerCoordinator,
         sealer: SecretSealer,
@@ -111,6 +118,7 @@ public struct HiveAPI: Sendable {
         self.init(
             hiveID: hiveID,
             database: database,
+            dataDirectory: dataDirectory,
             signIn: SignInWorkflow(hiveID: hiveID, devices: devices, sessions: SessionStore()),
             settingsStore: settings,
             listeners: listeners,
@@ -139,6 +147,7 @@ public struct HiveAPI: Sendable {
     init(
         hiveID: UUID,
         database: HiveDatabase,
+        dataDirectory: URL,
         signIn: SignInWorkflow,
         settingsStore: HiveSettingsStore,
         listeners: any ListenerControl,
@@ -172,11 +181,7 @@ public struct HiveAPI: Sendable {
         jobs = BackupJobWorkflow(store: BackupJobStore(database: database), sealer: sealer, schedule: schedule, now: now)
         self.addresses = addresses
         hostKeys = HostKeyWorkflow(
-            store: HostKeyStore(database: database),
-            servers: servers,
-            scanner: hostKeyScanner,
-            pending: PendingHostKeyScans(),
-            now: now
+            store: HostKeyStore(database: database), servers: servers, scanner: hostKeyScanner, pending: PendingHostKeyScans(), now: now
         )
         connectionTest = ConnectionTestWorkflow(targets: SSHTargetLoader(database: database, sealer: sealer), ssh: ssh)
         let drives = BackupDriveLocator(store: BackupDriveStore(database: database), volumes: volumes, hiveID: hiveID)
@@ -212,5 +217,6 @@ public struct HiveAPI: Sendable {
         )
         self.identityKeys = identityKeys
         self.restart = restart
+        recoveryFiles = RecoveryFileWriter(database: database, sealer: sealer, directory: dataDirectory, now: now)
     }
 }

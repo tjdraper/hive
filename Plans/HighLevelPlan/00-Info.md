@@ -46,7 +46,7 @@ Check off a slice here when its "done when" is true.
 
 ### Phase F — Recovery
 
-- [ ] [F1. Recovery key and recovery files](20-F1-RecoveryKeyAndRecoveryFiles.md) — Mixed, 1–2 sessions
+- [x] [F1. Recovery key and recovery files](20-F1-RecoveryKeyAndRecoveryFiles.md) — Mixed, 1–2 sessions
 - [ ] [F2. Recovery file copies in Beekeeper](21-F2-RecoveryFileCopiesInBeekeeper.md) — Mixed, 1 session
 - [ ] [F3. Restoring Hive on a new Mac](22-F3-RestoringHiveOnANewMac.md) — Mixed, 2 sessions, installed build, needs you
 
@@ -258,7 +258,7 @@ As AGENTS.md describes:
 
 Read the brainstorm's "Recovery files and disaster recovery".
 
-- **A recovery key is created at setup** and shown once, to save in a password manager or print. Setup can't finish until part of it is entered back. Hive keeps only the public half, so it can encrypt recovery files but never decrypt them (HPKE).
+- **A recovery key is created at setup** and shown once, to save in a password manager. Beekeeper makes it, and setup asks once to save it, without checking it was saved. Hive is given only the public half, so it can encrypt recovery files but never decrypt them (HPKE, F1).
 - **Recovery files** hold the whole configuration and every secret, including the Hive ID. They're written on a schedule and whenever the configuration changes.
 - **Copies:** in Hive's data directory, which the Mac backup picks up; on every paired Beekeeper; and on the Mac, optionally in a folder you choose, such as one in iCloud Drive. Every copy is safe to keep anywhere as long as the recovery key is safe.
 - **A new recovery key** can be made from Beekeeper while the Hive exists, and new recovery files use it. Older files still open with the old key, and copies of them stay in Mac backups. So Beekeeper deletes the old copies it manages, and when the old key may have leaked, Hive suggests rotating SSH keys and changing credentials.
