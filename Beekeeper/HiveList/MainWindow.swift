@@ -101,10 +101,10 @@ struct MainWindow: View {
 
     @ViewBuilder private var detail: some View {
         if let selection, let hive = store.hive(selection.hiveID), let link = store.link(for: hive.id),
-           let servers = store.servers(for: hive.id) {
+           let servers = store.servers(for: hive.id), let recovery = store.recoveryCopies(for: hive.id) {
             switch selection {
             case .hive:
-                HiveDetail(hive: hive, link: link, servers: servers, page: $page, selection: $selection) {
+                HiveDetail(hive: hive, link: link, servers: servers, recovery: recovery, page: $page, selection: $selection) {
                     addServer(to: hive.id)
                 }
             case .server(_, let serverID):

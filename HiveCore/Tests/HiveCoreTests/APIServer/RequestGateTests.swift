@@ -70,6 +70,7 @@ struct RequestGateTests {
             HiveEndpoint.jobStatus,
             HiveEndpoint.jobLog,
             HiveEndpoint.recoveryKey,
+            HiveEndpoint.recoveryFile,
         ]
     )
     func otherPathsAreRefused(path: String) async throws {

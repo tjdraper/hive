@@ -14,7 +14,7 @@ final class RecoveryKeySetup {
 
     /// Saves the key's public half with Touch ID or the password. Returns the Hive's answer once it's
     /// saved, or nil when it isn't.
-    func save(on link: HiveLink, hiveName: String) async -> RecoveryKeyState? {
+    func save(on link: HiveLink, reason: String) async -> RecoveryKeyState? {
         isSaving = true
         defer { isSaving = false }
         do {
@@ -22,7 +22,7 @@ final class RecoveryKeySetup {
                 "PUT",
                 HiveEndpoint.recoveryKey,
                 body: RecoveryKeyChange(publicKey: key.publicKey.rawRepresentation),
-                reason: "save the recovery key for “\(hiveName)”"
+                reason: reason
             )
             failure = nil
             return state

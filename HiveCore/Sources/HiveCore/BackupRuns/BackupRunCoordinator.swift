@@ -16,7 +16,7 @@ actor BackupRunCoordinator {
         var task: Task<BackupRun?, Never>?
     }
 
-    nonisolated let events = RunEventBroadcaster()
+    nonisolated let events = Broadcaster<RunEvent>()
 
     private let workflow: BackupRunWorkflow
     private let retention: RetentionWorkflow

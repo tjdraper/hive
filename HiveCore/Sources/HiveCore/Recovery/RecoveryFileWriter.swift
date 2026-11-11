@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import GRDB
+import HiveKit
 import os
 
 /// Keeps a current recovery file in Hive's data directory (§14), where the Mac's own backup picks it up:
@@ -10,12 +11,16 @@ import os
 /// opens secrets only to write. A secret entered again is sealed afresh, so its change shows too.
 /// Writing is one step on the actor with nothing awaited, so a file written for an old key can't land
 /// after a new key's has replaced it.
+///
+/// Each file written, and each new key, goes to `changes`, so devices can fetch their copy (§14).
 actor RecoveryFileWriter {
-    static let fileName = "recovery.\(RecoveryFile.fileExtension)"
+    static let fileName = "recovery.\(RecoveryFileHeader.fileExtension)"
     static let checkInterval: Duration = .seconds(30)
     static let rewriteInterval: TimeInterval = 24 * 60 * 60
 
     private static let logger = Logger(subsystem: HiveLog.subsystem, category: "Recovery")
+
+    nonisolated let changes = Broadcaster<RecoveryKeyState>()
 
     private let database: HiveDatabase
     private let keys: RecoveryKeyStore
@@ -62,14 +67,16 @@ actor RecoveryFileWriter {
             }
 
             let contents = try sealed.mappingSecrets { try sealer.open(SealedSecret(data: $0)) }
-            try file.replace(RecoveryFile.seal(contents, to: key))
-            try keys.recordFileWritten(at: date, with: key)
+            let written = try RecoveryFile.seal(contents, to: key)
+            try file.replace(written)
+            try keys.recordFileWritten(at: date, digest: RecoveryFileHeader.digest(of: written), with: key)
             lastWritten = (fingerprint, date)
             lastFailure = nil
             let jobCount = contents.servers.flatMap(\.jobs).count
             Self.logger.notice(
                 "Wrote the recovery file (\(contents.servers.count, privacy: .public) servers, \(jobCount, privacy: .public) jobs)"
             )
+            announce()
             return true
         } catch {
             let failure = String(describing: error)
@@ -92,7 +99,23 @@ actor RecoveryFileWriter {
         } catch {
             Self.logger.error("Couldn't remove the old recovery file: \(String(describing: error), privacy: .public)")
         }
-        return writeIfDue()
+        let wrote = writeIfDue()
+        // Devices remove their copies made with the old key even when no new file could be written.
+        if !wrote { announce() }
+        return wrote
+    }
+
+    /// The latest file, read on the actor so it's never one half replaced. Nil while there's none.
+    func currentFile() throws -> Data? {
+        try file.read()
+    }
+
+    private func announce() {
+        do {
+            changes.send(try keys.state())
+        } catch {
+            Self.logger.error("Couldn't read the recovery key state to announce: \(String(describing: error), privacy: .public)")
+        }
     }
 
     /// Hashes the date it's written out with everything else, since that changes on every check.

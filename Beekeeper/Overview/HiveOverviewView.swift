@@ -5,12 +5,12 @@ struct HiveOverviewView: View {
     let hive: KnownHive
     let link: HiveLink
     let servers: ServerList
+    let recovery: RecoveryFileCopies
     let onAddServer: () -> Void
     let onOpenSettings: () -> Void
     let onSelectServer: (UUID) -> Void
 
     @Environment(HiveListStore.self) private var store
-    @State private var recoveryKey: RecoveryKeyState?
     @State private var isSettingUpRecoveryKey = false
 
     var body: some View {
@@ -18,7 +18,7 @@ struct HiveOverviewView: View {
             if let overview = link.overview, overview.fullDiskAccess != .granted {
                 FullDiskAccessWarning(isOnThisMac: hive.isOnThisMac)
             }
-            if let recoveryKey, !recoveryKey.hasKey {
+            if let state = recovery.hiveState, !state.hasKey {
                 RecoveryKeyWarning { isSettingUpRecoveryKey = true }
             }
             BackupDriveWarning(link: link, onOpenSettings: onOpenSettings)
@@ -37,12 +37,15 @@ struct HiveOverviewView: View {
             } else {
                 ServerOverviewList(servers: servers, onSelect: onSelectServer)
             }
+            if recovery.hiveState?.hasKey == true {
+                RecoveryFileSummary(copies: recovery)
+            }
             RemovedJobsSection(hive: hive, link: link, statuses: servers.statuses)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .sheet(isPresented: $isSettingUpRecoveryKey) {
-            RecoveryKeySheet(hiveName: hive.name, link: link) { recoveryKey = $0 }
+            RecoveryKeySheet(hiveName: hive.name, link: link) { recovery.receive($0) }
         }
         .task {
             await link.refresh()
@@ -53,9 +56,8 @@ struct HiveOverviewView: View {
 
     /// A Hive just paired goes on to its recovery key, since its setup isn't finished without one.
     private func loadRecoveryKey() async {
-        guard let loaded = await RecoveryKeyWarning.load(from: link) else { return }
-        recoveryKey = loaded
-        if store.takeNewlyPaired(hive.id), !loaded.hasKey {
+        await recovery.refresh()
+        if store.takeNewlyPaired(hive.id), recovery.hiveState?.hasKey == false {
             isSettingUpRecoveryKey = true
         }
     }

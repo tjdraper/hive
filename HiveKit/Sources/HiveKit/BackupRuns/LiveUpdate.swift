@@ -7,6 +7,9 @@ public enum LiveUpdate: Codable, Hashable, Sendable {
     /// A job's status after it was queued, left the queue, started or finished.
     case jobStatus(JobStatus)
     case event(RunEvent)
+    /// After every job's status, once connected, then whenever the recovery key changes or a recovery
+    /// file is written.
+    case recovery(RecoveryKeyState)
     /// Sent while nothing else is, so neither end takes a quiet connection for a dead one.
     case heartbeat
 }

@@ -47,7 +47,7 @@ Check off a slice here when its "done when" is true.
 ### Phase F — Recovery
 
 - [x] [F1. Recovery key and recovery files](20-F1-RecoveryKeyAndRecoveryFiles.md) — Mixed, 1–2 sessions
-- [ ] [F2. Recovery file copies in Beekeeper](21-F2-RecoveryFileCopiesInBeekeeper.md) — Mixed, 1 session
+- [x] [F2. Recovery file copies in Beekeeper](21-F2-RecoveryFileCopiesInBeekeeper.md) — Mixed, 1 session
 - [ ] [F3. Restoring Hive on a new Mac](22-F3-RestoringHiveOnANewMac.md) — Mixed, 2 sessions, installed build, needs you
 
 ### Phase G — Replacing site-backups

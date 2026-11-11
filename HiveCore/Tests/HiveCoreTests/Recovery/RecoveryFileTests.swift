@@ -58,8 +58,8 @@ struct RecoveryFileTests {
         try await fixture.saveRecoveryKey(RecoveryKey())
         let other = RecoveryKey()
         var claimingOther = try Data(contentsOf: fixture.recoveryFile)
-        let keyStart = RecoveryFile.magic.count + 1
-        claimingOther.replaceSubrange(keyStart ..< keyStart + RecoveryFile.keyLength, with: other.publicKey.rawRepresentation)
+        let keyStart = RecoveryFileHeader.magic.count + 1
+        claimingOther.replaceSubrange(keyStart ..< keyStart + RecoveryFileHeader.keyLength, with: other.publicKey.rawRepresentation)
 
         // Act and Assert
         #expect(throws: RecoveryFileError.otherKey) { try fixture.openRecoveryFile(with: other) }
@@ -106,6 +106,8 @@ struct RecoveryFileTests {
             .filter { $0.hasPrefix("recovery.") }
         #expect(recoveryFiles == [RecoveryFileWriter.fileName])
         #expect(state.fileWrittenAt != nil)
+        #expect(state.publicKey == new.publicKey.rawRepresentation)
+        #expect(state.fileDigest == RecoveryFileHeader.digest(of: try Data(contentsOf: fixture.recoveryFile)))
         #expect(try fixture.auditEvents().prefix(2) == [
             .recoveryKeySaved(replacedAnother: true),
             .recoveryKeySaved(replacedAnother: false),
@@ -250,6 +252,86 @@ struct RecoveryFileTests {
         #expect(try fixture.auditEvents() == before)
         #expect(try await !fixture.send(.get, HiveEndpoint.recoveryKey).decoded(as: RecoveryKeyState.self).hasKey)
     }
+}
+
+struct RecoveryFileDownloadTests {
+    @Test("A device downloads the latest recovery file, the one the Hive's state describes")
+    func downloadsLatest() async throws {
+        // Arrange
+        let fixture = try APIFixture()
+        let key = RecoveryKey()
+        try await fixture.saveRecoveryKey(key)
+        _ = try await fixture.addServer()
+        await fixture.api.recoveryFiles.writeIfDue()
+
+        // Act
+        let download = try await fixture.send(.get, HiveEndpoint.recoveryFile).decoded(as: RecoveryFileDownload.self)
+        let state = try await fixture.send(.get, HiveEndpoint.recoveryKey).decoded(as: RecoveryKeyState.self)
+
+        // Assert
+        #expect(download.file == (try Data(contentsOf: fixture.recoveryFile)))
+        #expect(RecoveryFileHeader.digest(of: download.file) == state.fileDigest)
+        #expect(RecoveryFileHeader.publicKey(of: download.file) == key.publicKey.rawRepresentation)
+        #expect(state.publicKey == key.publicKey.rawRepresentation)
+        #expect(try RecoveryFile.open(download.file, with: key.privateKey).servers.count == 1)
+    }
+
+    @Test("Without a recovery file, there's nothing to download")
+    func nothingWithoutAFile() async throws {
+        // Arrange
+        let fixture = try APIFixture()
+
+        // Act
+        let answer = try await fixture.send(.get, HiveEndpoint.recoveryFile)
+
+        // Assert
+        #expect(answer.status == .notFound)
+    }
+
+    @Test("The recovery file isn't given out without signing in")
+    func refusesUnauthenticated() async throws {
+        // Arrange
+        let fixture = try APIFixture()
+        try await fixture.saveRecoveryKey(RecoveryKey())
+
+        // Act
+        let (status, length) = try await fixture.application.test(.router) { client in
+            try await client.execute(uri: HiveEndpoint.recoveryFile, method: .get) { ($0.status, $0.body.readableBytes) }
+        }
+
+        // Assert
+        #expect(status == .unauthorized)
+        #expect(length == 0)
+    }
+
+    @Test("A recovery file's header gives the key it was written for, and nothing for anything else")
+    func readsHeader() throws {
+        // Arrange
+        let key = RecoveryKey()
+        let file = try RecoveryFile.seal(
+            RecoveryContents(format: RecoveryContents.currentFormat, writtenAt: .now, hive: Self.hive, servers: [], email: nil),
+            to: key.publicKey
+        )
+        var otherVersion = file
+        otherVersion[RecoveryFileHeader.magic.count] = 2
+
+        // Act and Assert
+        #expect(RecoveryFileHeader.publicKey(of: file) == key.publicKey.rawRepresentation)
+        #expect(RecoveryFileHeader.publicKey(of: (Data([0]) + file).dropFirst()) == key.publicKey.rawRepresentation)
+        #expect(RecoveryFileHeader.publicKey(of: otherVersion) == nil)
+        #expect(RecoveryFileHeader.publicKey(of: file.prefix(RecoveryFileHeader.magic.count + 1 + 31)) == nil)
+        #expect(RecoveryFileHeader.publicKey(of: Data("Not a recovery file".utf8)) == nil)
+    }
+
+    private static let hive = RecoveryContents.Hive(
+        id: UUID(),
+        createdAt: .now,
+        name: "Test Hive",
+        networkAccess: "thisMacOnly",
+        listenAddress: nil,
+        port: nil,
+        backupDrive: nil
+    )
 }
 
 private extension Collection {

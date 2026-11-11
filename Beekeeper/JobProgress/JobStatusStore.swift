@@ -1,17 +1,10 @@
 import Foundation
 import HiveKit
 import Observation
-import os
 
 /// Where each of one Hive's jobs stands, kept up to date from the Hive's live updates.
 @Observable
 final class JobStatusStore {
-    private static let logger = Logger(subsystem: BeekeeperLog.subsystem, category: "LiveUpdates")
-    /// Soon, since the usual reason is a session that ran out, then less often while the Hive stays away.
-    private static let firstRetry = Duration.seconds(1)
-    private static let longestRetry = Duration.seconds(30)
-    private static let connectionCheck = Duration.seconds(2)
-
     private(set) var statuses: [UUID: JobStatus] = [:]
     /// Whether live updates are arriving. While they aren't, the statuses are as last heard.
     private(set) var isLive = false
@@ -69,42 +62,12 @@ final class JobStatusStore {
         await refresh(jobID)
     }
 
-    /// Follows the Hive's live updates, reconnecting when they stop, until cancelled. Opening them signs in
-    /// again, so a Hive that comes back after a restart shows as connected without waiting for anything else.
-    func follow() async {
-        var retry = Self.firstRetry
-        while !Task.isCancelled {
-            guard mayConnect else {
-                try? await Task.sleep(for: Self.connectionCheck)
-                continue
-            }
-            do {
-                for try await update in try await link.liveUpdates() {
-                    apply(update)
-                    retry = Self.firstRetry
-                }
-                Self.logger.info("Live updates ended")
-            } catch is CancellationError {
-                break
-            } catch {
-                Self.logger.notice("Live updates failed: \(String(describing: type(of: error)), privacy: .public)")
-            }
-            isLive = false
-            try? await Task.sleep(for: retry)
-            retry = min(retry * 2, Self.longestRetry)
-        }
+    /// While live updates aren't arriving, the statuses stay as last heard.
+    func liveUpdatesStopped() {
         isLive = false
     }
 
-    /// Not while trying again can't help, or would count against the device as a failed sign-in.
-    private var mayConnect: Bool {
-        switch link.status {
-        case .connecting, .connected, .offline, .failed: true
-        case .pairingAgain, .identityChanged, .notRecognized, .notPaired, .lockedOut, .needsUpdate: false
-        }
-    }
-
-    private func apply(_ update: LiveUpdate) {
+    func apply(_ update: LiveUpdate) {
         switch update {
         case .jobStatuses(let all):
             statuses = Dictionary(all.map { ($0.jobID, $0) }) { _, last in last }
@@ -119,8 +82,10 @@ final class JobStatusStore {
             statuses[jobID] = statuses[jobID]?.running(current: entry)
         case .event(.finished), .event(.removed):
             logRevision += 1
-        case .event(.queued), .event(.leftQueue), .event(.started), .heartbeat:
+        case .event(.queued), .event(.leftQueue), .event(.started):
             // A queued, cancelled or started run is followed by the job's new status.
+            break
+        case .heartbeat, .recovery:
             break
         }
     }

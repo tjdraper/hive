@@ -37,6 +37,8 @@ public enum HiveEndpoint {
     /// `GET` reads the `RecoveryKeyState`, and `PUT` a `RecoveryKeyChange` gives the Hive a recovery key
     /// or replaces its old one. Confirmed.
     public static let recoveryKey = "/recovery-key"
+    /// `GET` reads the latest `RecoveryFileDownload`, answering 404 while there isn't one.
+    public static let recoveryFile = "/recovery-file"
     /// A snapshot is deleted with `snapshot(_:)`.
     public static let snapshots = "/snapshots"
     /// `GET` lists the `RemovedJob`s whose snapshots stayed on the chosen backup drive.

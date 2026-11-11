@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import HiveKit
 
 public enum RecoveryFileError: Error, Equatable {
     case notARecoveryFile
@@ -14,16 +15,16 @@ public enum RecoveryFileError: Error, Equatable {
 /// A recovery file (§14): `RecoveryContents` encrypted to the recovery key with HPKE (RFC 9180). Hive
 /// holds only the key's public half, so it can write these files but never open one it wrote.
 ///
-/// Laid out as a magic string, a version byte, the recovery key's public half, HPKE's encapsulated key,
-/// then the ciphertext and tag. Everything before the ciphertext is authenticated with it. The public
-/// half lets a restore tell a file written for another key from one that was altered.
+/// Laid out as `RecoveryFileHeader` (a magic string, a version byte and the recovery key's public
+/// half), HPKE's encapsulated key, then the ciphertext and tag. Everything before the ciphertext is
+/// authenticated with it. The public half lets a restore tell a file written for another key from one
+/// that was altered, and Beekeeper tell a copy made with an older key.
 enum RecoveryFile {
-    static let fileExtension = "hiverecovery"
-    static let magic = Data("Hive recovery file".utf8)
-    static let version1: UInt8 = 1
     static let ciphersuite = HPKE.Ciphersuite.Curve25519_SHA256_ChachaPoly
     static let info = Data("Hive recovery file v1".utf8)
-    static let keyLength = 32
+
+    private static let magic = RecoveryFileHeader.magic
+    private static let keyLength = RecoveryFileHeader.keyLength
 
     private static var headerLength: Int {
         magic.count + 1 + keyLength + keyLength
@@ -31,7 +32,7 @@ enum RecoveryFile {
 
     static func seal(_ contents: RecoveryContents, to recoveryKey: Curve25519.KeyAgreement.PublicKey) throws -> Data {
         var sender = try HPKE.Sender(recipientKey: recoveryKey, ciphersuite: ciphersuite, info: info)
-        let header = magic + [version1] + recoveryKey.rawRepresentation + sender.encapsulatedKey
+        let header = magic + [RecoveryFileHeader.version1] + recoveryKey.rawRepresentation + sender.encapsulatedKey
         return header + (try sender.seal(contents.encoded(), authenticating: header))
     }
 
@@ -39,13 +40,13 @@ enum RecoveryFile {
         let bytes = Data(file)
         guard bytes.starts(with: magic), bytes.count > magic.count else { throw RecoveryFileError.notARecoveryFile }
         let version = bytes[magic.count]
-        guard version == version1 else { throw RecoveryFileError.unsupportedVersion(version) }
-        guard bytes.count > headerLength else { throw RecoveryFileError.couldNotOpen }
+        guard version == RecoveryFileHeader.version1 else { throw RecoveryFileError.unsupportedVersion(version) }
+        guard bytes.count > headerLength, let writtenFor = RecoveryFileHeader.publicKey(of: bytes) else {
+            throw RecoveryFileError.couldNotOpen
+        }
 
-        let keyStart = magic.count + 1
-        let writtenFor = bytes[keyStart ..< keyStart + keyLength]
         guard writtenFor == recoveryKey.publicKey.rawRepresentation else { throw RecoveryFileError.otherKey }
-        let encapsulatedKey = bytes[keyStart + keyLength ..< headerLength]
+        let encapsulatedKey = bytes[magic.count + 1 + keyLength ..< headerLength]
         let header = bytes.prefix(headerLength)
 
         let plaintext: Data

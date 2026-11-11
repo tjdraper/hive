@@ -4,6 +4,7 @@ import SwiftUI
 struct HiveSettingsView: View {
     let hive: KnownHive
     let link: HiveLink
+    let recovery: RecoveryFileCopies
 
     @Environment(HiveListStore.self) private var store
     @State private var state: HiveSettingsState?
@@ -35,51 +36,57 @@ struct HiveSettingsView: View {
                 }
             }
 
-            Section {
-                Picker("Listen on", selection: draft.access) {
-                    ForEach(SettingsDraft.Access.allCases) { access in
-                        Text(access.title).tag(access)
-                    }
-                }
-                if draft.wrappedValue.access == .oneAddress {
-                    Picker("Address", selection: draft.address) {
-                        ForEach(addressChoices(state: state, chosen: draft.wrappedValue.address), id: \.address) { choice in
-                            Text(choice.label).tag(choice.address)
-                        }
-                    }
-                }
-                StackedRow(title: "Port") {
-                    TextField("Port", value: draft.port, format: .number.grouping(.never))
-                        .stackedField("Port")
-                }
-                LabeledContent("Listening on", value: listeningSummary(state.listeningOn))
-            } header: {
-                Text("Network")
-            } footer: {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(networkFooter(state: state, draft: draft.wrappedValue))
-                        .foregroundStyle(.secondary)
-                    // Saves the name too, which has no footer of its own.
-                    HStack {
-                        if let failure {
-                            Text(failure)
-                                .foregroundStyle(.red)
-                        }
-                        Spacer()
-                        Button("Revert") { self.draft = SettingsDraft(state.settings) }
-                            .disabled(!isChanged(state) || isSaving)
-                        Button("Save") { Task { await save(draft.wrappedValue, replacing: state.settings) } }
-                            .keyboardShortcut("s")
-                            .disabled(!isChanged(state) || isSaving)
-                    }
-                }
-            }
+            networkSection(state: state, draft: draft)
 
             EmailSection(hive: hive, link: link)
+
+            RecoverySection(hive: hive, link: link, copies: recovery)
 
             IdentitySection(hive: hive, link: link)
         }
         .formStyle(.grouped)
+    }
+
+    /// Its Save button saves the name too, which has no footer of its own.
+    private func networkSection(state: HiveSettingsState, draft: Binding<SettingsDraft>) -> some View {
+        Section {
+            Picker("Listen on", selection: draft.access) {
+                ForEach(SettingsDraft.Access.allCases) { access in
+                    Text(access.title).tag(access)
+                }
+            }
+            if draft.wrappedValue.access == .oneAddress {
+                Picker("Address", selection: draft.address) {
+                    ForEach(addressChoices(state: state, chosen: draft.wrappedValue.address), id: \.address) { choice in
+                        Text(choice.label).tag(choice.address)
+                    }
+                }
+            }
+            StackedRow(title: "Port") {
+                TextField("Port", value: draft.port, format: .number.grouping(.never))
+                    .stackedField("Port")
+            }
+            LabeledContent("Listening on", value: listeningSummary(state.listeningOn))
+        } header: {
+            Text("Network")
+        } footer: {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(networkFooter(state: state, draft: draft.wrappedValue))
+                    .foregroundStyle(.secondary)
+                HStack {
+                    if let failure {
+                        Text(failure)
+                            .foregroundStyle(.red)
+                    }
+                    Spacer()
+                    Button("Revert") { self.draft = SettingsDraft(state.settings) }
+                        .disabled(!isChanged(state) || isSaving)
+                    Button("Save") { Task { await save(draft.wrappedValue, replacing: state.settings) } }
+                        .keyboardShortcut("s")
+                        .disabled(!isChanged(state) || isSaving)
+                }
+            }
+        }
     }
 
     private func isChanged(_ state: HiveSettingsState) -> Bool {

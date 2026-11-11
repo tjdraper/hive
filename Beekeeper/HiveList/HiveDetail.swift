@@ -5,6 +5,7 @@ struct HiveDetail: View {
     let hive: KnownHive
     let link: HiveLink
     let servers: ServerList
+    let recovery: RecoveryFileCopies
     @Binding var page: HivePage
     @Binding var selection: SidebarItem?
     let onAddServer: () -> Void
@@ -17,6 +18,7 @@ struct HiveDetail: View {
                     hive: hive,
                     link: link,
                     servers: servers,
+                    recovery: recovery,
                     onAddServer: onAddServer,
                     onOpenSettings: { page = .settings },
                     onSelectServer: { selection = .server(hiveID: hive.id, serverID: $0) }
@@ -24,7 +26,7 @@ struct HiveDetail: View {
             case .jobLog: JobLogView(link: link, servers: servers)
             case .devices: DeviceListView(hive: hive, link: link)
             case .auditLog: AuditLogView(link: link)
-            case .settings: HiveSettingsView(hive: hive, link: link)
+            case .settings: HiveSettingsView(hive: hive, link: link, recovery: recovery)
             }
         }
         .navigationTitle(hive.name)

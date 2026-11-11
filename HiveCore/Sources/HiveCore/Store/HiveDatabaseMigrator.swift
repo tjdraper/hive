@@ -57,6 +57,11 @@ enum HiveDatabaseMigrator {
                 table.add(column: "recoveryFileWrittenAt", .datetime)
             }
         }
+        migrator.registerMigration("Add the recovery file's digest") { database in
+            try database.alter(table: "hive") { table in
+                table.add(column: "recoveryFileDigest", .blob)
+            }
+        }
 
         return migrator
     }

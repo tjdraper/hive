@@ -10,16 +10,12 @@ enum LiveUpdateRoutes {
 
     static func add(
         to router: Router<HiveRequestContext>,
-        events: RunEventBroadcaster,
-        statuses: JobStatusReader,
-        signIn: SignInWorkflow,
-        heartbeat: Duration
+        stream: LiveUpdateStream,
+        signIn: SignInWorkflow
     ) {
         router.get(RouterPath(HiveEndpoint.liveUpdates)) { _, context in
             guard let token = context.sessionToken else { throw HTTPError(.unauthorized) }
-            let stream = LiveUpdateStream(events: events, statuses: statuses, heartbeat: heartbeat) {
-                signIn.sessions.deviceID(forToken: token, at: signIn.now()) != nil
-            }
+            let isSignedIn: @Sendable () -> Bool = { signIn.sessions.deviceID(forToken: token, at: signIn.now()) != nil }
             var headers: HTTPFields = [.contentType: "application/x-ndjson", .cacheControl: "no-store"]
             if let contentTypeOptions { headers[contentTypeOptions] = "nosniff" }
             return Response(
@@ -29,11 +25,11 @@ enum LiveUpdateRoutes {
                     let started = ContinuousClock.now
                     logger.info("A device started live updates")
                     do {
-                        let ending = try await stream.run { update in
+                        let ending = try await stream.run(isSignedIn: isSignedIn, writing: { update in
                             var line = try JSONEncoder().encode(update)
                             line.append(UInt8(ascii: "\n"))
                             try await writer.write(ByteBuffer(bytes: line))
-                        }
+                        })
                         let seconds = (ContinuousClock.now - started).roundedSeconds
                         logger.info("Live updates ended: \(ending.rawValue, privacy: .public) after \(seconds, privacy: .public)s")
                     } catch {

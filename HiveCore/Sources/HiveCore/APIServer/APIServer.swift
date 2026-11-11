@@ -81,10 +81,13 @@ public struct APIServer: Sendable {
         SnapshotDeletionRoutes.add(to: router, store: api.snapshotDeletions, runs: api.runs, confirmations: api.confirmations)
         LiveUpdateRoutes.add(
             to: router,
-            events: api.runs.events,
-            statuses: api.jobStatus,
-            signIn: api.signIn,
-            heartbeat: api.liveUpdateHeartbeat
+            stream: LiveUpdateStream(
+                events: api.runs.events,
+                statuses: api.jobStatus,
+                recovery: api.recoveryKey,
+                heartbeat: api.liveUpdateHeartbeat
+            ),
+            signIn: api.signIn
         )
         return router
     }

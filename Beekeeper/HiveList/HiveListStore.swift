@@ -11,6 +11,7 @@ final class HiveListStore {
     private(set) var hives: [KnownHive]
     private var links: [UUID: HiveLink] = [:]
     private var serverLists: [UUID: ServerList] = [:]
+    private var recoveryFiles: [UUID: RecoveryFileCopies] = [:]
     private var liveUpdates: [UUID: Task<Void, Never>] = [:]
     /// Hives first paired since Beekeeper opened, whose setup goes on to their recovery key.
     private var newlyPaired: Set<UUID> = []
@@ -37,6 +38,10 @@ final class HiveListStore {
         serverLists[id]
     }
 
+    func recoveryCopies(for id: UUID) -> RecoveryFileCopies? {
+        recoveryFiles[id]
+    }
+
     var hasOfflineHive: Bool {
         hives.contains { links[$0.id]?.status == .offline }
     }
@@ -59,7 +64,10 @@ final class HiveListStore {
         links[hive.id] = link
         let servers = ServerList(link: link)
         serverLists[hive.id] = servers
-        liveUpdates[hive.id] = Task { await servers.statuses.follow() }
+        let recovery = RecoveryFileCopies(hiveID: hive.id, hiveName: hive.name, link: link)
+        recoveryFiles[hive.id] = recovery
+        let follower = LiveUpdateFollower(link: link, statuses: servers.statuses, recovery: recovery)
+        liveUpdates[hive.id] = Task { await follower.follow() }
     }
 
     /// True once for a Hive first paired since Beekeeper opened.
@@ -71,6 +79,7 @@ final class HiveListStore {
     func rename(_ id: UUID, to name: String) {
         guard let index = hives.firstIndex(where: { $0.id == id }), hives[index].name != name else { return }
         hives[index].name = name
+        recoveryFiles[id]?.hiveName = name
         file.save(hives)
     }
 
@@ -82,11 +91,13 @@ final class HiveListStore {
         links[id]?.connect(to: hives[index].addresses.first)
     }
 
-    /// Takes a Hive this device is no longer paired with off the list.
+    /// Takes a Hive this device is no longer paired with off the list. Its recovery files stay, since
+    /// they may be all that's left to bring the Hive back.
     func remove(_ id: UUID) {
         hives.removeAll { $0.id == id }
         links[id] = nil
         serverLists[id] = nil
+        recoveryFiles[id] = nil
         liveUpdates.removeValue(forKey: id)?.cancel()
         try? keychain.delete(hiveID: id)
         file.save(hives)

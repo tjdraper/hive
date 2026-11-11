@@ -72,6 +72,8 @@ private extension APIFixture {
 }
 
 struct LiveUpdateTests {
+    static let noRecoveryKey = RecoveryKeyState(keySavedAt: nil, publicKey: nil, fileWrittenAt: nil, fileDigest: nil)
+
     @Test("Live updates are refused without signing in, with an unknown token, and once the session has run out")
     func refusedWithoutSigningIn() async throws {
         // Arrange
@@ -101,9 +103,12 @@ struct LiveUpdateTests {
         let fixture = try await BackupRunFixture()
         try fixture.write("hello", to: "srv/site/index.html")
         let written = WrittenUpdates()
-        let stream = LiveUpdateStream(events: fixture.runs.events, statuses: fixture.api.api.jobStatus, heartbeat: .seconds(3600)) { true }
-        let following = Task { try await stream.run { written.append($0) } }
-        try await written.wait { $0.count == 1 }
+        let api = fixture.api.api
+        let stream = LiveUpdateStream(
+            events: fixture.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey, heartbeat: .seconds(3600)
+        )
+        let following = Task { try await stream.run(isSignedIn: { true }, writing: { written.append($0) }) }
+        try await written.wait { $0.count == 2 }
 
         // Act
         _ = try await fixture.runNow()
@@ -159,7 +164,7 @@ struct LiveUpdateTests {
 
         // Assert
         #expect(answer.status == .ok)
-        #expect(answer.updates == [.jobStatuses([])])
+        #expect(answer.updates == [.jobStatuses([]), .recovery(Self.noRecoveryKey)])
     }
 
     @Test("A quiet stream gets heartbeats", .timeLimit(.minutes(1)))
@@ -168,10 +173,12 @@ struct LiveUpdateTests {
         let fixture = try APIFixture()
         let written = WrittenUpdates()
         let api = fixture.api
-        let stream = LiveUpdateStream(events: api.runs.events, statuses: api.jobStatus, heartbeat: .milliseconds(10)) { true }
+        let stream = LiveUpdateStream(
+            events: api.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey, heartbeat: .milliseconds(10)
+        )
 
         // Act
-        let following = Task { try await stream.run { written.append($0) } }
+        let following = Task { try await stream.run(isSignedIn: { true }, writing: { written.append($0) }) }
         try await written.wait { $0.count { $0 == .heartbeat } >= 2 }
         following.cancel()
 
@@ -201,7 +208,7 @@ struct LiveUpdateTests {
         }
 
         // Assert
-        #expect(answer.updates.count == 1)
+        #expect(answer.updates.count == 2)
         #expect(answer.events.isEmpty)
     }
 
@@ -226,6 +233,43 @@ struct LiveUpdateTests {
         }
         #expect(removal?.removed.map(\.snapshotID) == first.map(\.id))
         #expect(try await fixture.removals() == [try #require(removal)])
+    }
+
+    @Test(
+        "Live updates send the recovery key's state on connecting, then again for each file written and each new key",
+        .timeLimit(.minutes(1))
+    )
+    func recoveryChanges() async throws {
+        // Arrange
+        let fixture = try APIFixture()
+        let api = fixture.api
+        let written = WrittenUpdates()
+        let stream = LiveUpdateStream(
+            events: api.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey, heartbeat: .seconds(3600)
+        )
+        let following = Task { try await stream.run(isSignedIn: { true }, writing: { written.append($0) }) }
+        try await written.wait { $0.count == 2 }
+        let first = RecoveryKey()
+        let second = RecoveryKey()
+
+        // Act
+        try await fixture.saveRecoveryKey(first)
+        _ = try await fixture.addServer()
+        await api.recoveryFiles.writeIfDue()
+        try await fixture.saveRecoveryKey(second)
+        try await written.wait { $0.count == 5 }
+        following.cancel()
+
+        // Assert
+        let states = written.updates.compactMap { update -> RecoveryKeyState? in
+            guard case .recovery(let state) = update else { return nil }
+            return state
+        }
+        let firstKey = first.publicKey.rawRepresentation
+        #expect(states.map(\.publicKey) == [nil, firstKey, firstKey, second.publicKey.rawRepresentation])
+        #expect(states.dropFirst().allSatisfy { $0.fileDigest != nil })
+        #expect(Set(states.map(\.fileDigest)).count == 4)
+        #expect(states.last?.fileDigest == RecoveryFileHeader.digest(of: try Data(contentsOf: fixture.recoveryFile)))
     }
 
     private static func describe(_ event: RunEvent) -> String {
