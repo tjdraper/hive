@@ -30,6 +30,8 @@ actor BackupRunCoordinator {
     private var retentionWaiting = false
     private var deletionsWaiting = false
     private var stopping = false
+    /// Work that runs while nothing else on the queue does, such as rotating SSH keys.
+    private var holds = 0
 
     /// Runs within `startupDriveGrace` of now wait for the backup drive to mount, using `pause`.
     init(
@@ -125,6 +127,17 @@ actor BackupRunCoordinator {
         await waitUntilIdle()
     }
 
+    /// Runs `work` once the run going now has finished, keeping anything waiting from starting until it
+    /// returns. A run holds its server's key from its start, so its connections never see one change.
+    func whileHeld<Value: Sendable>(_ work: @Sendable () async -> Value) async -> Value {
+        holds += 1
+        await waitUntilIdle()
+        let value = await work()
+        holds -= 1
+        kick()
+        return value
+    }
+
     /// Returns once nothing is waiting or running.
     func waitUntilIdle() async {
         while let draining {
@@ -143,14 +156,14 @@ actor BackupRunCoordinator {
     }
 
     private func kick() {
-        guard draining == nil else { return }
+        guard draining == nil, holds == 0 else { return }
         draining = Task { await drain() }
     }
 
     /// Runs whatever is waiting, one at a time, until nothing is. Anything queued meanwhile is picked up
     /// before it stops, since the actor runs nothing else between the last check and stopping.
     private func drain() async {
-        while !stopping {
+        while !stopping, holds == 0 {
             if deletionsWaiting {
                 deletionsWaiting = false
                 await runRemovals { [deletions] in await deletions.run() }

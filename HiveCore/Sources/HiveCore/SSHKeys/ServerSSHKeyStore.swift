@@ -35,6 +35,24 @@ struct ServerSSHKeyStore: Sendable {
     }
 }
 
+extension ServerSSHKeyStore {
+    /// Gives the server its rotated key, with an audit entry, only while its key and connection are
+    /// still those the rotation started with. False when either changed meanwhile.
+    func rotateKey(forServer id: UUID, from old: SSHTarget, to key: SealedSSHKey, by deviceID: UUID, at date: Date) throws -> Bool {
+        try database.writer.write { database in
+            guard var record = try ServerRecord.fetchOne(database, key: id),
+                  record.sshPublicKey == old.key.publicKey.line, record.connection == old.connection
+            else { return false }
+            record.sealedSSHKey = key.sealedSeed.data
+            record.sshPublicKey = key.publicKey.line
+            try record.update(database)
+            let change = ServerChange.sshKeyRotated(old: old.key.publicKey.fingerprint, new: key.publicKey.fingerprint)
+            try AuditLog.record(.server(serverID: id, serverName: record.name, change: change), by: deviceID, at: date, in: database)
+            return true
+        }
+    }
+}
+
 struct SSHKeyReplacement {
     let old: OpenSSHPublicKey?
     let new: OpenSSHPublicKey

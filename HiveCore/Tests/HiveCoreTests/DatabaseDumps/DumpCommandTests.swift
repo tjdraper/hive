@@ -89,8 +89,8 @@ struct DumpCommandTests {
 
     @Test("A word with a single quote is closed, escaped and reopened")
     func quoting() {
-        #expect(DumpCommand.quoted("it's") == #"'it'\''s'"#)
-        #expect(DumpCommand.quoted("$HOME") == "'$HOME'")
+        #expect(RemoteCommandLine.quoted("it's") == #"'it'\''s'"#)
+        #expect(RemoteCommandLine.quoted("$HOME") == "'$HOME'")
     }
 
     @Test("Dumps are named for their database, compressed for MySQL and in custom format for Postgres")

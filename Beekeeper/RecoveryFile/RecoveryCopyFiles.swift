@@ -9,11 +9,15 @@ nonisolated struct RecoveryCopyFiles: Sendable {
     let hiveID: UUID
     let directory: URL
 
-    static func standard(for hiveID: UUID) -> RecoveryCopyFiles {
-        let directory = URL.applicationSupportDirectory
+    /// Every Hive's copy, each named for its Hive's ID.
+    static var standardDirectory: URL {
+        URL.applicationSupportDirectory
             .appending(path: Bundle.main.bundleIdentifier ?? "Beekeeper", directoryHint: .isDirectory)
             .appending(path: "Recovery Files", directoryHint: .isDirectory)
-        return RecoveryCopyFiles(hiveID: hiveID, directory: directory)
+    }
+
+    static func standard(for hiveID: UUID) -> RecoveryCopyFiles {
+        RecoveryCopyFiles(hiveID: hiveID, directory: standardDirectory)
     }
 
     private var copyURL: URL {

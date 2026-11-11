@@ -116,6 +116,21 @@ struct ConfirmedRouteTests {
                 accepted: .ok
             )
         },
+        ConfirmedRequestCase(testDescription: "starting retention after a restore", reason: .retentionStarted) { fixture in
+            try await fixture.signIn.database.writer.write { database in
+                try database.execute(sql: "UPDATE hive SET retentionPausedSince = ?", arguments: [fixture.signIn.clock.now])
+            }
+            return deletion(HiveEndpoint.retentionPause, other: HiveEndpoint.retentionPause + "/", accepted: .noContent)
+        },
+        ConfirmedRequestCase(testDescription: "rotating SSH keys", reason: .sshKeysRotated) { _ in
+            ConfirmedRequestCase.Request(
+                method: .post,
+                path: HiveEndpoint.sshKeyRotation,
+                body: Data(),
+                otherPath: HiveEndpoint.sshKeyRotation + "/",
+                accepted: .accepted
+            )
+        },
     ]
 
     private static func serverChange(_ server: Server, _ draft: ServerDraft) throws -> ConfirmedRequestCase.Request {
@@ -138,8 +153,8 @@ struct ConfirmedRouteTests {
         )
     }
 
-    private static func deletion(_ path: String, other: String) -> ConfirmedRequestCase.Request {
-        ConfirmedRequestCase.Request(method: .delete, path: path, body: Data(), otherPath: other, accepted: .accepted)
+    private static func deletion(_ path: String, other: String, accepted: HTTPResponse.Status = .accepted) -> ConfirmedRequestCase.Request {
+        ConfirmedRequestCase.Request(method: .delete, path: path, body: Data(), otherPath: other, accepted: accepted)
     }
 
     /// Every change is audited in the same transaction, so an unchanged audit log means nothing changed.

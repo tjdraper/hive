@@ -3,6 +3,8 @@ import SwiftUI
 /// Shown on the Hive's overview until it has a recovery key.
 struct RecoveryKeyWarning: View {
     let onSetUp: () -> Void
+    /// Offered only for a Hive on this Mac with nothing set up yet.
+    var onRestore: (() -> Void)?
 
     var body: some View {
         GroupBox {
@@ -17,7 +19,12 @@ struct RecoveryKeyWarning: View {
                             + "and it writes no recovery files."
                     )
                     .foregroundStyle(.secondary)
-                    Button("Set Up Recovery Key…", action: onSetUp)
+                    HStack {
+                        Button("Set Up Recovery Key…", action: onSetUp)
+                        if let onRestore {
+                            Button("Restore from a Recovery File…", action: onRestore)
+                        }
+                    }
                 }
                 Spacer(minLength: 0)
             }

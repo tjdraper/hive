@@ -24,6 +24,8 @@ public struct HiveAPI: Sendable {
     let identityKeys: HiveKeyStore
     let restart: HiveRestart
     let recoveryFiles: RecoveryFileWriter
+    let restore: RestoreWorkflow
+    let sshKeyRotation: SSHKeyRotationWorkflow
     /// How often an open live updates response gets a line when nothing else is happening.
     let liveUpdateHeartbeat: Duration
     /// Checked on every request, since it can be turned off while Hive runs.
@@ -81,6 +83,14 @@ public struct HiveAPI: Sendable {
 
     var recoveryKey: RecoveryKeyWorkflow {
         RecoveryKeyWorkflow(store: RecoveryKeyStore(database: servers.store.database), files: recoveryFiles, now: signIn.now)
+    }
+
+    var restoreState: RestoreStateReader {
+        RestoreStateReader(database: servers.store.database)
+    }
+
+    var retentionPause: RetentionPauseStore {
+        RetentionPauseStore(database: servers.store.database)
     }
 
     var removalEstimator: RemovalEstimator {
@@ -218,5 +228,7 @@ public struct HiveAPI: Sendable {
         self.identityKeys = identityKeys
         self.restart = restart
         recoveryFiles = RecoveryFileWriter(database: database, sealer: sealer, directory: dataDirectory, now: now)
+        restore = RestoreWorkflow(database: database, settings: settingsStore, sealer: sealer, volumes: volumes, restart: restart, now: now)
+        sshKeyRotation = SSHKeyRotationWorkflow(database: database, sealer: sealer, ssh: ssh, runs: runs, settings: settingsStore, now: now)
     }
 }

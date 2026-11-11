@@ -39,6 +39,14 @@ public enum HiveEndpoint {
     public static let recoveryKey = "/recovery-key"
     /// `GET` reads the latest `RecoveryFileDownload`, answering 404 while there isn't one.
     public static let recoveryFile = "/recovery-file"
+    /// `GET` reads the `RestoreState`, and `POST` a `RestoreRequest` restores the Hive from a recovery
+    /// file, answering with a `RestoreOutcome`, then restarts it. Only from the Hive's own Mac.
+    public static let restore = "/restore"
+    /// `DELETE` starts retention and quotas again after a restore. Confirmed.
+    public static let retentionPause = "/retention-pause"
+    /// `GET` reads the `SSHKeyRotationState`, and `POST` starts giving every server a new SSH key,
+    /// answering 409 while a rotation runs. Confirmed.
+    public static let sshKeyRotation = "/ssh-keys/rotation"
     /// A snapshot is deleted with `snapshot(_:)`.
     public static let snapshots = "/snapshots"
     /// `GET` lists the `RemovedJob`s whose snapshots stayed on the chosen backup drive.

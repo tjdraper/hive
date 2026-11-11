@@ -95,12 +95,16 @@ final class HiveListStore {
     /// they may be all that's left to bring the Hive back.
     func remove(_ id: UUID) {
         hives.removeAll { $0.id == id }
+        untrack(id)
+        try? keychain.delete(hiveID: id)
+        file.save(hives)
+    }
+
+    private func untrack(_ id: UUID) {
         links[id] = nil
         serverLists[id] = nil
         recoveryFiles[id] = nil
         liveUpdates.removeValue(forKey: id)?.cancel()
-        try? keychain.delete(hiveID: id)
-        file.save(hives)
     }
 
     #if os(macOS)
@@ -138,6 +142,49 @@ final class HiveListStore {
         case LocalPairingError.unreachable, LocalPairingError.refused(.hiveUnavailable): true
         default: false
         }
+    }
+
+    /// After this Mac's Hive was restored from a recovery file: it restarts as the restored Hive, which
+    /// kept this device, so Beekeeper's key for it is filed under the restored Hive's ID. An entry this
+    /// device had for the restored Hive pinned the old Mac's identity key, which is no use now, so the
+    /// restored Hive takes its place, and signs in once Hive is back. False when this device's key
+    /// couldn't be kept, which leaves the list as it was.
+    @discardableResult
+    func adoptRestoredHive(_ id: UUID, as outcome: RestoreOutcome) -> Bool {
+        guard let index = hives.firstIndex(where: { $0.id == id }) else { return false }
+        // The restored Hive's port, which may not be the one the new Hive started on.
+        let address = HiveAddress(host: "127.0.0.1", port: outcome.port)
+        let restored = KnownHive(id: outcome.hiveID, name: outcome.hiveName, addresses: [address], isOnThisMac: true)
+        do {
+            guard let credential = try keychain.credential(for: id) else { return false }
+            try keychain.save(DeviceCredential(
+                hiveID: restored.id,
+                deviceID: credential.deviceID,
+                pin: credential.pin,
+                keyData: credential.keyData,
+                confirmationKeyData: credential.confirmationKeyData
+            ))
+            try keychain.delete(hiveID: id)
+        } catch {
+            Self.logger.error("Couldn't keep this device's key for the restored Hive: \(String(describing: error), privacy: .public)")
+            return false
+        }
+
+        untrack(id)
+        untrack(restored.id)
+        hives.removeAll { $0.id == id || $0.id == restored.id }
+        hives.insert(restored, at: min(index, hives.count))
+        track(restored)
+        file.save(hives)
+        Self.logger.notice("Saved the restored Hive in the list")
+        let link = links[restored.id]
+        let servers = serverLists[restored.id]
+        link?.expectRestart()
+        Task {
+            await link?.reconnectAfterRestart()
+            if link?.status == .connected { await servers?.refresh() }
+        }
+        return true
     }
 
     /// Pairs with this Mac's Hive, or again with it after this device was revoked, and returns its ID.

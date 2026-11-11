@@ -42,6 +42,8 @@ struct HiveSettingsView: View {
 
             RecoverySection(hive: hive, link: link, copies: recovery)
 
+            SSHKeyRotationSection(hive: hive, link: link)
+
             IdentitySection(hive: hive, link: link)
         }
         .formStyle(.grouped)

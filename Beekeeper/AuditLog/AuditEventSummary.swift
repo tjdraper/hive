@@ -38,6 +38,11 @@ extension AuditEvent {
             "Saved the Hive's recovery key"
         case .recoveryKeySaved(replacedAnother: true):
             "Saved a new recovery key. Recovery files written before still open with the old one"
+        case .restoredFromRecoveryFile(let writtenAt, let serverCount, let jobCount):
+            "Restored the Hive from its recovery file of \(writtenAt.formatted(date: .abbreviated, time: .shortened)), "
+                + "with \(serverCount) servers and \(jobCount) jobs"
+        case .retentionStarted:
+            "Started retention and quotas again after a restore"
         }
     }
 }
@@ -91,6 +96,8 @@ extension ServerChange {
             "Made Hive's SSH key for “\(serverName)”, \(new)"
         case .newSSHKey(.some(let old), let new):
             "Made a new SSH key for “\(serverName)”, \(new), replacing \(old)"
+        case .sshKeyRotated(let old, let new):
+            "Rotated Hive's SSH key on “\(serverName)” to \(new), replacing \(old)"
         case .removed:
             "Removed the server “\(serverName)” and its jobs, keeping their snapshots"
         }

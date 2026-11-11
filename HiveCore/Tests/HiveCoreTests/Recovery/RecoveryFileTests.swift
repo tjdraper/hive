@@ -334,7 +334,7 @@ struct RecoveryFileDownloadTests {
     )
 }
 
-private extension Collection {
+extension Collection {
     var only: Element? {
         count == 1 ? first : nil
     }

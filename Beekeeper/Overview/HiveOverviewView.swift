@@ -9,9 +9,24 @@ struct HiveOverviewView: View {
     let onAddServer: () -> Void
     let onOpenSettings: () -> Void
     let onSelectServer: (UUID) -> Void
+    let onRestored: (RestoreOutcome) -> Void
+
+    private enum SetupSheet: Identifiable {
+        case choice
+        case recoveryKey
+        case restore
+
+        var id: Self {
+            self
+        }
+    }
 
     @Environment(HiveListStore.self) private var store
-    @State private var isSettingUpRecoveryKey = false
+    @State private var setupSheet: SetupSheet?
+    @State private var restoreState: RestoreState?
+    /// Handed on once the sheet has closed. The restored Hive takes this one's place in the list, and
+    /// removing the view a sheet came from while it closes leaves the window drawing nothing.
+    @State private var restored: RestoreOutcome?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -19,7 +34,15 @@ struct HiveOverviewView: View {
                 FullDiskAccessWarning(isOnThisMac: hive.isOnThisMac)
             }
             if let state = recovery.hiveState, !state.hasKey {
-                RecoveryKeyWarning { isSettingUpRecoveryKey = true }
+                RecoveryKeyWarning(
+                    onSetUp: { setupSheet = .recoveryKey },
+                    onRestore: canRestore ? { setupSheet = .restore } : nil
+                )
+            }
+            if let restoreState, restoreState.retentionPausedSince != nil {
+                RetentionPausedSection(hive: hive, link: link, state: restoreState) {
+                    Task { await loadRestoreState() }
+                }
             }
             BackupDriveWarning(link: link, onOpenSettings: onOpenSettings)
             if case .afterIdle(let minutes) = link.overview?.macSleep {
@@ -44,21 +67,47 @@ struct HiveOverviewView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .sheet(isPresented: $isSettingUpRecoveryKey) {
-            RecoveryKeySheet(hiveName: hive.name, link: link) { recovery.receive($0) }
+        .sheet(item: $setupSheet, onDismiss: handOnRestore) { sheet in
+            switch sheet {
+            case .choice:
+                HiveSetupSheet(hive: hive, link: link, onKeySaved: { recovery.receive($0) }, onRestored: { restored = $0 })
+            case .recoveryKey:
+                RecoveryKeySheet(hiveName: hive.name, link: link) { recovery.receive($0) }
+            case .restore:
+                RestoreSheet(hive: hive, link: link) { restored = $0 }
+            }
         }
         .task {
             await link.refresh()
+            await loadRestoreState()
             await loadRecoveryKey()
             await servers.refresh()
         }
     }
 
-    /// A Hive just paired goes on to its recovery key, since its setup isn't finished without one.
+    private func handOnRestore() {
+        guard let restored else { return }
+        self.restored = nil
+        onRestored(restored)
+    }
+
+    /// Only Beekeeper on the Hive's own Mac can restore it, and only while it has no configuration.
+    private var canRestore: Bool {
+        hive.isOnThisMac && restoreState?.canRestore == true
+    }
+
+    /// A Hive just paired goes on to its setup, since it isn't finished without a recovery key. One on this
+    /// Mac with nothing set up yet could instead be a Hive brought back from its recovery file.
     private func loadRecoveryKey() async {
         await recovery.refresh()
         if store.takeNewlyPaired(hive.id), recovery.hiveState?.hasKey == false {
-            isSettingUpRecoveryKey = true
+            setupSheet = canRestore ? .choice : .recoveryKey
+        }
+    }
+
+    private func loadRestoreState() async {
+        if let loaded: RestoreState = try? await link.perform({ try await $0.get(HiveEndpoint.restore) }) {
+            restoreState = loaded
         }
     }
 }

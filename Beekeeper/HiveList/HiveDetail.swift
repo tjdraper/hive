@@ -10,6 +10,8 @@ struct HiveDetail: View {
     @Binding var selection: SidebarItem?
     let onAddServer: () -> Void
 
+    @Environment(HiveListStore.self) private var store
+
     var body: some View {
         HiveConnectionGate(hive: hive, link: link) {
             switch page {
@@ -21,7 +23,8 @@ struct HiveDetail: View {
                     recovery: recovery,
                     onAddServer: onAddServer,
                     onOpenSettings: { page = .settings },
-                    onSelectServer: { selection = .server(hiveID: hive.id, serverID: $0) }
+                    onSelectServer: { selection = .server(hiveID: hive.id, serverID: $0) },
+                    onRestored: restored
                 )
             case .jobLog: JobLogView(link: link, servers: servers)
             case .devices: DeviceListView(hive: hive, link: link)
@@ -45,6 +48,18 @@ struct HiveDetail: View {
     }
 }
 
+extension HiveDetail {
+    /// The restored Hive takes this one's place in the list, under the restored Hive's ID.
+    private func restored(_ outcome: RestoreOutcome) {
+        #if os(macOS)
+        if store.adoptRestoredHive(hive.id, as: outcome) {
+            page = .overview
+            selection = .hive(outcome.hiveID)
+        }
+        #endif
+    }
+}
+
 /// Shows `content` while Beekeeper is signed in to the Hive, and otherwise why it isn't.
 struct HiveConnectionGate<Content: View>: View {
     let hive: KnownHive
@@ -60,6 +75,8 @@ struct HiveConnectionGate<Content: View>: View {
                 .task { await link.refresh() }
         case .pairingAgain:
             ProgressView("Pairing again with the Hive's new identity…")
+        case .restarting:
+            ProgressView("Waiting for the restored Hive to start…")
         default:
             HiveProblemView(hive: hive, link: link)
         }
@@ -104,7 +121,7 @@ private struct HiveProblemView: View {
             if link.status != .identityChanged {
                 Button("Remove from Beekeeper…") { isConfirmingRemoval = true }
             }
-        case .connecting, .pairingAgain, .connected, .needsUpdate:
+        case .connecting, .pairingAgain, .restarting, .connected, .needsUpdate:
             EmptyView()
         }
     }
@@ -119,7 +136,7 @@ private struct HiveProblemView: View {
         case .needsUpdate(.hive): "Update Hive"
         case .needsUpdate(.beekeeper): "Update Beekeeper"
         case .failed: "Something Went Wrong"
-        case .connecting, .pairingAgain, .connected: ""
+        case .connecting, .pairingAgain, .restarting, .connected: ""
         }
     }
 
@@ -130,7 +147,7 @@ private struct HiveProblemView: View {
         case .notRecognized, .notPaired: "person.crop.circle.badge.questionmark"
         case .lockedOut: "lock"
         case .needsUpdate: "arrow.down.circle"
-        case .failed, .connecting, .pairingAgain, .connected: "exclamationmark.triangle"
+        case .failed, .connecting, .pairingAgain, .restarting, .connected: "exclamationmark.triangle"
         }
     }
 
@@ -152,7 +169,7 @@ private struct HiveProblemView: View {
             "This Beekeeper is too old to work with this Hive."
         case .failed(let message):
             message
-        case .connecting, .pairingAgain, .connected:
+        case .connecting, .pairingAgain, .restarting, .connected:
             ""
         }
     }

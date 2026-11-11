@@ -79,7 +79,7 @@ final class FakeDatabaseServer {
     }
 
     private func install(_ tool: String) throws {
-        let record = DumpCommand.quoted(record.fileSystemPath)
+        let record = RemoteCommandLine.quoted(record.fileSystemPath)
         let script = tool == "docker" ? """
         #!/bin/sh
         printf 'docker %s\\n' "$*" >> \(record)/arguments

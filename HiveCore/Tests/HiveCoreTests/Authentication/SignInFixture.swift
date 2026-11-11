@@ -19,17 +19,21 @@ final class TestClock: Sendable {
 
 /// An in-memory Hive with one paired device, whose key is a software key in place of the Secure Enclave.
 struct SignInFixture {
-    let clock = TestClock()
-    let hiveID = UUID()
+    let clock: TestClock
+    /// The store's own, as the daemon reads it at start.
+    let hiveID: UUID
     let database: HiveDatabase
     let devices: DeviceStore
     let sessions = SessionStore()
     let workflow: SignInWorkflow
-    let deviceKey = P256.Signing.PrivateKey()
+    let deviceKey: P256.Signing.PrivateKey
     let device: PairedDevice
 
     init(apiVersions: APIVersions = .thisBuild) throws {
+        clock = TestClock()
+        deviceKey = P256.Signing.PrivateKey()
         database = try HiveDatabase.inMemory()
+        hiveID = try database.hiveID()
         devices = DeviceStore(database: database)
         let clock = clock
         workflow = SignInWorkflow(
@@ -45,6 +49,19 @@ struct SignInFixture {
             at: clock.now,
             auditedAs: .pairedOnHiveMac
         )
+    }
+
+    /// The same Hive started again, as the daemon does after a restore: the Hive ID read afresh from the
+    /// store, and every session forgotten.
+    init(restarting other: SignInFixture) throws {
+        clock = other.clock
+        database = other.database
+        hiveID = try database.hiveID()
+        devices = other.devices
+        deviceKey = other.deviceKey
+        device = other.device
+        let clock = clock
+        workflow = SignInWorkflow(hiveID: hiveID, devices: devices, sessions: sessions, apiVersions: .thisBuild, now: { clock.now })
     }
 
     /// A sign-in request answering a fresh challenge, signed by `key`.

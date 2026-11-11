@@ -45,7 +45,7 @@ struct LiveUpdateFollower {
     private var mayConnect: Bool {
         switch link.status {
         case .connecting, .connected, .offline, .failed: true
-        case .pairingAgain, .identityChanged, .notRecognized, .notPaired, .lockedOut, .needsUpdate: false
+        case .pairingAgain, .restarting, .identityChanged, .notRecognized, .notPaired, .lockedOut, .needsUpdate: false
         }
     }
 

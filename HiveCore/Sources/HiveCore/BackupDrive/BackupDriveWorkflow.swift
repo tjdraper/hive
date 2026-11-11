@@ -36,17 +36,27 @@ struct BackupDriveWorkflow: Sendable {
         return BackupDriveState(chosen: chosen, volumes: listed)
     }
 
-    /// Claims the volume's `Hive` folder for this Hive, then records the choice.
-    func choose(_ choice: BackupDriveChoice, by deviceID: UUID) throws -> BackupDriveState {
+    /// Claims the volume's `Hive` folder for this Hive, records the choice, then takes over any of this
+    /// Hive's snapshots the catalog doesn't have, such as on a drive restored from a Mac backup.
+    func choose(_ choice: BackupDriveChoice, by deviceID: UUID) throws -> (state: BackupDriveState, tookOverSnapshots: Bool) {
         guard let volume = volumes.mountedVolumes().first(where: { $0.uuid == choice.volumeUUID }) else {
             throw refusal(.notMounted)
         }
         if let problem = volume.unsuitability ?? HiveDriveFolder.claim(on: volume.url, hiveID: hiveID) {
             throw refusal(problem)
         }
-        try store.choose(BackupDriveIdentity(volumeUUID: volume.uuid, name: volume.name), by: deviceID, at: now())
+        let identity = BackupDriveIdentity(volumeUUID: volume.uuid, name: volume.name)
+        try store.choose(identity, by: deviceID, at: now())
         Self.logger.notice("Chose the backup drive")
-        return try state()
+        let drive = LocatedDrive(identity: identity, hiveFolder: HiveDriveFolder.url(on: volume.url))
+        var tookOver = false
+        do {
+            tookOver = try SnapshotCatalogBuilder(database: store.database, hiveID: hiveID, now: now).takeOver(drive).takenOver > 0
+        } catch {
+            // The drive is chosen either way. Choosing it again tries again.
+            Self.logger.error("Couldn't take over the drive's snapshots: \(String(describing: type(of: error)), privacy: .public)")
+        }
+        return (try state(), tookOver)
     }
 
     private func problem(with volume: MountedVolume) -> BackupDriveProblem? {

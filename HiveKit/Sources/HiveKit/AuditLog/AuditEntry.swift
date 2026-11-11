@@ -44,6 +44,11 @@ public enum AuditEvent: Codable, Hashable, Sendable {
     /// Hive was given a recovery key, replacing an older one when `replacedAnother`. Files written with
     /// the older key still open with it.
     case recoveryKeySaved(replacedAnother: Bool)
+    /// The Hive was brought back from a recovery file written at `writtenAt`, with its recovery key.
+    /// Retention and quotas wait until a device starts them again.
+    case restoredFromRecoveryFile(writtenAt: Date, serverCount: Int, jobCount: Int)
+    /// Retention and quotas, paused by a restore, were started again.
+    case retentionStarted
 }
 
 public enum EmailChange: Codable, Hashable, Sendable {
@@ -73,6 +78,8 @@ public enum ServerChange: Codable, Hashable, Sendable {
     case hostKeyConfirmed(old: HostKeyFingerprint?, new: HostKeyFingerprint)
     /// Fingerprints of Hive's SSH key for the server. The server needs the new one in `authorized_keys`.
     case newSSHKey(old: String?, new: String)
+    /// Fingerprints. Hive added the new key to the server's `authorized_keys` and checked it works.
+    case sshKeyRotated(old: String, new: String)
     /// Its configuration only. Its snapshots stay on the backup drive.
     case removed
 }

@@ -13,7 +13,7 @@ enum DumpCommand {
     /// separated by tabs and empty where it has none.
     static func containerList() -> String {
         let format = #"{{.ID}}\t{{.Label "\#(swarmServiceLabel)"}}\t{{.Label "\#(composeServiceLabel)"}}"#
-        return line(["docker", "ps", "--no-trunc", "--format", format])
+        return RemoteCommandLine.line(["docker", "ps", "--no-trunc", "--format", format])
     }
 
     /// `containerID` is nil for a database on the host.
@@ -28,8 +28,8 @@ enum DumpCommand {
         }
         // `sh` fills `$0`, so the arguments start at `$1`.
         let shell = ["sh", "-c", script, "sh"] + arguments
-        guard let containerID else { return line(shell) }
-        return line(["docker", "exec", "--interactive", containerID] + shell)
+        guard let containerID else { return RemoteCommandLine.line(shell) }
+        return RemoteCommandLine.line(["docker", "exec", "--interactive", containerID] + shell)
     }
 
     /// What the dump reads from standard input before it starts, which holds the password.
@@ -75,14 +75,5 @@ enum DumpCommand {
     /// and `\"` back as the characters.
     static func optionValue(_ value: String) -> String {
         "\"" + value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
-    }
-
-    static func line(_ words: [String]) -> String {
-        words.map(quoted).joined(separator: " ")
-    }
-
-    /// In single quotes, which a POSIX shell reads literally, with any single quote closed, escaped and reopened.
-    static func quoted(_ word: String) -> String {
-        "'" + word.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
     }
 }

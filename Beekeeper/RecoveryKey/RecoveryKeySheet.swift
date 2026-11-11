@@ -26,8 +26,8 @@ struct RecoveryKeySheet: View {
                 .fixedSize(horizontal: false, vertical: true)
                 if isReplacing {
                     Text(
-                        "Recovery files in Mac backups still open with the old key. If it may have leaked, give each server "
-                            + "a new SSH key and change the database and email passwords, since those files hold them."
+                        "Recovery files in Mac backups still open with the old key. If it may have leaked, use Rotate SSH Keys "
+                            + "in Settings and change the database and email passwords, since those files hold them."
                     )
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

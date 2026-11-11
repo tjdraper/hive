@@ -15,6 +15,8 @@ final class HiveLink {
         case connecting
         /// The Hive took a new identity and is restarting, and Beekeeper on its Mac is pairing again.
         case pairingAgain
+        /// The Hive is restarting as the Hive it was restored as, and Beekeeper signs in once it's back.
+        case restarting
         case connected
         case offline
         /// Hive showed a key other than the pinned one. Beekeeper never accepts it without pairing again.
@@ -69,7 +71,7 @@ final class HiveLink {
 
     /// Fetches the overview, which also finds out whether the Hive can be reached and signed in to.
     func refresh() async {
-        guard session != nil else { return }
+        guard session != nil, status != .restarting else { return }
         overview = try? await perform { try await $0.get(HiveEndpoint.overview) }
     }
 
@@ -121,6 +123,35 @@ final class HiveLink {
     func liveUpdates() async throws -> AsyncThrowingStream<LiveUpdate, any Error> {
         try await perform { try await $0.liveUpdates() }
     }
+
+    /// After a restore, Hive restarts as the restored Hive. Signing in before the old one has stopped would
+    /// be turned down, and count as a failed sign-in, so this waits for it to go and come back first.
+    func reconnectAfterRestart() async {
+        expectRestart()
+        guard let session else { return }
+        let stopping = ContinuousClock.now + Self.stopAllowance
+        while ContinuousClock.now < stopping, (try? await session.checkHealth()) != nil {
+            try? await Task.sleep(for: Self.pollInterval)
+        }
+        let starting = ContinuousClock.now + Self.startAllowance
+        while ContinuousClock.now < starting, (try? await session.checkHealth()) == nil {
+            try? await Task.sleep(for: Self.pollInterval)
+        }
+        status = .connecting
+        await refresh()
+    }
+
+    /// Until `reconnectAfterRestart` is done, nothing signs in.
+    func expectRestart() {
+        status = .restarting
+    }
+
+    /// Hive stops a second after answering, once its run has stopped. A restart missed between two checks
+    /// is caught by this running out.
+    private static let stopAllowance = Duration.seconds(15)
+    /// launchd starts a daemon again within seconds.
+    private static let startAllowance = Duration.seconds(60)
+    private static let pollInterval = Duration.milliseconds(200)
 
     /// While Beekeeper on the Hive's Mac pairs again after a new identity. Pairing again connects it.
     func startPairingAgain() {

@@ -152,6 +152,8 @@ extension ConfirmationReason {
         case .identityRegenerated: "give the Hive a new identity"
         case .emailHostChanged: "change the mail server Hive sends email through"
         case .recoveryKeyChanged: "save a recovery key, which opens the Hive's recovery files"
+        case .retentionStarted: "start retention and quotas again, which removes snapshots"
+        case .sshKeysRotated: "give every server a new SSH key, removing the old ones"
         }
     }
 }
