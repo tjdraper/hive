@@ -43,20 +43,20 @@ final class HiveLink {
     init(hive: KnownHive, keychain: DeviceKeychain) {
         hiveID = hive.id
         self.keychain = keychain
-        connect(to: hive.addresses.first)
+        connect(to: hive.addresses)
     }
 
-    /// Starts over with a new session, such as after pairing again or when the port changed.
-    func connect(to address: HiveAddress?) {
+    /// Starts over with a new session, such as after pairing again or when the addresses changed.
+    func connect(to addresses: [HiveAddress]) {
         session = nil
         deviceID = nil
         do {
-            guard let address, let credential = try keychain.credential(for: hiveID) else {
+            guard !addresses.isEmpty, let credential = try keychain.credential(for: hiveID) else {
                 status = .notPaired
                 return
             }
             session = HiveSession(
-                connection: HiveConnection(address: address, pin: credential.pin),
+                connection: HiveConnection(addresses: addresses, pin: credential.pin),
                 hiveID: hiveID,
                 deviceID: credential.deviceID,
                 key: try credential.signingKey()

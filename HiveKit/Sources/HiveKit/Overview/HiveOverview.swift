@@ -5,12 +5,14 @@ public struct HiveOverview: Codable, Hashable, Sendable {
     public let name: String
     public let fullDiskAccess: FullDiskAccessStatus
     public let macSleep: MacSleep
+    public let addresses: HiveAddresses
 
-    public init(hiveID: UUID, name: String, fullDiskAccess: FullDiskAccessStatus, macSleep: MacSleep) {
+    public init(hiveID: UUID, name: String, fullDiskAccess: FullDiskAccessStatus, macSleep: MacSleep, addresses: HiveAddresses) {
         self.hiveID = hiveID
         self.name = name
         self.fullDiskAccess = fullDiskAccess
         self.macSleep = macSleep
+        self.addresses = addresses
     }
 }
 

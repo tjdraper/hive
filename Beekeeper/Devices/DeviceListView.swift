@@ -8,6 +8,7 @@ struct DeviceListView: View {
     @State private var devices: [DeviceSummary] = []
     @State private var failure: String?
     @State private var isConfirmingSelfRevoke = false
+    @State private var isPairing = false
 
     var body: some View {
         Table(devices) {
@@ -47,6 +48,19 @@ struct DeviceListView: View {
                 Text(failure)
                     .foregroundStyle(.secondary)
                     .padding()
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack {
+                Button("Pair a Device…", systemImage: "plus") { isPairing = true }
+                Spacer()
+            }
+            .padding(10)
+            .background(.bar)
+        }
+        .sheet(isPresented: $isPairing) {
+            PairDeviceSheet(hive: hive, link: link) {
+                Task { await load() }
             }
         }
         .confirmationDialog("Revoke this device?", isPresented: $isConfirmingSelfRevoke) {

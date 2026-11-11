@@ -62,6 +62,7 @@ enum HiveDatabaseMigrator {
                 table.add(column: "recoveryFileDigest", .blob)
             }
         }
+        migrator.registerMigration("Add address options", migrate: addAddressOptions)
 
         return migrator
     }
@@ -315,6 +316,15 @@ enum HiveDatabaseMigrator {
             table.column("jobID", .blob).notNull().references("backupJob", onDelete: .cascade)
             table.column("minuteOfDay", .integer).notNull()
             table.primaryKey(["jobID", "minuteOfDay"])
+        }
+    }
+}
+
+extension HiveDatabaseMigrator {
+    static func addAddressOptions(_ database: Database) throws {
+        try database.alter(table: "hive") { table in
+            // `[AddressOption]` as JSON, in the order devices try them.
+            table.add(column: "addressOptions", .text).notNull().defaults(to: "[]")
         }
     }
 }

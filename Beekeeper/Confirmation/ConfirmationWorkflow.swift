@@ -154,6 +154,7 @@ extension ConfirmationReason {
         case .recoveryKeyChanged: "save a recovery key, which opens the Hive's recovery files"
         case .retentionStarted: "start retention and quotas again, which removes snapshots"
         case .sshKeysRotated: "give every server a new SSH key, removing the old ones"
+        case .pairingWindowOpened: "let a new device pair with the Hive, giving it full access"
         }
     }
 }

@@ -55,6 +55,7 @@ struct MainWindow: View {
     @State private var page = HivePage.overview
     @State private var addingServer: AddServerRequest?
     @State private var addingJob: AddJobRequest?
+    @State private var isAddingHive = false
 
     var body: some View {
         NavigationSplitView {
@@ -79,6 +80,13 @@ struct MainWindow: View {
                 }
             }
         }
+        .sheet(isPresented: $isAddingHive) {
+            AddHiveSheet { hiveID in
+                selection = .hive(hiveID)
+            }
+        }
+        .environment(\.addHive, addHive)
+        .focusedSceneValue(\.addHive, addHive)
         .task {
             var retry = Self.firstRetry
             while !Task.isCancelled {
@@ -136,6 +144,10 @@ struct MainWindow: View {
         } else {
             ContentUnavailableView("Choose a Hive", systemImage: "hexagon")
         }
+    }
+
+    private var addHive: AddHiveAction {
+        AddHiveAction { isAddingHive = true }
     }
 
     private func addServer(to hiveID: UUID) {

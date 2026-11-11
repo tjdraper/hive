@@ -10,6 +10,10 @@ public enum LiveUpdate: Codable, Hashable, Sendable {
     /// After every job's status, once connected, then whenever the recovery key changes or a recovery
     /// file is written.
     case recovery(RecoveryKeyState)
+    /// After the recovery key's state, once connected, then whenever the port or the address options
+    /// change. A device connected when the port changes keeps this response on the old port, so it
+    /// hears of the new one.
+    case addresses(HiveAddresses)
     /// Sent while nothing else is, so neither end takes a quiet connection for a dead one.
     case heartbeat
 }

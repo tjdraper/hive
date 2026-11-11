@@ -2,8 +2,8 @@ import Foundation
 import HiveKit
 import ServiceLifecycle
 
-/// One device's live updates: where every job stands and the recovery key's state, then each change as
-/// it happens, until the device's session runs out or ends, or Hive stops.
+/// One device's live updates: where every job stands, the recovery key's state and where devices reach
+/// the Hive, then each change as it happens, until the device's session runs out or ends, or Hive stops.
 struct LiveUpdateStream: Sendable {
     enum Ending: String {
         case sessionEnded
@@ -11,14 +11,17 @@ struct LiveUpdateStream: Sendable {
     }
 
     private enum Signal {
+        /// Written as it is.
+        case update(LiveUpdate)
+        /// Written, followed by the job's new status when it changed one.
         case event(RunEvent)
-        case recovery(RecoveryKeyState)
-        case heartbeat
     }
 
     let events: Broadcaster<RunEvent>
     let statuses: JobStatusReader
     let recovery: RecoveryKeyWorkflow
+    let settings: HiveSettingsStore
+    let addressChanges: Broadcaster<HiveAddresses>
     let heartbeat: Duration
 
     /// `isSignedIn` is checked before every line, so nothing reaches a device once its session has
@@ -28,9 +31,11 @@ struct LiveUpdateStream: Sendable {
         // arrive meanwhile repeat what the statuses show, which leaves them as they were.
         let events = events.listen()
         let recoveryChanges = recovery.files.changes.listen()
+        let addressChanges = addressChanges.listen()
         guard isSignedIn() else { return .sessionEnded }
         try await write(.jobStatuses(statuses.statuses()))
         try await write(.recovery(recovery.state()))
+        try await write(.addresses(settings.settings().addresses))
 
         let (signals, input) = AsyncStream.makeStream(of: Signal.self)
         return try await withThrowingTaskGroup { group in
@@ -41,13 +46,18 @@ struct LiveUpdateStream: Sendable {
             }
             group.addTask {
                 for await state in recoveryChanges {
-                    input.yield(.recovery(state))
+                    input.yield(.update(.recovery(state)))
+                }
+            }
+            group.addTask {
+                for await addresses in addressChanges {
+                    input.yield(.update(.addresses(addresses)))
                 }
             }
             group.addTask { [heartbeat] in
                 while true {
                     try await Task.sleep(for: heartbeat)
-                    input.yield(.heartbeat)
+                    input.yield(.update(.heartbeat))
                 }
             }
             defer { group.cancelAll() }
@@ -55,10 +65,8 @@ struct LiveUpdateStream: Sendable {
             for await signal in signals.cancelOnGracefulShutdown() {
                 guard isSignedIn() else { return .sessionEnded }
                 switch signal {
-                case .heartbeat:
-                    try await write(.heartbeat)
-                case .recovery(let state):
-                    try await write(.recovery(state))
+                case .update(let update):
+                    try await write(update)
                 case .event(let event):
                     try await write(.event(event))
                     if let jobID = event.changedJobState, let status = try await statuses.statuses(ofJob: jobID).first {

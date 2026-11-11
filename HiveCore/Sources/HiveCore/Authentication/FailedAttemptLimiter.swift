@@ -3,6 +3,7 @@ import Synchronization
 
 struct FailedAttemptPolicy: Sendable {
     static let signIn = FailedAttemptPolicy(maximumFailures: 5, window: 15 * 60, lockout: 15 * 60, maximumTracked: 10000)
+    static let pairing = signIn
 
     let maximumFailures: Int
     let window: TimeInterval

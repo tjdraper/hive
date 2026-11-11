@@ -85,7 +85,7 @@ final class JobStatusStore {
         case .event(.queued), .event(.leftQueue), .event(.started):
             // A queued, cancelled or started run is followed by the job's new status.
             break
-        case .heartbeat, .recovery:
+        case .heartbeat, .recovery, .addresses:
             break
         }
     }

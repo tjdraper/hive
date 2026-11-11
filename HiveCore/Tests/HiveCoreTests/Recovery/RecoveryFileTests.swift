@@ -330,6 +330,7 @@ struct RecoveryFileDownloadTests {
         networkAccess: "thisMacOnly",
         listenAddress: nil,
         port: nil,
+        addressOptions: nil,
         backupDrive: nil
     )
 }

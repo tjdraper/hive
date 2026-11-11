@@ -12,11 +12,13 @@ enum OverviewRoutes {
     ) {
         router.get(RouterPath(HiveEndpoint.overview)) { _, _ in
             let access = FullDiskAccessStatus(rawValue: fullDiskAccess().rawValue) ?? .unknown
+            let current = try settings.settings()
             return try await JSONResponse(HiveOverview(
                 hiveID: hiveID,
-                name: settings.settings().name,
+                name: current.name,
                 fullDiskAccess: access,
-                macSleep: macSleep()
+                macSleep: macSleep(),
+                addresses: current.addresses
             ))
         }
     }

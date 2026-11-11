@@ -22,13 +22,15 @@ public struct HiveSettingsStore: Sendable {
 
     public func settings() throws -> HiveSettings {
         try database.writer.read { database in
-            guard let row = try Row.fetchOne(database, sql: "SELECT name, networkAccess, listenAddress, port FROM hive") else {
+            let sql = "SELECT name, networkAccess, listenAddress, port, addressOptions FROM hive"
+            guard let row = try Row.fetchOne(database, sql: sql) else {
                 throw HiveDatabaseError.missingHiveID
             }
             return HiveSettings(
                 name: row["name"],
                 networkAccess: Self.networkAccess(kind: row["networkAccess"], address: row["listenAddress"]),
-                port: row["port"] ?? defaultPort
+                port: row["port"] ?? defaultPort,
+                addressOptions: try Self.addressOptions(from: row["addressOptions"])
             )
         }
     }
@@ -36,10 +38,11 @@ public struct HiveSettingsStore: Sendable {
     /// Saves the settings with an audit entry for each one that changed, all or none of them.
     func save(_ new: HiveSettings, replacing old: HiveSettings, by deviceID: UUID, at date: Date) throws {
         let (kind, address) = Self.stored(new.networkAccess)
+        let options = try Self.stored(new.addressOptions)
         try database.writer.write { database in
             try database.execute(
-                sql: "UPDATE hive SET name = ?, networkAccess = ?, listenAddress = ?, port = ?",
-                arguments: [new.name, kind.rawValue, address, new.port == old.port ? (try currentPort(in: database)) : new.port]
+                sql: "UPDATE hive SET name = ?, networkAccess = ?, listenAddress = ?, port = ?, addressOptions = ?",
+                arguments: [new.name, kind.rawValue, address, new.port == old.port ? (try currentPort(in: database)) : new.port, options]
             )
             for event in Self.changes(from: old, to: new) {
                 try AuditLog.record(event, by: deviceID, at: date, in: database)
@@ -57,7 +60,21 @@ public struct HiveSettingsStore: Sendable {
         if old.name != new.name { events.append(.hiveRenamed(old: old.name, new: new.name)) }
         if old.networkAccess != new.networkAccess { events.append(.networkAccessChanged(old: old.networkAccess, new: new.networkAccess)) }
         if old.port != new.port { events.append(.portChanged(old: old.port, new: new.port)) }
+        if old.addressOptions != new.addressOptions {
+            events.append(.addressOptionsChanged(old: old.addressOptions, new: new.addressOptions))
+        }
         return events
+    }
+
+    static func addressOptions(from json: String) throws -> [AddressOption] {
+        try JSONDecoder().decode([AddressOption].self, from: Data(json.utf8))
+    }
+
+    static func stored(_ options: [AddressOption]) throws -> String {
+        guard let json = String(bytes: try JSONEncoder().encode(options), encoding: .utf8) else {
+            throw EncodingError.invalidValue(options, EncodingError.Context(codingPath: [], debugDescription: "Not UTF-8"))
+        }
+        return json
     }
 
     private static func networkAccess(kind: String, address: String?) -> NetworkAccess {

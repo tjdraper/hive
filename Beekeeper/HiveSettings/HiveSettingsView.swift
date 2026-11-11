@@ -38,6 +38,15 @@ struct HiveSettingsView: View {
 
             networkSection(state: state, draft: draft)
 
+            AddressOptionsSection(
+                options: draft.addressOptions,
+                networkAccess: draft.wrappedValue.settings.networkAccess,
+                suggestedHosts: state.suggestedHosts,
+                hivePort: state.settings.port
+            ) {
+                saveControls(state: state, draft: draft.wrappedValue)
+            }
+
             EmailSection(hive: hive, link: link)
 
             RecoverySection(hive: hive, link: link, copies: recovery)
@@ -49,7 +58,6 @@ struct HiveSettingsView: View {
         .formStyle(.grouped)
     }
 
-    /// Its Save button saves the name too, which has no footer of its own.
     private func networkSection(state: HiveSettingsState, draft: Binding<SettingsDraft>) -> some View {
         Section {
             Picker("Listen on", selection: draft.access) {
@@ -72,22 +80,28 @@ struct HiveSettingsView: View {
         } header: {
             Text("Network")
         } footer: {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(networkFooter(state: state, draft: draft.wrappedValue))
-                    .foregroundStyle(.secondary)
-                HStack {
-                    if let failure {
-                        Text(failure)
-                            .foregroundStyle(.red)
-                    }
-                    Spacer()
-                    Button("Revert") { self.draft = SettingsDraft(state.settings) }
-                        .disabled(!isChanged(state) || isSaving)
-                    Button("Save") { Task { await save(draft.wrappedValue, replacing: state.settings) } }
-                        .keyboardShortcut("s")
-                        .disabled(!isChanged(state) || isSaving)
-                }
+            Text(networkFooter(state: state, draft: draft.wrappedValue))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Saves the name, the network and the addresses for other devices together, since which addresses
+    /// work depends on where Hive listens.
+    private func saveControls(state: HiveSettingsState, draft: SettingsDraft) -> some View {
+        HStack {
+            if let failure {
+                Text(failure)
+                    .foregroundStyle(.red)
             }
+            Spacer()
+            Button("Revert") {
+                self.draft = SettingsDraft(state.settings)
+                failure = nil
+            }
+            .disabled(!isChanged(state) || isSaving)
+            Button("Save") { Task { await save(draft) } }
+                .keyboardShortcut("s")
+                .disabled(!isChanged(state) || isSaving)
         }
     }
 
@@ -102,7 +116,7 @@ struct HiveSettingsView: View {
 
     /// The Mac's addresses, plus the chosen one when the Mac doesn't have it right now.
     private func addressChoices(state: HiveSettingsState, chosen: String) -> [AddressChoice] {
-        var choices = state.interfaces.map { AddressChoice(address: $0.address, label: "\($0.address) (\($0.interface))") }
+        var choices = state.interfaces.map { AddressChoice(address: $0.address, label: $0.choiceLabel) }
         if !chosen.isEmpty, !choices.contains(where: { $0.address == chosen }) {
             choices.insert(AddressChoice(address: chosen, label: "\(chosen) (not on the Mac right now)"), at: 0)
         }
@@ -117,6 +131,9 @@ struct HiveSettingsView: View {
     }
 
     private func networkFooter(state: HiveSettingsState, draft: SettingsDraft) -> String {
+        if draft.port != state.settings.port {
+            return "Devices connected to the Hive when the port changes follow it. Any that aren't have to pair again."
+        }
         switch draft.access {
         case .thisMacOnly:
             return "Only Beekeeper on the Hive's Mac can reach it."
@@ -140,7 +157,7 @@ struct HiveSettingsView: View {
         }
     }
 
-    private func save(_ draft: SettingsDraft, replacing old: HiveSettings) async {
+    private func save(_ draft: SettingsDraft) async {
         isSaving = true
         defer { isSaving = false }
         let new = draft.settings
@@ -150,9 +167,7 @@ struct HiveSettingsView: View {
             self.draft = SettingsDraft(saved.settings)
             failure = nil
             store.rename(hive.id, to: saved.settings.name)
-            if saved.settings.port != old.port {
-                store.changePort(of: hive.id, to: saved.settings.port)
-            }
+            store.follow(hive.id, to: saved.settings.addresses)
         } catch let refused as HiveRequestError {
             failure = (try? JSONDecoder().decode(SettingsRefusal.self, from: refused.body)).map { Self.message(for: $0.problem) }
                 ?? HiveLink.message(for: refused)
@@ -167,6 +182,8 @@ struct HiveSettingsView: View {
         case .invalidPort: "Choose a port from 1024 to 65535."
         case .invalidAddress: "Choose an address another device could reach the Mac at."
         case .portUnavailable: "Something else on the Hive's Mac is using that port."
+        case .invalidAddressOption: "Each address for other devices has to be a name or IP address they could reach, listed once."
+        case .tooManyAddressOptions: "Use at most \(PairingCode.largestAddressCount) addresses for other devices."
         }
     }
 }
@@ -195,10 +212,12 @@ struct SettingsDraft: Equatable {
     var access: Access
     var address: String
     var port: Int
+    var addressOptions: [AddressOption]
 
     init(_ settings: HiveSettings) {
         name = settings.name
         port = settings.port
+        addressOptions = settings.addressOptions
         switch settings.networkAccess {
         case .thisMacOnly:
             access = .thisMacOnly
@@ -218,7 +237,17 @@ struct SettingsDraft: Equatable {
         case .oneAddress: .address(address)
         case .allAddresses: .allAddresses
         }
-        return HiveSettings(name: name, networkAccess: networkAccess, port: port)
+        return HiveSettings(name: name, networkAccess: networkAccess, port: port, addressOptions: addressOptions)
+    }
+}
+
+extension NetworkInterfaceAddress {
+    /// Such as "100.101.102.103 — Tailscale (studio.tail0000.ts.net)", with the BSD name when macOS
+    /// gives the interface no name of its own.
+    var choiceLabel: String {
+        let what = displayName.map { "\($0), \(interface)" } ?? interface
+        let name = hostName.map { " (\($0))" } ?? ""
+        return "\(address) — \(what)\(name)"
     }
 }
 

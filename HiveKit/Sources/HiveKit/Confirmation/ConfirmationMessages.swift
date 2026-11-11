@@ -53,7 +53,8 @@ public struct ConfirmationKeyRegistration: Codable, Hashable, Sendable {
 }
 
 /// Why a change needs the device's confirmation key as well as its session: it sends a secret
-/// somewhere new, deletes snapshots or leads to them being deleted, or unpairs every device.
+/// somewhere new, deletes snapshots or leads to them being deleted, unpairs every device, or lets a
+/// new one pair.
 public enum ConfirmationReason: String, Codable, CaseIterable, Hashable, Sendable {
     case connectionChanged
     case quotaLowered
@@ -70,6 +71,8 @@ public enum ConfirmationReason: String, Codable, CaseIterable, Hashable, Sendabl
     case retentionStarted
     /// Hive removes its old key from every server.
     case sshKeysRotated
+    /// Whoever pairs through it gets full access.
+    case pairingWindowOpened
 }
 
 /// Sent with 428 when a change needs confirming and the request carried none.

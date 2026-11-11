@@ -2,7 +2,7 @@
 /// misread what the other sends, and `oldestCompatible` whenever this build stops understanding a
 /// version of the other side.
 public struct APIVersions: Codable, Hashable, Sendable {
-    public static let thisBuild = APIVersions(current: 1, oldestCompatible: 1)
+    public static let thisBuild = APIVersions(current: 2, oldestCompatible: 2)
 
     public let current: Int
     public let oldestCompatible: Int

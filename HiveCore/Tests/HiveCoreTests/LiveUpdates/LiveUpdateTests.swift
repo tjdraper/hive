@@ -73,6 +73,7 @@ private extension APIFixture {
 
 struct LiveUpdateTests {
     static let noRecoveryKey = RecoveryKeyState(keySavedAt: nil, publicKey: nil, fileWrittenAt: nil, fileDigest: nil)
+    static let noAddressOptions = HiveAddresses(port: APIFixture.defaultPort, options: [])
 
     @Test("Live updates are refused without signing in, with an unknown token, and once the session has run out")
     func refusedWithoutSigningIn() async throws {
@@ -105,10 +106,11 @@ struct LiveUpdateTests {
         let written = WrittenUpdates()
         let api = fixture.api.api
         let stream = LiveUpdateStream(
-            events: fixture.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey, heartbeat: .seconds(3600)
+            events: fixture.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey,
+            settings: api.settingsStore, addressChanges: api.addressChanges, heartbeat: .seconds(3600)
         )
         let following = Task { try await stream.run(isSignedIn: { true }, writing: { written.append($0) }) }
-        try await written.wait { $0.count == 2 }
+        try await written.wait { $0.count == 3 }
 
         // Act
         _ = try await fixture.runNow()
@@ -164,7 +166,7 @@ struct LiveUpdateTests {
 
         // Assert
         #expect(answer.status == .ok)
-        #expect(answer.updates == [.jobStatuses([]), .recovery(Self.noRecoveryKey)])
+        #expect(answer.updates == [.jobStatuses([]), .recovery(Self.noRecoveryKey), .addresses(Self.noAddressOptions)])
     }
 
     @Test("A quiet stream gets heartbeats", .timeLimit(.minutes(1)))
@@ -174,7 +176,8 @@ struct LiveUpdateTests {
         let written = WrittenUpdates()
         let api = fixture.api
         let stream = LiveUpdateStream(
-            events: api.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey, heartbeat: .milliseconds(10)
+            events: api.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey,
+            settings: api.settingsStore, addressChanges: api.addressChanges, heartbeat: .milliseconds(10)
         )
 
         // Act
@@ -208,7 +211,7 @@ struct LiveUpdateTests {
         }
 
         // Assert
-        #expect(answer.updates.count == 2)
+        #expect(answer.updates.count == 3)
         #expect(answer.events.isEmpty)
     }
 
@@ -245,10 +248,11 @@ struct LiveUpdateTests {
         let api = fixture.api
         let written = WrittenUpdates()
         let stream = LiveUpdateStream(
-            events: api.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey, heartbeat: .seconds(3600)
+            events: api.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey,
+            settings: api.settingsStore, addressChanges: api.addressChanges, heartbeat: .seconds(3600)
         )
         let following = Task { try await stream.run(isSignedIn: { true }, writing: { written.append($0) }) }
-        try await written.wait { $0.count == 2 }
+        try await written.wait { $0.count == 3 }
         let first = RecoveryKey()
         let second = RecoveryKey()
 
@@ -257,7 +261,7 @@ struct LiveUpdateTests {
         _ = try await fixture.addServer()
         await api.recoveryFiles.writeIfDue()
         try await fixture.saveRecoveryKey(second)
-        try await written.wait { $0.count == 5 }
+        try await written.wait { $0.count == 6 }
         following.cancel()
 
         // Assert

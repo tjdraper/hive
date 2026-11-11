@@ -42,12 +42,13 @@ struct RestoreTests {
         #expect(try new.auditEvents().first == .restoredFromRecoveryFile(writtenAt: old.signIn.clock.now, serverCount: 1, jobCount: 1))
     }
 
-    @Test("A restored Hive listens on the old Hive's port, and says so")
+    @Test("A restored Hive listens on the old Hive's port, says so, and keeps its address options")
     func keepsPort() async throws {
         // Arrange
         let old = try APIFixture()
         _ = try await old.addEverything()
-        let settings = HiveSettings(name: "Studio Hive", networkAccess: .thisMacOnly, port: 5_000)
+        let options = [AddressOption(host: "studio.tail0000.ts.net"), AddressOption(host: "hive.example.com", port: 443)]
+        let settings = HiveSettings(name: "Studio Hive", networkAccess: .thisMacOnly, port: 5_000, addressOptions: options)
         let changed = try await old.send(.put, HiveEndpoint.settings, json: settings)
         #expect(changed.status == .ok)
         let key = RecoveryKey()
@@ -61,6 +62,7 @@ struct RestoreTests {
         #expect(outcome.port == 5_000)
         #expect(outcome.hiveName == "Studio Hive")
         #expect(try new.settings.settings().port == 5_000)
+        #expect(try new.settings.settings().addressOptions == options)
     }
 
     @Test("A restored Hive writes its recovery files with the same recovery key")

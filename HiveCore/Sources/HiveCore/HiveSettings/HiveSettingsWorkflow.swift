@@ -16,18 +16,27 @@ enum SettingsChangeError: Error, Equatable {
 /// a port that's taken is turned down with nothing changed, and nothing waits for the daemon to restart.
 struct HiveSettingsWorkflow: Sendable {
     static let ports = 1024 ... 65535
+    /// An address option's port can be any, since a port forward or tunnel isn't Hive listening.
+    static let anyPort = 1 ... 65535
 
     private static let logger = Logger(subsystem: HiveLog.subsystem, category: "Settings")
 
     let store: HiveSettingsStore
     let listeners: any ListenerControl
+    let interfaces: @Sendable () -> [NetworkInterfaceAddress]
+    let suggestions: SuggestedHostResolver
+    /// Told the port and address options whenever either changes, for every device's live updates.
+    let addressChanges: Broadcaster<HiveAddresses>
     let now: @Sendable () -> Date
 
     func state() async throws -> HiveSettingsState {
-        HiveSettingsState(
-            settings: try store.settings(),
-            interfaces: NetworkInterfaceList.current(),
-            listeningOn: await listeners.listeningHosts()
+        let settings = try store.settings()
+        let interfaces = await suggestions.described(interfaces())
+        return HiveSettingsState(
+            settings: settings,
+            interfaces: interfaces,
+            listeningOn: await listeners.listeningHosts(),
+            suggestedHosts: suggestions.hosts(for: interfaces)
         )
     }
 
@@ -53,6 +62,7 @@ struct HiveSettingsWorkflow: Sendable {
             throw error
         }
         Self.logger.notice("Changed the settings")
+        if new.addresses != old.addresses { addressChanges.send(new.addresses) }
         return try await state()
     }
 
@@ -68,6 +78,11 @@ struct HiveSettingsWorkflow: Sendable {
         case .thisMacOnly, .allAddresses:
             networkAccess = requested.networkAccess
         }
-        return HiveSettings(name: name, networkAccess: networkAccess, port: requested.port)
+        return HiveSettings(
+            name: name,
+            networkAccess: networkAccess,
+            port: requested.port,
+            addressOptions: try AddressOptionCheck.validated(requested.addressOptions)
+        )
     }
 }

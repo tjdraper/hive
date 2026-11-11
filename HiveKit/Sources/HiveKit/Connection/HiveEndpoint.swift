@@ -9,6 +9,12 @@ public enum HiveEndpoint {
     public static let settings = "/settings"
     /// Newest first. `?before=<entry ID>` gives the page after one already shown.
     public static let auditLog = "/audit-log"
+    /// `POST` opens a pairing window, answering with its `PairingWindow`. Confirmed. `GET` reads its
+    /// `PairingWindowState`, and `DELETE` closes it.
+    public static let pairingWindow = "/pairing-window"
+    /// `POST` a `PairingRequest` to pair a new device through the open window. Answers 404 for every
+    /// request without a good token, as if it weren't there.
+    public static let pairing = "/pairing"
 
     public static let servers = "/servers"
     /// Every server's jobs. A job is added under its server, with `jobs(onServer:)`.

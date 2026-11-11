@@ -22,3 +22,16 @@ public struct HiveAddress: Codable, Hashable, Sendable {
         return components.url
     }
 }
+
+/// Where devices reach a Hive: its own port, which Beekeeper on its Mac uses on `127.0.0.1`, and its
+/// address options with the port each is reached at, for every other device.
+public struct HiveAddresses: Codable, Hashable, Sendable {
+    public let port: Int
+    /// In the order to try them.
+    public let options: [HiveAddress]
+
+    public init(port: Int, options: [HiveAddress]) {
+        self.port = port
+        self.options = options
+    }
+}

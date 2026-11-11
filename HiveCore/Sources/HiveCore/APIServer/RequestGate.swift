@@ -19,6 +19,8 @@ struct RequestGate<Next: HTTPResponder>: HTTPResponder where Next.Context == Hiv
             OpenRoute(method: .get, path: HiveEndpoint.health),
             OpenRoute(method: .post, path: HiveEndpoint.signInChallenge),
             OpenRoute(method: .post, path: HiveEndpoint.signIn),
+            // Answers only a device holding the open window's token.
+            OpenRoute(method: .post, path: HiveEndpoint.pairing),
         ]
     }
 

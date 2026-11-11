@@ -32,16 +32,20 @@ enum RecoveryContentsWriter {
         in database: Database
     ) throws {
         let hive = sealed.hive
+        // Read back before it's stored, since every settings read would fail on options it can't read.
+        let addressOptions = hive.addressOptions
+            .flatMap { try? HiveSettingsStore.addressOptions(from: $0) }
+            .flatMap { try? HiveSettingsStore.stored($0) }
         try database.execute(
             sql: """
             UPDATE hive SET
-                id = ?, createdAt = ?, name = ?, networkAccess = ?, listenAddress = ?, port = ?,
+                id = ?, createdAt = ?, name = ?, networkAccess = ?, listenAddress = ?, port = ?, addressOptions = ?,
                 backupDriveUUID = ?, backupDriveName = ?,
                 recoveryPublicKey = ?, recoveryKeySavedAt = ?, recoveryFileWrittenAt = NULL, recoveryFileDigest = NULL,
                 retentionPausedSince = ?
             """,
             arguments: [
-                hive.id, hive.createdAt, hive.name, hive.networkAccess, hive.listenAddress, hive.port,
+                hive.id, hive.createdAt, hive.name, hive.networkAccess, hive.listenAddress, hive.port, addressOptions ?? "[]",
                 hive.backupDrive?.volumeUUID, hive.backupDrive?.name,
                 recoveryKey.rawRepresentation, date,
                 date,

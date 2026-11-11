@@ -77,6 +77,28 @@ struct PinnedTrustEvaluatorTests {
         #expect(!evaluator.accepts(trust))
     }
 
+    @Test("A pairing code with a wrong key hash refuses the Hive's certificate, and one with the right hash accepts it")
+    func pairingCodePin() throws {
+        // Arrange
+        let trust = try makeTrust(
+            certificate: makeCertificate(key: Certificate.PrivateKey(key), validFrom: now - day, until: now + day),
+            host: "hive.example"
+        )
+        let address = HiveAddress(host: "hive.example", port: 4483)
+        let token = Data(repeating: 9, count: PairingCode.tokenLength)
+        let otherPin = PublicKeyPin(publicKey: P256.Signing.PrivateKey().publicKey)
+        let wrong = PairingCode(hiveID: UUID(), pin: otherPin, token: token, addresses: [address])
+        let right = PairingCode(hiveID: UUID(), pin: PublicKeyPin(publicKey: key.publicKey), token: token, addresses: [address])
+
+        // Act
+        let wrongPin = try #require(PairingCode(text: wrong.text)).pin
+        let rightPin = try #require(PairingCode(text: right.text)).pin
+
+        // Assert
+        #expect(!PinnedTrustEvaluator(pin: wrongPin).accepts(trust))
+        #expect(PinnedTrustEvaluator(pin: rightPin).accepts(trust))
+    }
+
     @Test("A pin is the SHA-256 hash of the key's X9.63 form")
     func pinHashesX963() {
         // Act

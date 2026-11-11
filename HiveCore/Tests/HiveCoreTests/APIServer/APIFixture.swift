@@ -205,6 +205,9 @@ struct APIFixture {
     /// and writes its recovery file.
     let keyFolder: TemporaryDirectory
     let identityKeys: HiveKeyStore
+    /// The identity key's, which pairing codes carry.
+    let pin: PublicKeyPin
+    let hostNames = FakeHostNaming()
     let restart = HiveRestart(delay: .zero)
     /// The fixture device's confirmation key, a software key in place of the Secure Enclave's.
     let confirmationKey = P256.Signing.PrivateKey()
@@ -234,7 +237,7 @@ struct APIFixture {
         auditLog = AuditLog(database: signIn.database)
         keyFolder = try TemporaryDirectory()
         identityKeys = HiveKeyStore(directory: keyFolder.url, factory: SoftwareKeyFactory(), owner: getuid())
-        _ = try identityKeys.loadOrCreate()
+        pin = PublicKeyPin(publicKey: try identityKeys.loadOrCreate().identity.publicKey)
         // Straight into the store, so tests' audit logs start with only what they do.
         try signIn.database.writer.write { [confirmationKey] database in
             try database.execute(
@@ -245,6 +248,7 @@ struct APIFixture {
         let clock = signIn.clock
         api = HiveAPI(
             hiveID: signIn.hiveID,
+            pin: pin,
             database: signIn.database,
             dataDirectory: keyFolder.url,
             signIn: signIn.workflow,
@@ -258,6 +262,7 @@ struct APIFixture {
             ssh: ssh,
             hostKeyScanner: ssh,
             addresses: { [addresses] in addresses.current },
+            hostNaming: hostNames,
             volumes: volumes,
             rsync: RsyncRunner(rsync: TestRsync.url),
             dumps: DatabaseDumpRunner(localSearchPath: dumpSearchPath),

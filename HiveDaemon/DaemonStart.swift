@@ -24,9 +24,11 @@ enum DaemonStart {
             let hiveID = try database.hiveID()
             let settings = HiveSettingsStore(database: database, defaultPort: APIServer.defaultPort(for: mode))
             let listeners = ListenerCoordinator(target: try settings.settings().listenTarget)
+            let pin = PublicKeyPin(publicKey: keys.identity.publicKey)
 
             let api = HiveAPI(
                 hiveID: hiveID,
+                pin: pin,
                 database: database,
                 dataDirectory: started.dataDirectory,
                 settings: settings,
@@ -41,7 +43,7 @@ enum DaemonStart {
                 beekeeperSigningIdentifier: info.beekeeperSigningIdentifier,
                 workflow: LocalPairingWorkflow(
                     hiveID: hiveID,
-                    pin: PublicKeyPin(publicKey: keys.identity.publicKey),
+                    pin: pin,
                     settings: settings,
                     devices: DeviceStore(database: database),
                     isRestarting: { api.isRestarting }

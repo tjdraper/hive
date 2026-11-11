@@ -6,6 +6,16 @@ extension AuditEvent {
         switch self {
         case .pairedOnHiveMac:
             "Paired as Beekeeper on the Hive's Mac"
+        case .pairingWindowOpened:
+            "Opened a pairing window for a new device"
+        case .pairingWindowClosed:
+            "Closed the pairing window before a device used it"
+        case .pairedWithCode(_, let openedByName):
+            "Paired with a code from “\(openedByName)”"
+        case .addressOptionsChanged(_, let new) where new.isEmpty:
+            "Removed every address for other devices"
+        case .addressOptionsChanged(_, let new):
+            "Changed the addresses for other devices to \(new.map(\.summary).formatted(.list(type: .and)))"
         case .deviceRevoked(_, let deviceName):
             "Revoked “\(deviceName)”"
         case .hiveRenamed(let old, let new):
@@ -44,6 +54,12 @@ extension AuditEvent {
         case .retentionStarted:
             "Started retention and quotas again after a restore"
         }
+    }
+}
+
+extension AddressOption {
+    var summary: String {
+        port.map { "\(host) port \($0)" } ?? host
     }
 }
 

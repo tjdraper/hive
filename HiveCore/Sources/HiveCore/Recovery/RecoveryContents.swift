@@ -20,6 +20,8 @@ struct RecoveryContents: Codable, Equatable {
         let listenAddress: String?
         /// Nil while it's the default.
         let port: Int?
+        /// `[AddressOption]` as the store keeps it. Missing from files written before there were any.
+        let addressOptions: String?
         /// Chosen again after a restore, since a drive restored from a Mac backup has a new volume UUID.
         let backupDrive: BackupDrive?
     }

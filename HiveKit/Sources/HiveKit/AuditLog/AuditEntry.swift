@@ -21,6 +21,13 @@ public struct AuditEntry: Codable, Hashable, Identifiable, Sendable {
 public enum AuditEvent: Codable, Hashable, Sendable {
     /// The device that made the change is the one that paired, as Beekeeper on the Hive Mac.
     case pairedOnHiveMac
+    /// A device opened a pairing window, which lasts a few minutes and lets one device pair.
+    case pairingWindowOpened
+    /// A device closed the pairing window it opened before anyone used it.
+    case pairingWindowClosed
+    /// The device that made the change is the one that paired, through a window opened by `openedBy`.
+    case pairedWithCode(openedBy: UUID, openedByName: String)
+    case addressOptionsChanged(old: [AddressOption], new: [AddressOption])
     case deviceRevoked(deviceID: UUID, deviceName: String)
     case hiveRenamed(old: String, new: String)
     case networkAccessChanged(old: NetworkAccess, new: NetworkAccess)

@@ -122,6 +122,16 @@ struct ConfirmedRouteTests {
             }
             return deletion(HiveEndpoint.retentionPause, other: HiveEndpoint.retentionPause + "/", accepted: .noContent)
         },
+        ConfirmedRequestCase(testDescription: "opening a pairing window", reason: .pairingWindowOpened) { fixture in
+            try fixture.setAddressOptions()
+            return ConfirmedRequestCase.Request(
+                method: .post,
+                path: HiveEndpoint.pairingWindow,
+                body: Data(),
+                otherPath: HiveEndpoint.pairingWindow + "/",
+                accepted: .created
+            )
+        },
         ConfirmedRequestCase(testDescription: "rotating SSH keys", reason: .sshKeysRotated) { _ in
             ConfirmedRequestCase.Request(
                 method: .post,

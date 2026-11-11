@@ -71,6 +71,8 @@ struct RequestGateTests {
             HiveEndpoint.jobLog,
             HiveEndpoint.recoveryKey,
             HiveEndpoint.recoveryFile,
+            HiveEndpoint.pairingWindow,
+            "/pairing/",
         ]
     )
     func otherPathsAreRefused(path: String) async throws {
@@ -94,6 +96,9 @@ struct RequestGateTests {
             (HiveEndpoint.signInChallenge, .get),
             (HiveEndpoint.signIn, .get),
             (HiveEndpoint.signIn, .put),
+            (HiveEndpoint.pairing, .get),
+            (HiveEndpoint.pairing, .put),
+            (HiveEndpoint.pairing, .delete),
         ]
     )
     func otherMethodsAreRefused(path: String, method: HTTPRequest.Method) async throws {
@@ -112,6 +117,8 @@ struct RequestGateTests {
             (HiveEndpoint.settings, HTTPRequest.Method.put),
             (HiveEndpoint.device(UUID()), .delete),
             (HiveEndpoint.devices, .delete),
+            (HiveEndpoint.pairingWindow, .post),
+            (HiveEndpoint.pairingWindow, .delete),
         ]
     )
     func changesAreRefused(path: String, method: HTTPRequest.Method) async throws {

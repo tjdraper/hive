@@ -4,6 +4,8 @@ import HiveKit
 /// Everything the API's routes work with.
 public struct HiveAPI: Sendable {
     let hiveID: UUID
+    /// The identity key's, which pairing codes carry.
+    let pin: PublicKeyPin
     let signIn: SignInWorkflow
     let settingsStore: HiveSettingsStore
     let settings: HiveSettingsWorkflow
@@ -11,6 +13,11 @@ public struct HiveAPI: Sendable {
     let jobs: BackupJobWorkflow
     /// The Hive Mac's addresses, read fresh each time.
     let addresses: @Sendable () -> [NetworkInterfaceAddress]
+    /// The port and address options, each time either changes.
+    let addressChanges = Broadcaster<HiveAddresses>()
+    let pairingWindows = PairingWindowStore()
+    /// Kept for as long as Hive runs, so failures count across requests.
+    let pairingLimiter = FailedAttemptLimiter<ClientAddress>(policy: .pairing)
     let hostKeys: HostKeyWorkflow
     let connectionTest: ConnectionTestWorkflow
     let backupDrive: BackupDriveWorkflow
@@ -56,6 +63,31 @@ public struct HiveAPI: Sendable {
 
     var devices: DeviceStore {
         signIn.devices
+    }
+
+    var pairingWindow: PairingWindowWorkflow {
+        PairingWindowWorkflow(
+            hiveID: hiveID,
+            pin: pin,
+            settings: settingsStore,
+            database: servers.store.database,
+            windows: pairingWindows,
+            isRestarting: { [restart] in restart.isRequested },
+            now: signIn.now
+        )
+    }
+
+    var codePairing: CodePairingWorkflow {
+        CodePairingWorkflow(
+            settings: settingsStore,
+            devices: signIn.devices,
+            windows: pairingWindows,
+            limiter: pairingLimiter,
+            apiVersions: signIn.apiVersions,
+            hiveID: hiveID,
+            isRestarting: { [restart] in restart.isRequested },
+            now: signIn.now
+        )
     }
 
     var revocation: DeviceRevocationWorkflow {
@@ -116,6 +148,7 @@ public struct HiveAPI: Sendable {
     /// written in `dataDirectory`.
     public init(
         hiveID: UUID,
+        pin: PublicKeyPin,
         database: HiveDatabase,
         dataDirectory: URL,
         settings: HiveSettingsStore,
@@ -127,6 +160,7 @@ public struct HiveAPI: Sendable {
         let devices = DeviceStore(database: database)
         self.init(
             hiveID: hiveID,
+            pin: pin,
             database: database,
             dataDirectory: dataDirectory,
             signIn: SignInWorkflow(hiveID: hiveID, devices: devices, sessions: SessionStore()),
@@ -140,6 +174,7 @@ public struct HiveAPI: Sendable {
             ssh: SSHRunner(),
             hostKeyScanner: HostKeyScanner(),
             addresses: { NetworkInterfaceList.current() },
+            hostNaming: SystemHostNaming(),
             volumes: MountedVolumeList(),
             rsync: RsyncRunner(rsync: rsync),
             dumps: DatabaseDumpRunner(),
@@ -156,6 +191,7 @@ public struct HiveAPI: Sendable {
 
     init(
         hiveID: UUID,
+        pin: PublicKeyPin,
         database: HiveDatabase,
         dataDirectory: URL,
         signIn: SignInWorkflow,
@@ -169,6 +205,7 @@ public struct HiveAPI: Sendable {
         ssh: any SSHRunning,
         hostKeyScanner: any HostKeyScanning,
         addresses: @escaping @Sendable () -> [NetworkInterfaceAddress],
+        hostNaming: any HostNaming,
         volumes: any VolumeListing,
         rsync: RsyncRunner,
         dumps: DatabaseDumpRunner,
@@ -182,9 +219,13 @@ public struct HiveAPI: Sendable {
         now: @escaping @Sendable () -> Date
     ) {
         self.hiveID = hiveID
+        self.pin = pin
         self.signIn = signIn
         self.settingsStore = settingsStore
-        settings = HiveSettingsWorkflow(store: settingsStore, listeners: listeners, now: now)
+        settings = HiveSettingsWorkflow(
+            store: settingsStore, listeners: listeners, interfaces: addresses,
+            suggestions: SuggestedHostResolver(naming: hostNaming), addressChanges: addressChanges, now: now
+        )
         let servers = ServerStore(database: database)
         self.servers = ServerWorkflow(store: servers, sealer: sealer, now: now)
         let schedule = ScheduleCalendar(calendar: calendar)
@@ -198,15 +239,8 @@ public struct HiveAPI: Sendable {
         backupDrive = BackupDriveWorkflow(store: drives.store, volumes: volumes, hiveID: hiveID, now: now)
         runs = BackupRunCoordinator(
             workflow: BackupRunWorkflow(
-                hiveID: hiveID,
-                database: database,
-                drives: drives,
-                targets: connectionTest.targets,
-                rsync: rsync,
-                dumps: dumps,
-                passwords: DatabasePasswordLoader(database: database, sealer: sealer),
-                origin: origin,
-                now: now
+                hiveID: hiveID, database: database, drives: drives, targets: connectionTest.targets, rsync: rsync, dumps: dumps,
+                passwords: DatabasePasswordLoader(database: database, sealer: sealer), origin: origin, now: now
             ),
             retention: RetentionWorkflow(database: database, drives: drives, calendar: calendar, now: now),
             sleep: sleepPrevention,

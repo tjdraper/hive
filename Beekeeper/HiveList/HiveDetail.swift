@@ -89,6 +89,7 @@ private struct HiveProblemView: View {
     let link: HiveLink
 
     @Environment(HiveListStore.self) private var store
+    @Environment(\.addHive) private var addHive
     @State private var isConfirmingRemoval = false
 
     var body: some View {
@@ -118,7 +119,10 @@ private struct HiveProblemView: View {
                 }
             }
             #endif
-            if link.status != .identityChanged {
+            if !hive.isOnThisMac {
+                Button("Pair Again with a Code…") { addHive?() }
+            }
+            if link.status != .identityChanged || !hive.isOnThisMac {
                 Button("Remove from Beekeeper…") { isConfirmingRemoval = true }
             }
         case .connecting, .pairingAgain, .restarting, .connected, .needsUpdate:
@@ -155,10 +159,15 @@ private struct HiveProblemView: View {
         switch link.status {
         case .offline:
             "Check that the Hive's Mac is on and Hive is running."
-        case .identityChanged:
+        case .identityChanged where hive.isOnThisMac:
             "It showed a different key from the one this device paired with. Beekeeper won't connect to it until you pair again."
-        case .notRecognized:
+        case .identityChanged:
+            "It showed a different key from the one this device paired with. Beekeeper won't connect to it until you pair "
+                + "again, with a code from a device that's paired with it now."
+        case .notRecognized where hive.isOnThisMac:
             "This device may have been revoked from another one. Pair again to manage this Hive."
+        case .notRecognized:
+            "This device may have been revoked from another one. Pair again with a code from a device that's still paired."
         case .notPaired:
             "This device isn't paired with this Hive any more."
         case .lockedOut:

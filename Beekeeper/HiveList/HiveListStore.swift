@@ -55,7 +55,10 @@ final class HiveListStore {
     private func refresh(_ id: UUID) async {
         guard let link = links[id] else { return }
         await link.refresh()
-        if let name = link.overview?.name { rename(id, to: name) }
+        if let overview = link.overview {
+            rename(id, to: overview.name)
+            follow(id, to: overview.addresses)
+        }
         if link.status == .connected { await serverLists[id]?.refresh() }
     }
 
@@ -66,7 +69,9 @@ final class HiveListStore {
         serverLists[hive.id] = servers
         let recovery = RecoveryFileCopies(hiveID: hive.id, hiveName: hive.name, link: link)
         recoveryFiles[hive.id] = recovery
-        let follower = LiveUpdateFollower(link: link, statuses: servers.statuses, recovery: recovery)
+        let follower = LiveUpdateFollower(link: link, statuses: servers.statuses, recovery: recovery) { [weak self] addresses in
+            self?.follow(hive.id, to: addresses)
+        }
         liveUpdates[hive.id] = Task { await follower.follow() }
     }
 
@@ -83,12 +88,40 @@ final class HiveListStore {
         file.save(hives)
     }
 
-    /// After the Hive's port changed, so the next request goes to the new one.
-    func changePort(of id: UUID, to port: Int) {
+    /// Keeps up with the Hive's port and address options, whichever device changed them, so the next
+    /// request goes where the Hive is now. A Hive with no address options leaves the ones this device
+    /// has, since it's reaching the Hive through them.
+    func follow(_ id: UUID, to addresses: HiveAddresses) {
         guard let index = hives.firstIndex(where: { $0.id == id }) else { return }
-        hives[index].addresses = hives[index].addresses.map { HiveAddress(host: $0.host, port: port) }
+        let new = hives[index].isOnThisMac ? [HiveAddress(host: "127.0.0.1", port: addresses.port)] : addresses.options
+        guard !new.isEmpty, new != hives[index].addresses else { return }
+        hives[index].addresses = new
         file.save(hives)
-        links[id]?.connect(to: hives[index].addresses.first)
+        links[id]?.connect(to: new)
+        Self.logger.notice("Followed a Hive to new addresses")
+    }
+
+    /// Pairs with a Hive through a pairing code from a device already paired with it, and returns its ID.
+    /// Pairing again with a Hive already in the list, such as one whose identity changed, replaces it.
+    func pairWithCode(_ code: PairingCode, deviceName: String) async throws -> UUID {
+        let result = try await CodePairingWorkflow(keychain: keychain).pair(code, deviceName: deviceName)
+        let addresses = result.addresses.options.isEmpty ? code.addresses : result.addresses.options
+
+        if let index = hives.firstIndex(where: { $0.id == result.hiveID }) {
+            hives[index].name = result.hiveName
+            if !hives[index].isOnThisMac { hives[index].addresses = addresses }
+            links[result.hiveID]?.connect(to: hives[index].addresses)
+        } else {
+            let hive = KnownHive(id: result.hiveID, name: result.hiveName, addresses: addresses, isOnThisMac: false)
+            hives.append(hive)
+            track(hive)
+            newlyPaired.insert(hive.id)
+        }
+        file.save(hives)
+        Self.logger.notice("Saved a Hive paired with a code in the list")
+
+        await refresh(result.hiveID)
+        return result.hiveID
     }
 
     /// Takes a Hive this device is no longer paired with off the list. Its recovery files stay, since
@@ -98,6 +131,25 @@ final class HiveListStore {
         untrack(id)
         try? keychain.delete(hiveID: id)
         file.save(hives)
+    }
+
+    /// Revokes this device on the Hive when it can, so the Hive's device list doesn't keep a device that
+    /// no longer has a key, then takes the Hive off the list. Returns whether the Hive revoked it.
+    @discardableResult
+    func removeRevokingThisDevice(_ id: UUID) async -> Bool {
+        var revoked = false
+        if let link = links[id], link.status == .connected, let deviceID = link.deviceID {
+            do {
+                try await link.perform { try await $0.delete(HiveEndpoint.device(deviceID)) }
+                revoked = true
+            } catch {
+                let kind = String(describing: type(of: error))
+                Self.logger.error("Couldn't revoke this device before removing a Hive: \(kind, privacy: .public)")
+            }
+        }
+        remove(id)
+        Self.logger.notice("Removed a Hive from the list, revoked on the Hive: \(revoked, privacy: .public)")
+        return revoked
     }
 
     private func untrack(_ id: UUID) {
@@ -127,7 +179,7 @@ final class HiveListStore {
                     try? await Task.sleep(for: .seconds(2))
                 } catch {
                     Self.logger.error("Couldn't pair again after a new identity: \(String(describing: error), privacy: .public)")
-                    link.connect(to: hive(id)?.addresses.first)
+                    link.connect(to: hive(id)?.addresses ?? [])
                     return
                 }
             }
@@ -194,7 +246,7 @@ final class HiveListStore {
 
         if let index = hives.firstIndex(where: { $0.id == pairing.hiveID }) {
             hives[index].addresses = [address]
-            links[pairing.hiveID]?.connect(to: address)
+            links[pairing.hiveID]?.connect(to: [address])
         } else {
             let hive = KnownHive(id: pairing.hiveID, name: "This Mac's Hive", addresses: [address], isOnThisMac: true)
             hives.append(hive)

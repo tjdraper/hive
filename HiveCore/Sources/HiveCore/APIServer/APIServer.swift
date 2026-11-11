@@ -61,6 +61,7 @@ public struct APIServer: Sendable {
             macSleep: api.macSleep
         )
         DeviceRoutes.add(to: router, devices: api.devices, revocation: api.revocation)
+        PairingRoutes.add(to: router, windows: api.pairingWindow, pairing: api.codePairing, confirmations: api.confirmations)
         ConfirmationRoutes.add(to: router, verifier: api.confirmations)
         IdentityRoutes.add(to: router, workflow: api.identity, confirmations: api.confirmations)
         SettingsRoutes.add(to: router, workflow: api.settings)
@@ -87,6 +88,8 @@ public struct APIServer: Sendable {
                 events: api.runs.events,
                 statuses: api.jobStatus,
                 recovery: api.recoveryKey,
+                settings: api.settingsStore,
+                addressChanges: api.addressChanges,
                 heartbeat: api.liveUpdateHeartbeat
             ),
             signIn: api.signIn

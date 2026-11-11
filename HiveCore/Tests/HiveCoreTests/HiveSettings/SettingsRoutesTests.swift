@@ -24,6 +24,10 @@ struct SettingsRoutesTests {
         }
     }
 
+    private static func withOptions(_ options: [AddressOption]) -> HiveSettings {
+        HiveSettings(name: "Hive", networkAccess: .allAddresses, port: 4483, addressOptions: options)
+    }
+
     private var current: HiveSettings {
         get throws { try fixture.settings.settings() }
     }
@@ -99,6 +103,100 @@ struct SettingsRoutesTests {
         #expect(fixture.listeners.applied == [ListenTarget(networkAccess: .allAddresses, port: 5000)])
     }
 
+    @Test("Address options are saved in one written form, in order, and recorded")
+    func savesAddressOptions() async throws {
+        // Arrange
+        var settings = try current
+        settings.addressOptions = [
+            AddressOption(host: " Studio.tail0000.ts.net. "),
+            AddressOption(host: "[FD7A:115C:A1E0::1]"),
+            AddressOption(host: "hive.example.com", port: 443),
+        ]
+        let expected = [
+            AddressOption(host: "studio.tail0000.ts.net"),
+            AddressOption(host: "fd7a:115c:a1e0::1"),
+            AddressOption(host: "hive.example.com", port: 443),
+        ]
+
+        // Act
+        let (status, _) = try await put(settings)
+
+        // Assert
+        #expect(status == .ok)
+        #expect(try current.addressOptions == expected)
+        #expect(try fixture.auditEvents().first == .addressOptionsChanged(old: [], new: expected))
+        #expect(fixture.listeners.applied.isEmpty)
+    }
+
+    @Test("A device's live updates hear of a new port or address options as they're saved")
+    func changesReachLiveUpdates() async throws {
+        // Arrange
+        let changes = fixture.api.addressChanges.listen()
+        var settings = try current
+        settings.port = 5000
+        settings.addressOptions = [AddressOption(host: "hive.example.com"), AddressOption(host: "tunnel.example.net", port: 31337)]
+
+        // Act
+        _ = try await put(settings)
+
+        // Assert
+        var iterator = changes.makeAsyncIterator()
+        #expect(await iterator.next() == HiveAddresses(port: 5000, options: [
+            HiveAddress(host: "hive.example.com", port: 5000),
+            HiveAddress(host: "tunnel.example.net", port: 31337),
+        ]))
+    }
+
+    @Test("Hive suggests where other devices could reach it, by name as well as by address, with what each is")
+    func suggestsHosts() async throws {
+        // Act
+        let state = try await fixture.api.settings.state()
+
+        // Assert
+        #expect(state.suggestedHosts == [
+            SuggestedHost(host: "studio.local", label: "This Mac's name on the local network", address: nil),
+            SuggestedHost(host: "192.168.1.20", label: "Wi-Fi", address: "192.168.1.20"),
+            SuggestedHost(host: "studio.tail0000.ts.net", label: "Tailscale name", address: "100.64.0.7"),
+            SuggestedHost(host: "100.64.0.7", label: "Tailscale", address: "100.64.0.7"),
+        ])
+    }
+
+    @Test(
+        "A suggestion is only offered where Hive listens: its own address, or any for all of them",
+        arguments: [
+            (NetworkAccess.thisMacOnly, [String]()),
+            (.address("100.64.0.7"), ["studio.tail0000.ts.net", "100.64.0.7"]),
+            (.address("192.168.1.99"), []),
+            (.allAddresses, ["studio.local", "192.168.1.20", "studio.tail0000.ts.net", "100.64.0.7"]),
+        ]
+    )
+    func suggestionsFollowListening(access: NetworkAccess, expected: [String]) async throws {
+        // Act
+        let state = try await fixture.api.settings.state()
+
+        // Assert
+        #expect(state.suggestedHosts.filter { $0.isReachable(through: access) }.map(\.host) == expected)
+    }
+
+    @Test("Each of the Mac's addresses says what it is: Tailscale's as Tailscale, others as macOS names them, if it does")
+    func labelsInterfaces() async throws {
+        // Arrange
+        fixture.addresses.set([
+            NetworkInterfaceAddress(interface: "en0", address: "192.168.1.20"),
+            NetworkInterfaceAddress(interface: "utun4", address: "100.64.0.7"),
+            NetworkInterfaceAddress(interface: "utun4", address: "fd7a:115c:a1e0::7"),
+            NetworkInterfaceAddress(interface: "utun2", address: "100.200.0.1"),
+            NetworkInterfaceAddress(interface: "bridge100", address: "192.168.139.3"),
+        ])
+
+        // Act
+        let state = try await fixture.api.settings.state()
+
+        // Assert
+        #expect(state.interfaces.map(\.displayName) == ["Wi-Fi", "Tailscale", "Tailscale", nil, nil])
+        #expect(state.interfaces.map(\.hostName) == [nil, "studio.tail0000.ts.net", nil, nil, nil])
+    }
+
     @Test("Sending the settings unchanged records nothing")
     func unchangedRecordsNothing() async throws {
         // Arrange
@@ -121,6 +219,18 @@ struct SettingsRoutesTests {
             (HiveSettings(name: "Hive", networkAccess: .allAddresses, port: 65536), .invalidPort),
             (HiveSettings(name: "Hive", networkAccess: .address("127.0.0.1"), port: 4483), .invalidAddress),
             (HiveSettings(name: "Hive", networkAccess: .address("hive.example.com"), port: 4483), .invalidAddress),
+            (Self.withOptions([AddressOption(host: "https://hive.example.com")]), .invalidAddressOption),
+            (Self.withOptions([AddressOption(host: "hive.example.com/path")]), .invalidAddressOption),
+            (Self.withOptions([AddressOption(host: "-hive.example.com")]), .invalidAddressOption),
+            (Self.withOptions([AddressOption(host: "300.1.1.1")]), .invalidAddressOption),
+            (Self.withOptions([AddressOption(host: "127.0.0.1")]), .invalidAddressOption),
+            (Self.withOptions([AddressOption(host: "fe80::1")]), .invalidAddressOption),
+            (Self.withOptions([AddressOption(host: "localhost")]), .invalidAddressOption),
+            (Self.withOptions([AddressOption(host: "")]), .invalidAddressOption),
+            (Self.withOptions([AddressOption(host: "hive.example.com", port: 0)]), .invalidAddressOption),
+            (Self.withOptions([AddressOption(host: "hive.example.com", port: 65536)]), .invalidAddressOption),
+            (Self.withOptions([AddressOption(host: "hive.example.com"), AddressOption(host: "Hive.Example.com.")]), .invalidAddressOption),
+            (Self.withOptions((1 ... 9).map { AddressOption(host: "hive\($0).example.com") }), .tooManyAddressOptions),
         ]
     )
     func refusesInvalidChange(settings: HiveSettings, problem: SettingsProblem) async throws {

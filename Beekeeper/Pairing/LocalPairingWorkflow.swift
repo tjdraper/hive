@@ -22,7 +22,7 @@ struct LocalPairingWorkflow {
         let key = try DeviceCredential.makeSigningKey()
         let request = LocalPairingRequest(
             devicePublicKey: key.publicKey.x963Representation,
-            deviceName: Host.current().localizedName ?? "Mac"
+            deviceName: ThisDevice.name
         )
 
         let result: LocalPairingResult

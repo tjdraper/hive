@@ -15,7 +15,9 @@ enum RecoveryContentsReader {
     }
 
     private static func hive(in database: Database) throws -> RecoveryContents.Hive {
-        let sql = "SELECT id, createdAt, name, networkAccess, listenAddress, port, backupDriveUUID, backupDriveName FROM hive"
+        let sql = """
+        SELECT id, createdAt, name, networkAccess, listenAddress, port, addressOptions, backupDriveUUID, backupDriveName FROM hive
+        """
         guard let row = try Row.fetchOne(database, sql: sql) else { throw HiveDatabaseError.missingHiveID }
         let driveUUID: String? = row["backupDriveUUID"]
         return RecoveryContents.Hive(
@@ -25,6 +27,7 @@ enum RecoveryContentsReader {
             networkAccess: row["networkAccess"],
             listenAddress: row["listenAddress"],
             port: row["port"],
+            addressOptions: row["addressOptions"],
             backupDrive: driveUUID.map { RecoveryContents.BackupDrive(volumeUUID: $0, name: row["backupDriveName"] ?? "") }
         )
     }
