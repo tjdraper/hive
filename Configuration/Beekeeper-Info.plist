@@ -14,5 +14,16 @@
 	<string>$(UPDATES_PUBLIC_KEY)</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
+	<!--
+	ATS runs the system's trust check even after PinnedTaskDelegate accepts the Hive's pinned key, and
+	refuses its self-signed certificate at any address but loopback and private LAN ranges, such as
+	Tailscale's. Exception domains can't name IP addresses or hosts the user types in, so ATS is off.
+	HiveAddress only builds https URLs, and HiveConnection requires TLS 1.3.
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

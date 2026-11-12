@@ -15,3 +15,8 @@ The first slice that touches real servers and the real backup drive. Each step a
 7. **Leave your own SSH key on the servers.** The PHP version logs in with your personal `~/.ssh/id_rsa`, so removing "its" key would lock you out.
 
 **Done when:** every site from `site-backups` is backed up by Hive on schedule, the restored dumps check out, and the PHP version is off.
+
+## Follow-ups
+
+- **Beekeeper doesn't move itself to Applications.** Opened from Downloads, it just runs there. macOS runs an app opened in place from Downloads from a read-only, randomized path (App Translocation), and Sparkle can't update it there. Offer to move it to `/Applications` on first launch.
+- **Beekeeper can't reach a Hive at a Tailscale address.** Pairing Karrin with Ivy's Hive at `100.115.153.27` failed with `URLError -1200`. The pin check accepted the key, then App Transport Security ran the system's own trust check and refused the self-signed certificate (`ATS failed system trust`). ATS skips `127.0.0.1` and, it seems, private LAN addresses, but Tailscale's `100.64.0.0/10` isn't one of them. G1's tailnet sign-in probably went over the LAN. Fixed by turning ATS off in Beekeeper's `Info.plist`, since Hive addresses are whatever the user enters; Karrin then paired over Tailscale in an installed build. Ships in the next release.
