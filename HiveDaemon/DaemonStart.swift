@@ -16,9 +16,7 @@ enum DaemonStart {
             let started = try DaemonStartupWorkflow(mode: mode).run()
             let keyStore = HiveKeyStore(directory: started.dataDirectory)
             let keys = try keyStore.loadOrCreate()
-            try HiveKeyCheck(directory: started.dataDirectory).run(keys)
-            let certificate = try IdentityCertificateStore(directory: started.dataDirectory).loadOrIssue(for: keys.identity)
-            let identity = TLSIdentity(key: keys.identity, certificate: certificate)
+            let identity = try checkedIdentity(for: keys, in: started.dataDirectory)
 
             let database = try HiveDatabase.open(in: started.dataDirectory, defaultHiveName: defaultHiveName())
             let hiveID = try database.hiveID()
@@ -35,7 +33,9 @@ enum DaemonStart {
                 listeners: listeners,
                 sealer: SecretSealer(key: keys.storage),
                 identityKeys: keyStore,
-                rsync: bundledRsync()
+                rsync: bundledRsync(),
+                version: info.version,
+                executable: executable
             )
             server = try APIServer(api: api, identity: identity, listeners: listeners)
             pairing = try LocalPairingListener(
@@ -65,9 +65,20 @@ enum DaemonStart {
         }
     }
 
+    private static var executable: URL {
+        Bundle.main.executableURL ?? URL(filePath: CommandLine.arguments[0])
+    }
+
+    /// Checks the keys work before anything relies on them (§7), and makes the TLS identity from them.
+    private static func checkedIdentity(for keys: HiveKeys, in dataDirectory: URL) throws -> TLSIdentity {
+        try HiveKeyCheck(directory: dataDirectory).run(keys)
+        let certificate = try IdentityCertificateStore(directory: dataDirectory).loadOrIssue(for: keys.identity)
+        return TLSIdentity(key: keys.identity, certificate: certificate)
+    }
+
     /// Hive still starts without it, so Beekeeper can show the runs failing rather than a Hive that's offline.
     private static func bundledRsync() -> URL {
-        let rsync = BundledRsync.url(besideExecutable: Bundle.main.executableURL ?? URL(filePath: CommandLine.arguments[0]))
+        let rsync = BundledRsync.url(besideExecutable: executable)
         if !BundledRsync.isPresent(at: rsync) {
             logger.fault("The bundled rsync is missing from Hive.app, so every backup will fail")
         }

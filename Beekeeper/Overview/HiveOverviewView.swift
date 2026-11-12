@@ -33,6 +33,10 @@ struct HiveOverviewView: View {
             if let overview = link.overview, overview.fullDiskAccess != .granted {
                 FullDiskAccessWarning(isOnThisMac: hive.isOnThisMac)
             }
+            if let hiveVersion = link.overview?.version, let beekeeperVersion = HiveUpdateNotice.beekeeperVersion,
+               hiveVersion < beekeeperVersion {
+                HiveUpdateNotice(hiveVersion: hiveVersion, beekeeperVersion: beekeeperVersion, isOnThisMac: hive.isOnThisMac)
+            }
             if let state = recovery.hiveState, !state.hasKey {
                 RecoveryKeyWarning(
                     onSetUp: { setupSheet = .recoveryKey },

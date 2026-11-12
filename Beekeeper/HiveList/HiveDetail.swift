@@ -90,6 +90,9 @@ private struct HiveProblemView: View {
 
     @Environment(HiveListStore.self) private var store
     @Environment(\.addHive) private var addHive
+    #if os(macOS)
+    @Environment(BeekeeperUpdater.self) private var updater
+    #endif
     @State private var isConfirmingRemoval = false
 
     var body: some View {
@@ -125,7 +128,19 @@ private struct HiveProblemView: View {
             if link.status != .identityChanged || !hive.isOnThisMac {
                 Button("Remove from Beekeeper…") { isConfirmingRemoval = true }
             }
-        case .connecting, .pairingAgain, .restarting, .connected, .needsUpdate:
+        case .needsUpdate(.hive):
+            #if os(macOS)
+            if hive.isOnThisMac {
+                OpenHiveButton()
+            }
+            #endif
+        case .needsUpdate(.beekeeper):
+            #if os(macOS)
+            if updater.updatesItself {
+                Button("Check for Updates…") { updater.checkForUpdates() }
+            }
+            #endif
+        case .connecting, .pairingAgain, .restarting, .connected:
             EmptyView()
         }
     }

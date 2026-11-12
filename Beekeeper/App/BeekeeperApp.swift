@@ -4,6 +4,9 @@ import SwiftUI
 @main
 struct BeekeeperApp: App {
     @State private var hives = HiveListStore()
+    #if os(macOS)
+    @State private var updater = BeekeeperUpdater()
+    #endif
 
     init() {
         Logger(subsystem: BeekeeperLog.subsystem, category: "Launch").info("Beekeeper launched")
@@ -13,12 +16,23 @@ struct BeekeeperApp: App {
         WindowGroup {
             MainWindow()
                 .environment(hives)
+                #if os(macOS)
+                .environment(updater)
+                #endif
         }
         .defaultSize(width: 960, height: 620)
         .commands {
             CommandGroup(after: .newItem) {
                 AddHiveCommand()
             }
+            #if os(macOS)
+            CommandGroup(after: .appInfo) {
+                if updater.updatesItself {
+                    Button("Check for Updates…") { updater.checkForUpdates() }
+                        .disabled(!updater.canCheckForUpdates)
+                }
+            }
+            #endif
         }
 
         #if os(macOS) && (DEBUG || TEST_BUILD)
@@ -26,6 +40,7 @@ struct BeekeeperApp: App {
         Window("Developer", id: DeveloperWindow.id) {
             DeveloperWindow()
                 .environment(hives)
+                .environment(updater)
         }
         .defaultSize(width: 720, height: 560)
         #endif

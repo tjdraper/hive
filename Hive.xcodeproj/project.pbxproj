@@ -8,10 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		A1010000000000000000000B /* HiveDaemon in Embed Daemon */ = {isa = PBXBuildFile; fileRef = A10200000000000000000002 /* HiveDaemon */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		A10100000000000000000013 /* rsync in Embed Daemon */ = {isa = PBXBuildFile; fileRef = A10100000000000000000012 /* rsync */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		A10100000000000000000013 /* build/rsync/rsync in Embed Daemon */ = {isa = PBXBuildFile; fileRef = A10100000000000000000012 /* build/rsync/rsync */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		A10100000000000000000015 /* COPYING in Embed rsync License */ = {isa = PBXBuildFile; fileRef = A10100000000000000000014 /* COPYING */; };
+		A10100000000000000000017 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A10100000000000000000018 /* Sparkle */; };
 		A1020000000000000000000B /* HiveCore in Frameworks */ = {isa = PBXBuildFile; productRef = A1020000000000000000000C /* HiveCore */; };
 		A1030000000000000000000B /* HiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1030000000000000000000C /* HiveKit */; };
+		A10300000000000000000017 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = A10300000000000000000018 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,7 +34,7 @@
 			dstSubfolderSpec = 6;
 			files = (
 				A1010000000000000000000B /* HiveDaemon in Embed Daemon */,
-				A10100000000000000000013 /* rsync in Embed Daemon */,
+				A10100000000000000000013 /* build/rsync/rsync in Embed Daemon */,
 			);
 			name = "Embed Daemon";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -58,9 +60,9 @@
 		A1000000000000000000000F /* Signing.template.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.template.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000010 /* HiveKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = HiveKit; sourceTree = "<group>"; };
 		A10000000000000000000011 /* HiveCore */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = HiveCore; sourceTree = "<group>"; };
-		A10100000000000000000012 /* rsync */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = build/rsync/rsync; sourceTree = SOURCE_ROOT; };
-		A10100000000000000000014 /* COPYING */ = {isa = PBXFileReference; lastKnownFileType = text; path = COPYING; sourceTree = "<group>"; };
 		A10100000000000000000002 /* Hive (Debug).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hive (Debug).app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10100000000000000000012 /* build/rsync/rsync */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = build/rsync/rsync; sourceTree = SOURCE_ROOT; };
+		A10100000000000000000014 /* COPYING */ = {isa = PBXFileReference; lastKnownFileType = text; path = COPYING; sourceTree = "<group>"; };
 		A10200000000000000000002 /* HiveDaemon */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = HiveDaemon; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10300000000000000000002 /* Beekeeper (Debug).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Beekeeper (Debug).app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -88,6 +90,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10100000000000000000017 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -104,6 +107,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1030000000000000000000B /* HiveKit in Frameworks */,
+				A10300000000000000000017 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -119,7 +123,7 @@
 				A10000000000000000000010 /* HiveKit */,
 				A10000000000000000000011 /* HiveCore */,
 				A1000000000000000000000D /* Configuration */,
-				A10000000000000000000012 /* rsync */,
+				A10000000000000000000012 /* ThirdParty/rsync */,
 				A10000000000000000000003 /* Products */,
 				A10000000000000000000007 /* .swiftlint.yml */,
 				A10000000000000000000008 /* .gitignore */,
@@ -146,10 +150,10 @@
 			path = Configuration;
 			sourceTree = "<group>";
 		};
-		A10000000000000000000012 /* rsync */ = {
+		A10000000000000000000012 /* ThirdParty/rsync */ = {
 			isa = PBXGroup;
 			children = (
-				A10100000000000000000012 /* rsync */,
+				A10100000000000000000012 /* build/rsync/rsync */,
 				A10100000000000000000014 /* COPYING */,
 			);
 			path = ThirdParty/rsync;
@@ -179,6 +183,9 @@
 				A10100000000000000000003 /* Hive */,
 			);
 			name = Hive;
+			packageProductDependencies = (
+				A10100000000000000000018 /* Sparkle */,
+			);
 			productName = Hive;
 			productReference = A10100000000000000000002 /* Hive (Debug).app */;
 			productType = "com.apple.product-type.application";
@@ -225,6 +232,7 @@
 			name = Beekeeper;
 			packageProductDependencies = (
 				A1030000000000000000000C /* HiveKit */,
+				A10300000000000000000018 /* Sparkle */,
 			);
 			productName = Beekeeper;
 			productReference = A10300000000000000000002 /* Beekeeper (Debug).app */;
@@ -264,6 +272,7 @@
 				A1000000000000000000000A /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */,
 				A1000000000000000000000B /* XCLocalSwiftPackageReference "HiveKit" */,
 				A1000000000000000000000C /* XCLocalSwiftPackageReference "HiveCore" */,
+				A10000000000000000000013 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000003 /* Products */;
@@ -368,6 +377,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				BEEKEEPER_BUNDLE_ID = "$(BUNDLE_ID_PREFIX).HiveBeekeeper.Debug";
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -401,6 +411,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = CQZ49H6WAK;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -419,6 +430,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HIVE_BUNDLE_ID = "$(BUNDLE_ID_PREFIX).Hive.Debug";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
@@ -427,8 +439,6 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				BEEKEEPER_BUNDLE_ID = "$(BUNDLE_ID_PREFIX).HiveBeekeeper.Debug";
-				HIVE_BUNDLE_ID = "$(BUNDLE_ID_PREFIX).Hive.Debug";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -443,6 +453,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				BEEKEEPER_BUNDLE_ID = "$(BUNDLE_ID_PREFIX).HiveBeekeeper";
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -476,6 +487,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = CQZ49H6WAK;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -488,6 +500,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HIVE_BUNDLE_ID = "$(BUNDLE_ID_PREFIX).Hive";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
@@ -495,8 +508,6 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				BEEKEEPER_BUNDLE_ID = "$(BUNDLE_ID_PREFIX).HiveBeekeeper";
-				HIVE_BUNDLE_ID = "$(BUNDLE_ID_PREFIX).Hive";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -513,6 +524,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Configuration/Hive-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Hive;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
@@ -534,6 +546,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Configuration/Hive-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Hive;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
@@ -710,6 +723,14 @@
 				version = 0.63.2;
 			};
 		};
+		A10000000000000000000013 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -717,6 +738,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A1000000000000000000000A /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */;
 			productName = "plugin:SwiftLintBuildToolPlugin";
+		};
+		A10100000000000000000018 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000013 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 		A1020000000000000000000C /* HiveCore */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -737,6 +763,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A1000000000000000000000A /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */;
 			productName = "plugin:SwiftLintBuildToolPlugin";
+		};
+		A10300000000000000000018 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000013 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

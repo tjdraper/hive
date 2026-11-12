@@ -277,7 +277,8 @@ struct APIFixture {
                 try await pauses.pause()
             },
             liveUpdateHeartbeat: liveUpdateHeartbeat,
-            now: { clock.now }
+            now: { clock.now },
+            version: ReleaseVersion("2026.3")
         )
     }
 

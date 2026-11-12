@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct DaemonSetupView: View {
+    let updater: HiveUpdater
+
     @State private var store = DaemonSetupStore()
     @State private var isConfirmingRemoval = false
 
@@ -26,6 +28,8 @@ struct DaemonSetupView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Open Full Disk Access Settings") { settings.openFullDiskAccess() }
             }
+
+            UpdatesSection(updater: updater)
 
             Section {
                 HStack {

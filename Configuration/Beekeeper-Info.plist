@@ -6,5 +6,13 @@
 	<string>$(HIVE_BUNDLE_ID).Pairing</string>
 	<key>HiveDaemonSigningIdentifier</key>
 	<string>$(HIVE_BUNDLE_ID).Daemon</string>
+	<key>HiveBundleIdentifier</key>
+	<string>$(HIVE_BUNDLE_ID)</string>
+	<key>SUFeedURL</key>
+	<string>https://$(UPDATES_SITE)/appcasts/beekeeper.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>$(UPDATES_PUBLIC_KEY)</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 </dict>
 </plist>

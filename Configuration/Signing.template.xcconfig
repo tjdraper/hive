@@ -6,3 +6,11 @@ DEVELOPMENT_TEAM =
 // The start of every bundle ID, such as com.example. Hive's is <prefix>.Hive and Beekeeper's is
 // <prefix>.HiveBeekeeper.
 BUNDLE_ID_PREFIX =
+
+// Where the Mac apps look for updates, without https://, such as example.github.io/hive. Leave both of
+// these empty to build copies that never update themselves, so a copy you build is never replaced by
+// one signed by someone else.
+UPDATES_SITE =
+
+// The public half of the Sparkle signing key, as printed by Scripts/sparkle-tools.sh generate_keys -p.
+UPDATES_PUBLIC_KEY =

@@ -199,7 +199,7 @@ install_on_mac() {
         step "Exporting a Developer ID build of $app"
         xcodebuild -exportArchive \
             -archivePath "$archive" \
-            -exportOptionsPlist "$REPO_ROOT/Scripts/TestBuildExportOptions.plist" \
+            -exportOptionsPlist "$REPO_ROOT/Scripts/DeveloperIDExportOptions.plist" \
             -exportPath "$export_dir" \
             -allowProvisioningUpdates
 

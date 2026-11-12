@@ -104,7 +104,9 @@ Check off a slice here when its "done when" is true.
 - **Hive:** macOS only. macOS 26 runs only on Apple silicon and T2 Macs, all of which have the Secure Enclave Hive needs (§7).
 - **Beekeeper:** macOS, iPadOS and iOS. The Mac comes first. iPhone and iPad follow in Phase H, once backups run end to end and the PHP version is retired.
 - **Minimum OS versions:** macOS 26, iOS 26 and iPadOS 26.
-- **The Mac apps** ship with Developer ID and notarization, and update through Sparkle. They aren't on the App Store and don't use the App Sandbox.
+- **The Mac apps** ship with Developer ID and notarization, and update through Sparkle. They aren't on the App Store and don't use the App Sandbox. Hive and Beekeeper share one version and are released together (G2).
+- **Installing and updating Hive** (G2): the first install is a signed, notarized `.pkg`, which puts `Hive.app` in `/Applications` owned by root (§4). Updates go through Sparkle in `Hive.app`, which asks for an administrator password and keeps the new copy owned by root. `Hive.app` checks each time it opens, and Beekeeper says when a Hive is older than itself, with a button on the Hive's Mac to open `Hive.app`. The daemon restarts itself once its executable has been replaced, so launchd starts the new version. Beekeeper is a zip and updates through Sparkle like any other app.
+- **Update feeds** are appcasts in `docs/appcasts/`, served by GitHub Pages, with the downloads attached to GitHub releases. The feed and Sparkle's public key come from the gitignored `.xcconfig`, so a copy someone else builds never updates to a published one signed by another team.
 - **Beekeeper for iPhone and iPad** goes on your devices through internal TestFlight builds, or ad hoc builds as a fallback. Other people build their own.
 - **Open source** (§17).
 
@@ -317,7 +319,7 @@ Each gets its own plan once this one is done. Until then, features not in Part 1
 - [x] How long the job log is kept: a year, pruned daily (C5)
 - [x] Default retention tiers and quota: 30 daily and 12 monthly snapshots, and no quota, which stays allowed (C6)
 - [x] An SMTP library, or a small client of Hive's own over SwiftNIO: Hive's own, over SwiftNIO and NIOSSL, which Hive already uses. SMTP for sending is small, and owning it keeps certificate checks, what's logged and the order commands go out in Hive's hands (§13, E1)
-- [ ] How Hive updates itself (G2). `Hive.app` isn't running most of the time, and the daemon has to restart from the new bundle.
+- [x] How Hive updates itself: Sparkle in `Hive.app`, prompted by Beekeeper, and the daemon restarts when its executable is replaced (§2, G2)
 - [ ] The license (I1). The other open-source Locus apps use MIT.
 
 ---

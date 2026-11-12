@@ -33,14 +33,20 @@ public struct APIServer: Sendable {
             listeners: listeners,
             factory: TLSListenerFactory(responder: Self.responder(api: api), tlsConfiguration: tlsConfiguration)
         )
+        var services: [ServiceGroupConfiguration.ServiceConfiguration] = [
+            .init(service: service),
+            .init(service: SchedulingService(scheduler: api.scheduler, runs: api.runs)),
+            .init(service: AlertService(monitor: api.alerts)),
+            .init(service: RecoveryFileService(writer: api.recoveryFiles)),
+            .init(service: RestartService(restart: api.restart), successTerminationBehavior: .gracefullyShutdownGroup),
+        ]
+        if let watcher = api.replacementWatcher {
+            // It asks RestartService to shut down, and ends on its own when it can't watch.
+            let updates = UpdateRestartService(watcher: watcher, restart: api.restart)
+            services.append(.init(service: updates, successTerminationBehavior: .ignore))
+        }
         let group = ServiceGroup(configuration: ServiceGroupConfiguration(
-            services: [
-                .init(service: service),
-                .init(service: SchedulingService(scheduler: api.scheduler, runs: api.runs)),
-                .init(service: AlertService(monitor: api.alerts)),
-                .init(service: RecoveryFileService(writer: api.recoveryFiles)),
-                .init(service: RestartService(restart: api.restart), successTerminationBehavior: .gracefullyShutdownGroup),
-            ],
+            services: services,
             gracefulShutdownSignals: [.sigterm, .sigint],
             logger: TLSListener.quietLogger
         ))
@@ -53,13 +59,7 @@ public struct APIServer: Sendable {
             HTTPResponse.Status.noContent
         }
         SignInRoutes.add(to: router, workflow: api.signIn)
-        OverviewRoutes.add(
-            to: router,
-            hiveID: api.hiveID,
-            settings: api.settingsStore,
-            fullDiskAccess: api.fullDiskAccess,
-            macSleep: api.macSleep
-        )
+        OverviewRoutes.add(to: router, api: api)
         DeviceRoutes.add(to: router, devices: api.devices, revocation: api.revocation)
         PairingRoutes.add(to: router, windows: api.pairingWindow, pairing: api.codePairing, confirmations: api.confirmations)
         ConfirmationRoutes.add(to: router, verifier: api.confirmations)

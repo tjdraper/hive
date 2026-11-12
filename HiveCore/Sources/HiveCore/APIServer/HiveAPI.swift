@@ -38,6 +38,9 @@ public struct HiveAPI: Sendable {
     /// Checked on every request, since it can be turned off while Hive runs.
     let fullDiskAccess: @Sendable () -> FullDiskAccess
     let macSleep: @Sendable () async -> MacSleep
+    let version: ReleaseVersion?
+    /// Nil where nothing should restart Hive for an update, such as in tests.
+    let replacementWatcher: ExecutableReplacementWatcher?
 
     var sshKeys: ServerSSHKeyWorkflow {
         ServerSSHKeyWorkflow(
@@ -145,7 +148,7 @@ public struct HiveAPI: Sendable {
     }
 
     /// `identityKeys` is where the identity key is saved, for regenerating it. The recovery file is
-    /// written in `dataDirectory`.
+    /// written in `dataDirectory`. Hive restarts when an update replaces `executable`.
     public init(
         hiveID: UUID,
         pin: PublicKeyPin,
@@ -155,7 +158,9 @@ public struct HiveAPI: Sendable {
         listeners: ListenerCoordinator,
         sealer: SecretSealer,
         identityKeys: HiveKeyStore,
-        rsync: URL
+        rsync: URL,
+        version: ReleaseVersion?,
+        executable: URL
     ) {
         let devices = DeviceStore(database: database)
         self.init(
@@ -185,7 +190,9 @@ public struct HiveAPI: Sendable {
             startupDriveGrace: 5 * 60,
             pause: { try await Task.sleep(for: $0) },
             liveUpdateHeartbeat: .seconds(15),
-            now: Date.init
+            now: Date.init,
+            version: version,
+            replacementWatcher: ExecutableReplacementWatcher(executable: executable)
         )
     }
 
@@ -216,9 +223,13 @@ public struct HiveAPI: Sendable {
         startupDriveGrace: TimeInterval,
         pause: @escaping @Sendable (Duration) async throws -> Void,
         liveUpdateHeartbeat: Duration,
-        now: @escaping @Sendable () -> Date
+        now: @escaping @Sendable () -> Date,
+        version: ReleaseVersion? = nil,
+        replacementWatcher: ExecutableReplacementWatcher? = nil
     ) {
         self.hiveID = hiveID
+        self.version = version
+        self.replacementWatcher = replacementWatcher
         self.pin = pin
         self.signIn = signIn
         self.settingsStore = settingsStore

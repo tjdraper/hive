@@ -23,7 +23,7 @@ struct OverviewRoutesTests {
         }
     }
 
-    @Test("The overview gives the Hive's ID and name, and how the Mac is set to sleep")
+    @Test("The overview gives the Hive's ID, name and version, and how the Mac is set to sleep")
     func givesIDAndName() async throws {
         // Act
         let overview = try await overview()
@@ -33,6 +33,7 @@ struct OverviewRoutesTests {
         #expect(overview.name == "Test Hive")
         #expect(overview.fullDiskAccess == .granted)
         #expect(overview.macSleep == .afterIdle(minutes: 10))
+        #expect(overview.version?.description == "2026.3")
     }
 
     @Test("Full Disk Access is checked at each request, so turning it off shows at once")
