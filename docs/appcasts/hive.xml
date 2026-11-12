@@ -2,5 +2,30 @@
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>Hive</title>
+        <item>
+            <title>2026.1</title>
+            <pubDate>Thu, 12 Nov 2026 07:53:45 -0600</pubDate>
+            <link>https://github.com/tjdraper/hive</link>
+            <sparkle:version>2026.1</sparkle:version>
+            <sparkle:shortVersionString>2026.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## [2026.1] - 2026-11-12
+
+The first release of Hive, which backs up your servers from a Mac, and Beekeeper, which manages it.
+
+### Added
+
+- Hive runs in the background from startup with its keys in the Secure Enclave.
+- Incremental snapshots of server directories over rsync and SSH, browsable in Finder.
+- MySQL, MariaDB and Postgres dumps, on the host or in Docker containers.
+- Schedules, retention by day and month, and per-server quotas.
+- Live progress, a job log and an audit log in Beekeeper.
+- Email alerts for failed backups, a missing drive, changed host keys and low space.
+- Pairing with a QR code or pairing code. Every connection is TLS, pinned to the Hive's key.
+- A recovery key and encrypted recovery files, for bringing Hive back on a new Mac.
+- Updates for both apps. Beekeeper shows when Hive needs an update.
+]]></description>
+            <enclosure url="https://github.com/tjdraper/hive/releases/download/v2026.1/Hive-2026.1.zip" length="19901416" type="application/octet-stream" sparkle:edSignature="q4NedSNIfrLPY+3ClYoqDDpUjSO1mGDuc9MANZyKknVXLNDcD9IxMezjwH3N3cBoyVVPV2oN90XcKO5RxgfJCQ=="/>
+        </item>
     </channel>
 </rss>
