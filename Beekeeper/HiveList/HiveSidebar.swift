@@ -96,6 +96,7 @@ struct HiveSidebar: View {
                             Spacer()
                             JobHealthBadge(health: JobHealth(servers.statuses.status(of: job.id)))
                         }
+                        .tappableAcrossRow()
                     }
                     .contextMenu {
                         Button("Edit…") { jobEditRequest = JobEditRequest(action: .edit, job: job, jobs: servers.jobs) }
@@ -171,6 +172,7 @@ private struct HiveSidebarRow: View {
             Spacer()
             HiveStatusBadge(status: status)
         }
+        .tappableAcrossRow()
     }
 }
 
@@ -192,6 +194,14 @@ private struct ServerSidebarRow: View {
                 JobHealthBadge(health: health)
             }
         }
+        .tappableAcrossRow()
+    }
+}
+
+private extension View {
+    /// On iPad a tap on a row's empty middle misses its link, and the list takes it as choosing nothing.
+    func tappableAcrossRow() -> some View {
+        contentShape(.rect)
     }
 }
 
