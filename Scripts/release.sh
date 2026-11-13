@@ -143,8 +143,11 @@ if [[ -z "$REHEARSAL" ]]; then
         || fail "couldn't read AuthKey_$asc_key_id.p8 from $ASC_OP_ITEM"
     notary_key=(--key "$asc_key_path" --key-id "$asc_key_id" --issuer "$asc_issuer_id")
 
-    xcrun notarytool history "${notary_key[@]}" --output-format json >/dev/null 2>&1 \
-        || fail "Apple's notary service turned down the API key in $ASC_OP_ITEM (see Scripts/README.md)"
+    # Apple's reason is the only clue to most refusals, such as an agreement waiting to be accepted.
+    if ! notary_check="$(xcrun notarytool history "${notary_key[@]}" --output-format json 2>&1)"; then
+        echo "$notary_check" >&2
+        fail "Apple's notary service turned down the API key in $ASC_OP_ITEM (see Scripts/README.md)"
+    fi
 fi
 
 SPARKLE_BIN="$("$REPO_ROOT/Scripts/sparkle-tools.sh")"
