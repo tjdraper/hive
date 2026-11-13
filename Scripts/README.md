@@ -20,6 +20,20 @@ The script refuses to run unless the working tree is clean and the branch is in 
 
 Required, in `docs/release-notes/<version>.md`, covering both apps. If they're missing, the script checks everything else first, then creates the empty file and stops. They're embedded in both appcasts, where Sparkle shows them as Markdown, and become the GitHub release's description. They don't need committing first; they go in with the release commit.
 
+## Beekeeper for iPhone and iPad
+
+```
+Scripts/release.sh --testflight
+```
+
+Archives Beekeeper for iPhone and iPad from the working tree and uploads it to TestFlight for internal testers. It's separate from a Mac release, since TestFlight is also how work in progress reaches a real device, and uncommitted changes go into the build. After a release, run it from the release commit, so your devices have the released Beekeeper.
+
+- **The version** is the project's, which is the last release's, so Beekeeper on a device never says a Hive has an update waiting when no update exists.
+- **The build number** is a count that goes up by one with each upload, whatever the version, read from App Store Connect. A build about to expire is replaced by uploading the same version again.
+- **The build date** is stamped into `Info.plist` as `BeekeeperBuildDate`. TestFlight builds stop opening 90 days after upload, and Beekeeper works out its expiry from it (Plans §16).
+
+The archive is saved where Xcode's Organizer lists it. The script asks before uploading, since an upload can't be undone, and prints the date the build stops opening. Internal-only builds can never be sent to App Review, which Beekeeper never is.
+
 ## How the apps update
 
 **Beekeeper** checks for updates with Sparkle, as the other Mac apps do, and has Check for Updates… in its app menu.
@@ -70,6 +84,16 @@ If the key isn't set up yet:
 
 To keep the item somewhere else, set `HIVE_ASC_OP_ITEM` to its reference, such as `op://Work/Some Other Item`.
 
+The key needs the **Admin** role: uploading to TestFlight from the command line creates and updates provisioning profiles.
+
+### App Store Connect app record
+
+For TestFlight. App Store Connect → Apps → **+** → New App, with only iOS ticked, Beekeeper's bundle ID (`<prefix>.HiveBeekeeper`), and a name of your choosing; App Store names are unique across all apps, so "Beekeeper" alone may be taken. The name only shows in TestFlight. The script looks the app up by bundle ID and stops if it isn't there.
+
+Then, under TestFlight → Internal Testing, add a group with yourself in it and turn on automatic distribution, so each upload reaches your devices once Apple has processed it. Install the TestFlight app on each iPhone and iPad and sign in with the same Apple Account.
+
+Beekeeper only uses the encryption built into iOS, so `ITSAppUsesNonExemptEncryption` is set to `NO` and TestFlight doesn't ask about export compliance for each build.
+
 ### Sparkle signing key
 
 Sparkle signs each update with the EdDSA key in your login keychain, the one `Scripts/sparkle-tools.sh generate_keys -p` prints the public half of. Put that public half in `UPDATES_PUBLIC_KEY`. The release script checks that both apps carry it.
@@ -91,3 +115,5 @@ If the feed ever moves to a custom domain, add it to the same Pages site rather 
 # Test builds
 
 `Scripts/install-test-build.sh --mac-installed` builds Developer ID copies of the working tree and installs them in `/Applications`, Hive owned by root, without notarizing or touching the version or appcasts. It keeps the project's current version, so Sparkle may offer to replace it with a newer release.
+
+`Scripts/install-test-build.sh --iphone` and `--ipad` build Debug Beekeeper for a simulator. Simulators have no Secure Enclave, so they show layouts but can't pair or sign in. Anything else on iPhone and iPad goes through TestFlight.

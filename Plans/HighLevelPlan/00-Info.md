@@ -58,7 +58,7 @@ Check off a slice here when its "done when" is true.
 
 ### Phase H — iPhone and iPad
 
-- [ ] [H1. iOS release script and first TestFlight build](26-H1-IOSReleaseScriptAndFirstTestFlightBuild.md) — Engine, 1 session, needs you
+- [x] [H1. iOS release script and first TestFlight build](26-H1-IOSReleaseScriptAndFirstTestFlightBuild.md) — Engine, 1 session, needs you
 - [ ] [H2. Beekeeper on iPad](27-H2-BeekeeperOnIPad.md) — Mixed, 1–2 sessions, TestFlight
 - [ ] [H3. Beekeeper on iPhone](28-H3-BeekeeperOnIPhone.md) — UI, 1–2 sessions, TestFlight
 - [ ] [H4. Build expiry warnings](29-H4-BuildExpiryWarnings.md) — Engine, 1 session, TestFlight
@@ -272,7 +272,7 @@ Read the brainstorm's "Recovery files and disaster recovery".
 
 - **A list of Hives** and, for each: servers and backup jobs, their status and live progress, snapshots and their sizes, the job log, the audit log, devices, and the Hive's settings.
 - **Connected to several Hives at once,** so it can show all their status.
-- **Addresses:** typed in, or taken from a pairing code. Several address options per Hive, using whichever responds. Hive advertises itself with Bonjour on any LAN interface it listens on, with a setting to turn it off (H2).
+- **Addresses:** typed in, or taken from a pairing code. Several address options per Hive, using whichever responds. Hive advertises itself with Bonjour as `_hive._tcp`, which IANA hasn't assigned (checked 2026-11-13), on any LAN interface it listens on, with a setting to turn it off (H2). Beekeeper's `Info.plist` names the type in `NSBonjourServices` (H1).
 - **On the Hive Mac** it pairs itself (§6).
 - **A proper Mac app,** with menus, keyboard handling, and windows that remember their size and place. The layout is worked out together in Phases B and D.
 

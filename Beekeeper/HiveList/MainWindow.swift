@@ -64,8 +64,10 @@ struct MainWindow: View {
         } detail: {
             detail
         }
+        #if os(macOS)
         // A floor for the window, so no page's content can make its smallest size larger than the screen.
         .frame(minWidth: 640, minHeight: 400)
+        #endif
         .sheet(item: $addingServer) { request in
             if let link = store.link(for: request.hiveID), let servers = store.servers(for: request.hiveID) {
                 AddServerSheet(link: link, servers: servers) { serverID in

@@ -10,11 +10,15 @@
 # build/rehearsal/, for a server on this Mac's loopback address. Rehearse two versions in turn, install
 # the first, point the installed apps at the rehearsal feed, and let them update to the second.
 #
+# With --testflight, archives Beekeeper for iPhone and iPad from the working tree, at the project's
+# version and the next build number, and uploads it to TestFlight for internal testers.
+#
 # One-time setup is in Scripts/README.md.
 #
 # Usage:
 #   Scripts/release.sh <version>                a release to publish, such as 2026.1
 #   Scripts/release.sh --rehearsal <version>    a release to try on this Mac
+#   Scripts/release.sh --testflight             Beekeeper for iPhone and iPad, to TestFlight
 #
 
 set -euo pipefail
@@ -24,6 +28,9 @@ readonly APPS=("Hive" "Beekeeper")
 readonly GITHUB_REPO="tjdraper/hive"
 # The team's App Store Connect API key, shared with the other apps' release scripts.
 readonly ASC_OP_ITEM="${HIVE_ASC_OP_ITEM:-op://Private/Apple Developer Account Admin Key}"
+readonly ASC_API="https://api.appstoreconnect.apple.com/v1"
+# TestFlight builds stop opening this long after they're uploaded.
+readonly TESTFLIGHT_DAYS=90
 # Sparkle only downloads over HTTP or HTTPS. Plain HTTP is allowed to the loopback address, and every
 # update is still checked against the Sparkle signing key.
 readonly REHEARSAL_PORT="${HIVE_REHEARSAL_PORT:-8484}"
@@ -58,13 +65,161 @@ appcast_name() {
     echo "$(echo "$1" | tr '[:upper:]' '[:lower:]').xml"
 }
 
+check_signing_config() {
+    [[ -f "$REPO_ROOT/Configuration/Signing.local.xcconfig" ]] \
+        || fail "copy Configuration/Signing.template.xcconfig to Configuration/Signing.local.xcconfig and fill it in"
+}
+
+# Reads the team's App Store Connect API key from 1Password. notarytool and xcodebuild only take the
+# key as a file, so it's written somewhere private for the length of the run and removed on the way
+# out, however the run ends.
+read_asc_key() {
+    command -v op >/dev/null || fail "the 1Password CLI is missing; brew install 1password-cli (see Scripts/README.md)"
+    asc_key_dir="$(mktemp -d)"
+    trap 'rm -rf "$asc_key_dir"' EXIT
+    asc_key_id="$(op read "$ASC_OP_ITEM/Key ID")" || fail "couldn't read the Key ID from $ASC_OP_ITEM"
+    asc_issuer_id="$(op read "$ASC_OP_ITEM/Issuer ID")" || fail "couldn't read the Issuer ID from $ASC_OP_ITEM"
+    asc_key_path="$asc_key_dir/AuthKey_$asc_key_id.p8"
+    op read --out-file "$asc_key_path" "$ASC_OP_ITEM/AuthKey_$asc_key_id.p8" >/dev/null \
+        || fail "couldn't read AuthKey_$asc_key_id.p8 from $ASC_OP_ITEM"
+}
+
+# GETs $1 from the App Store Connect API.
+asc_get() {
+    local token
+    token="$(swift "$REPO_ROOT/Scripts/asc-token.swift" "$asc_key_path" "$asc_key_id" "$asc_issuer_id")" \
+        || fail "couldn't sign an App Store Connect API token with the key from $ASC_OP_ITEM"
+    curl --silent --show-error --globoff --fail-with-body \
+        -H "Authorization: Bearer $token" "$ASC_API$1"
+}
+
+send_to_testflight() {
+    step "Checking prerequisites"
+    check_signing_config
+    for tool in jq swift; do
+        command -v "$tool" >/dev/null || fail "$tool is missing"
+    done
+    read_asc_key
+
+    # The project carries the version of the last release, so Beekeeper on iPhone and iPad never
+    # tells a Hive it's out of date when no Hive update exists.
+    local version
+    version="$(grep -oE 'MARKETING_VERSION = [^;]+;' "$PBXPROJ" | sort -u | sed -E 's/.* = (.*);/\1/')"
+    [[ "$version" =~ ^[0-9]{4}\.[0-9]+(\.[0-9]+)?$ ]] \
+        || fail "the project's MARKETING_VERSION should be one release version, got: $(tr '\n' ' ' <<<"$version")"
+
+    # Read from the project, since the bundle ID prefix is set in each clone's own configuration.
+    local bundle_id
+    bundle_id="$(xcodebuild -showBuildSettings -project "$PROJECT" -scheme Beekeeper -configuration Release \
+        -destination "generic/platform=iOS" 2>/dev/null | awk '$1 == "PRODUCT_BUNDLE_IDENTIFIER" { print $3; exit }')"
+    [[ -n "$bundle_id" ]] || fail "couldn't read Beekeeper's bundle ID from the project"
+
+    if [[ -n "$(git status --porcelain)" ]]; then
+        echo "The working tree has uncommitted changes. They go into this build."
+    fi
+
+    step "Checking App Store Connect"
+    local app_json app_id builds_json highest build
+    app_json="$(asc_get "/apps?filter[bundleId]=$bundle_id&fields[apps]=name")" \
+        || fail "App Store Connect turned down the API key: $app_json"
+    app_id="$(jq -r '.data[0].id // empty' <<<"$app_json")"
+    [[ -n "$app_id" ]] || fail "App Store Connect has no app with bundle ID $bundle_id (see Scripts/README.md)"
+
+    # Build numbers are a count that goes up with every upload, whatever the version, since a
+    # TestFlight build is uploaded again under the same version to replace one about to expire.
+    builds_json="$(asc_get "/builds?filter[app]=$app_id&sort=-uploadedDate&fields[builds]=version&limit=200")" \
+        || fail "couldn't list Beekeeper's builds: $builds_json"
+    highest="$(jq -r '.data[].attributes.version' <<<"$builds_json" | grep -E '^[0-9]+$' | sort -n | tail -1 || true)"
+    build=$(( ${highest:-0} + 1 ))
+
+    local work_dir="$REPO_ROOT/build/testflight"
+    # Saved where Xcode's Organizer lists it, for its crash reports.
+    local archive
+    archive="$HOME/Library/Developer/Xcode/Archives/$(date +%Y-%m-%d)/Beekeeper $version ($build) iOS.xcarchive"
+    local build_date
+    build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    local auth=(
+        -allowProvisioningUpdates
+        -authenticationKeyPath "$asc_key_path"
+        -authenticationKeyID "$asc_key_id"
+        -authenticationKeyIssuerID "$asc_issuer_id"
+    )
+
+    rm -rf "$work_dir" "$archive"
+    mkdir -p "$work_dir"
+
+    step "Archiving Beekeeper $version ($build) for iPhone and iPad"
+    xcodebuild archive \
+        -project "$PROJECT" \
+        -scheme Beekeeper \
+        -configuration Release \
+        -destination "generic/platform=iOS" \
+        -archivePath "$archive" \
+        "${auth[@]}" \
+        MARKETING_VERSION="$version" \
+        CURRENT_PROJECT_VERSION="$build" \
+        BEEKEEPER_BUILD_DATE="$build_date"
+
+    local plist="$archive/Products/Applications/Beekeeper.app/Info.plist"
+    [[ "$(plutil -extract CFBundleShortVersionString raw "$plist")" == "$version" ]] || fail "the archive isn't version $version"
+    [[ "$(plutil -extract CFBundleVersion raw "$plist")" == "$build" ]] || fail "the archive isn't build $build"
+    [[ "$(plutil -extract BeekeeperBuildDate raw "$plist")" == "$build_date" ]] || fail "the archive has no build date"
+
+    echo
+    read -r -p "Upload Beekeeper $version ($build) to TestFlight for internal testers? An upload can't be undone. [y/N] " answer
+    [[ "$answer" == "y" || "$answer" == "Y" ]] || fail "cancelled; nothing was uploaded"
+
+    # Internal only: Beekeeper is never sent to App Review, and other people build their own.
+    cat > "$work_dir/ExportOptions.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>upload</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+	<key>testFlightInternalTestingOnly</key>
+	<true/>
+</dict>
+</plist>
+EOF
+
+    step "Uploading to TestFlight"
+    xcodebuild -exportArchive \
+        -archivePath "$archive" \
+        -exportOptionsPlist "$work_dir/ExportOptions.plist" \
+        -exportPath "$work_dir/export" \
+        "${auth[@]}"
+
+    cat <<EOF
+
+Uploaded Beekeeper $version ($build). It shows in the TestFlight app once Apple has processed it,
+and stops opening on $(date -v+"${TESTFLIGHT_DAYS}"d "+%B %-d, %Y").
+EOF
+}
+
 # --- Arguments -------------------------------------------------------------
 
 rehearsal=""
-if [[ "${1:-}" == "--rehearsal" ]]; then
-    rehearsal=1
-    shift
-fi
+case "${1:-}" in
+    --rehearsal)
+        rehearsal=1
+        shift
+        ;;
+    --testflight)
+        shift
+        [[ $# -eq 0 ]] || usage
+        send_to_testflight
+        exit 0
+        ;;
+esac
 [[ $# -eq 1 ]] || usage
 readonly REHEARSAL="$rehearsal"
 readonly VERSION="$1"
@@ -90,8 +245,7 @@ readonly OUTPUT_DIR="$WORK_DIR/output"
 
 step "Checking prerequisites"
 
-[[ -f "$REPO_ROOT/Configuration/Signing.local.xcconfig" ]] \
-    || fail "copy Configuration/Signing.template.xcconfig to Configuration/Signing.local.xcconfig and fill it in"
+check_signing_config
 
 if [[ -z "$REHEARSAL" ]]; then
     # This version's notes may be uncommitted, since they go in with the release commit.
@@ -130,17 +284,7 @@ fi
 readonly INSTALLER_IDENTITY="$installer_identity"
 
 if [[ -z "$REHEARSAL" ]]; then
-    command -v op >/dev/null || fail "the 1Password CLI is missing; brew install 1password-cli (see Scripts/README.md)"
-
-    # notarytool only takes the key as a file, so it's written somewhere private for the length of
-    # the run and removed on the way out, however the run ends.
-    asc_key_dir="$(mktemp -d)"
-    trap 'rm -rf "$asc_key_dir"' EXIT
-    asc_key_id="$(op read "$ASC_OP_ITEM/Key ID")" || fail "couldn't read the Key ID from $ASC_OP_ITEM"
-    asc_issuer_id="$(op read "$ASC_OP_ITEM/Issuer ID")" || fail "couldn't read the Issuer ID from $ASC_OP_ITEM"
-    asc_key_path="$asc_key_dir/AuthKey_$asc_key_id.p8"
-    op read --out-file "$asc_key_path" "$ASC_OP_ITEM/AuthKey_$asc_key_id.p8" >/dev/null \
-        || fail "couldn't read AuthKey_$asc_key_id.p8 from $ASC_OP_ITEM"
+    read_asc_key
     notary_key=(--key "$asc_key_path" --key-id "$asc_key_id" --issuer "$asc_issuer_id")
 
     # Apple's reason is the only clue to most refusals, such as an agreement waiting to be accepted.
@@ -381,6 +525,10 @@ appcasts point at them:
   git push origin v$VERSION
   gh release create v$VERSION "$PACKAGE" "$OUTPUT_DIR/Hive-$VERSION.zip" "$OUTPUT_DIR/Beekeeper-$VERSION.zip" --repo $GITHUB_REPO --title "$VERSION" --verify-tag --notes-file $RELEASE_NOTES_PATH
   git push
+
+Then send Beekeeper $VERSION for iPhone and iPad to TestFlight from the release commit:
+
+  Scripts/release.sh --testflight
 
 If you stop here, undo the version and the appcast entries with:
 

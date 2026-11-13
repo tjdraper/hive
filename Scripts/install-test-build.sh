@@ -17,20 +17,24 @@
 # Terminal or Xcode borrows their access. Not notarized. A build made on this Mac carries no
 # quarantine flag, so Gatekeeper never checks it.
 #
-# With --simulator, builds Debug Beekeeper for an iOS simulator, as Xcode's Run does, installs it
-# there, launches it and shows the simulator. Permissions on iPad and iPhone are checked through
-# TestFlight, never a simulator.
+# With --iphone, --ipad or --simulator, builds Debug Beekeeper for an iOS simulator, as Xcode's Run
+# does, installs it there, launches it and shows the simulator. Simulators have no Secure Enclave, so
+# Beekeeper there shows its layouts but can't pair or sign in. Permissions on iPad and iPhone are
+# checked through TestFlight, never a simulator.
 #
 # Usage:
 #   Scripts/install-test-build.sh --mac                 the Mac, as Xcode's Run builds it
 #   Scripts/install-test-build.sh --mac-installed       the Mac, signed and in /Applications
+#   Scripts/install-test-build.sh --iphone              an iPhone simulator
+#   Scripts/install-test-build.sh --ipad                an iPad simulator
 #   Scripts/install-test-build.sh --simulator <name or UDID>
 #
-# The options combine, such as --mac --simulator "iPad Air 11-inch (M3)". The simulator is installed
-# first and the Mac last, so the Mac apps end up in front.
+# The options combine, such as --mac --ipad. Each simulator is installed in turn, and the Mac last,
+# so the Mac apps end up in front.
 #
-# `xcrun simctl list devices available` shows the simulators. The newest iOS version with that name
-# is used.
+# A simulator already running of the kind asked for is used. Otherwise it's the newest iOS version's
+# Pro iPhone, or 13-inch iPad Pro. With a name, `xcrun simctl list devices available` shows the
+# choices, and the newest iOS version with that name is used.
 
 set -euo pipefail
 
@@ -239,7 +243,8 @@ install_on_mac() {
     echo "Installed and opened Developer ID builds of the working tree."
 }
 
-# Prints the UDID and name of the simulator to use, separated by a tab. $1 is a device's name or UDID.
+# Prints the UDID and name of the simulator to use, separated by a tab. $1 is iphone, ipad, or a
+# device's name or UDID.
 choose_simulator() {
     xcrun simctl list devices available --json | /usr/bin/python3 -c '
 import json, re, sys
@@ -253,7 +258,17 @@ for runtime, entries in json.load(sys.stdin)["devices"].items():
 # Newest iOS first, so a name shared by several versions picks the newest.
 devices.sort(key=lambda entry: entry[0], reverse=True)
 
-candidates = [device for _, device in devices if wanted in (device["udid"], device["name"])]
+kinds = {"iphone": ("iPhone", r"iPhone \d+ Pro"), "ipad": ("iPad", r"iPad Pro 13-inch.*")}
+if wanted in kinds:
+    prefix, preferred = kinds[wanted]
+    of_kind = [device for _, device in devices if device["name"].startswith(prefix)]
+    candidates = (
+        [device for device in of_kind if device["state"] == "Booted"]
+        + [device for device in of_kind if re.fullmatch(preferred, device["name"])]
+        + of_kind
+    )
+else:
+    candidates = [device for _, device in devices if wanted in (device["udid"], device["name"])]
 if not candidates:
     sys.exit(1)
 print(candidates[0]["udid"] + "\t" + candidates[0]["name"])
@@ -334,6 +349,8 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --mac) mac=debug ;;
         --mac-installed) mac=installed ;;
+        --iphone) simulators+=("iphone") ;;
+        --ipad) simulators+=("ipad") ;;
         --simulator)
             [[ $# -ge 2 ]] || usage 2
             simulators+=("$2")
