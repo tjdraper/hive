@@ -54,7 +54,7 @@ Check off a slice here when its "done when" is true.
 
 - [x] [G1. Pairing more devices](23-G1-PairingMoreDevices.md) — Mixed, 1–2 sessions, installed build, needs you
 - [x] [G2. Mac release script and updates](24-G2-MacReleaseScriptAndUpdates.md) — Engine, 1–2 sessions, installed build, needs you
-- [ ] [G3. Moving off site-backups](25-G3-MovingOffSiteBackups.md) — Mixed, 1 session, needs you
+- [x] [G3. Moving off site-backups](25-G3-MovingOffSiteBackups.md) — Mixed, 1 session, needs you
 
 ### Phase H — iPhone and iPad
 
