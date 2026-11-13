@@ -61,6 +61,8 @@ struct MainWindow: View {
         NavigationSplitView {
             HiveSidebar(selection: $selection, onAddServer: addServer, onAddJob: addJob)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240)
+                // Nothing in it takes typing, so a keyboard for the detail or a sheet leaves it alone.
+                .ignoresSafeArea(.keyboard)
         } detail: {
             detail
         }

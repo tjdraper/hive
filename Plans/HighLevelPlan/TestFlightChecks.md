@@ -12,3 +12,4 @@ Add a check here whenever a slice leaves one, with the slice it came from. Check
 - [x] **H2:** Live progress for a Run Now on the iPad moves as the run goes, and the run shows in the Job Log.
 - [x] **H2:** Deleting a snapshot on the iPad asks for Face ID, then the snapshot leaves the list.
 - [ ] **H2:** With Tailscale off on the iPad and the Hive's address options holding only its Tailscale name, Beekeeper still reaches the Hive over Wi-Fi through its Bonjour advertisement. Turning off Advertise on the Local Network in the Hive's settings stops that.
+- [ ] **H2:** With the floating keyboard on the iPad, typing in a sheet or the Hive's settings leaves the sheet and window their full size. With the docked keyboard, the field being typed in stays above it. The sidebar never moves for either.
