@@ -44,11 +44,15 @@ extension View {
             // Without the glass capsule toolbar items get, so it reads as the title it stands in for.
             ToolbarItem(placement: .navigation) {
                 LocationPath(parts: parts)
+                    // iPadOS otherwise gives the item only enough room for its first icon.
+                    .fixedSize()
             }
             .sharedBackgroundVisibility(.hidden)
         }
         #if os(macOS)
         .toolbar(removing: .title)
+        #else
+        .navigationBarTitleDisplayMode(.inline)
         #endif
     }
 }

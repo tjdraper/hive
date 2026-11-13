@@ -11,7 +11,7 @@ struct RecoveryFileSummary: View {
 
     var body: some View {
         GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 0) {
                 LabeledContent("Last written") {
                     if let written = copies.hiveState?.fileWrittenAt {
                         // Each minute, and without seconds, so it never sits on a stale "47 seconds ago".
@@ -23,18 +23,22 @@ struct RecoveryFileSummary: View {
                         Text("Not yet")
                     }
                 }
+                Divider()
                 LabeledContent(Self.thisDevice) {
                     deviceCopy
                 }
                 #if os(macOS)
                 if copies.folder != nil {
+                    Divider()
                     LabeledContent("In “\(copies.folderName ?? "the chosen folder")”") {
                         folderCopy
                     }
                 }
                 #endif
             }
-            .padding(4)
+            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .labeledContentStyle(SpreadLabeledContentStyle())
         } label: {
             Text("Recovery File")
         }
@@ -89,5 +93,19 @@ private struct HasLatestLabel: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
         }
+    }
+}
+
+/// Laid out as the server rows above: the label at the leading edge, the value at the trailing one.
+/// Outside a form, the Mac otherwise puts the value straight after the label.
+private struct SpreadLabeledContentStyle: LabeledContentStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            configuration.label
+            Spacer()
+            configuration.content
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 6)
     }
 }

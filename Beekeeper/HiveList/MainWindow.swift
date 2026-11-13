@@ -67,6 +67,8 @@ struct MainWindow: View {
         #if os(macOS)
         // A floor for the window, so no page's content can make its smallest size larger than the screen.
         .frame(minWidth: 640, minHeight: 400)
+        #else
+        .groupBoxStyle(LabelAboveGroupBoxStyle())
         #endif
         .sheet(item: $addingServer) { request in
             if let link = store.link(for: request.hiveID), let servers = store.servers(for: request.hiveID) {
