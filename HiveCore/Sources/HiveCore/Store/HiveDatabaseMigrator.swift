@@ -63,6 +63,7 @@ enum HiveDatabaseMigrator {
             }
         }
         migrator.registerMigration("Add address options", migrate: addAddressOptions)
+        migrator.registerMigration("Add advertising on the local network", migrate: addLocalNetworkAdvertising)
 
         return migrator
     }
@@ -325,6 +326,12 @@ extension HiveDatabaseMigrator {
         try database.alter(table: "hive") { table in
             // `[AddressOption]` as JSON, in the order devices try them.
             table.add(column: "addressOptions", .text).notNull().defaults(to: "[]")
+        }
+    }
+
+    static func addLocalNetworkAdvertising(_ database: Database) throws {
+        try database.alter(table: "hive") { table in
+            table.add(column: "advertisesOnLocalNetwork", .boolean).notNull().defaults(to: true)
         }
     }
 }

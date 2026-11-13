@@ -1,3 +1,4 @@
+import Foundation
 @testable import HiveCore
 import HiveKit
 import Synchronization
@@ -59,6 +60,19 @@ enum FakeListenerError: Error {
     case addressInUse
 }
 
+/// Keeps what it was last told to advertise.
+final class FakeAdvertiser: LocalNetworkAdvertiser {
+    private let latest = Mutex<LocalNetworkAdvertisement?>(nil)
+
+    var advertised: LocalNetworkAdvertisement? {
+        latest.withLock { $0 }
+    }
+
+    func advertise(_ advertisement: LocalNetworkAdvertisement?) {
+        latest.withLock { $0 = advertisement }
+    }
+}
+
 final class FakeAddresses: Sendable {
     private let present = Mutex<Set<String>>([])
 
@@ -76,9 +90,15 @@ struct ListenerCoordinatorTests {
 
     private let factory = FakeListenerFactory()
     private let addresses = FakeAddresses()
+    private let advertiser = FakeAdvertiser()
 
     private func coordinator(_ access: NetworkAccess, port: Int = 4483) -> ListenerCoordinator {
-        ListenerCoordinator(target: ListenTarget(networkAccess: access, port: port)) { [addresses] in addresses.current }
+        ListenerCoordinator(
+            target: ListenTarget(networkAccess: access, port: port),
+            presentAddresses: { [addresses] in addresses.current },
+            localNetworks: { [] },
+            advertiser: advertiser
+        )
     }
 
     private func address(_ host: String, port: Int = 4483) -> ListenerAddress {
@@ -207,17 +227,28 @@ struct ListenerCoordinatorRunTests {
     func appliesWhileRunningAndStops() async throws {
         // Arrange
         let factory = FakeListenerFactory()
-        let coordinator = ListenerCoordinator(target: ListenTarget(networkAccess: .thisMacOnly, port: 4483)) { [] }
+        let advertiser = FakeAdvertiser()
+        let wiFi = LocalNetworkInterface(name: "en0", index: 4, addresses: ["192.168.1.20"])
+        let hive = AdvertisedHive(hiveID: UUID(), name: "Studio Hive")
+        let coordinator = ListenerCoordinator(
+            target: ListenTarget(networkAccess: .thisMacOnly, port: 4483, advertised: hive),
+            presentAddresses: { [] },
+            localNetworks: { [wiFi] },
+            advertiser: advertiser
+        )
         let running = Task { try await coordinator.run(with: factory) }
 
         // Act
-        try await coordinator.apply(ListenTarget(networkAccess: .allAddresses, port: 4483))
+        try await coordinator.apply(ListenTarget(networkAccess: .allAddresses, port: 4483, advertised: hive))
         let whileRunning = factory.running
+        let advertisedWhileRunning = advertiser.advertised
         running.cancel()
         try await running.value
 
         // Assert
         #expect(whileRunning == [ListenerAddress(host: "127.0.0.1", port: 4483), ListenerAddress(host: "::", port: 4483)])
+        #expect(advertisedWhileRunning == LocalNetworkAdvertisement(hive: hive, port: 4483, interfaces: [4]))
         #expect(factory.running.isEmpty)
+        #expect(advertiser.advertised == nil)
     }
 }

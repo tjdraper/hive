@@ -56,7 +56,7 @@ struct RestoreSheet: View {
             }
             .padding()
         }
-        .frame(width: 560, height: 520)
+        .macSheetSize(width: 560, height: 520)
         .interactiveDismissDisabled(draft.isRestoring)
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [Self.recoveryFileType]) { result in
             guard case .success(let url) = result else { return }

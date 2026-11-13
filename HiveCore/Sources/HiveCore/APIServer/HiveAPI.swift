@@ -234,7 +234,7 @@ public struct HiveAPI: Sendable {
         self.signIn = signIn
         self.settingsStore = settingsStore
         settings = HiveSettingsWorkflow(
-            store: settingsStore, listeners: listeners, interfaces: addresses,
+            hiveID: hiveID, store: settingsStore, listeners: listeners, interfaces: addresses,
             suggestions: SuggestedHostResolver(naming: hostNaming), addressChanges: addressChanges, now: now
         )
         let servers = ServerStore(database: database)

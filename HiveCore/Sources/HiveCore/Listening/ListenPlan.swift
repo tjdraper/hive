@@ -1,3 +1,4 @@
+import Foundation
 import HiveKit
 
 struct ListenerAddress: Hashable, Sendable {
@@ -17,16 +18,20 @@ struct ListenerAddress: Hashable, Sendable {
 public struct ListenTarget: Hashable, Sendable {
     let networkAccess: NetworkAccess
     let port: Int
+    /// Nil when Hive doesn't advertise itself on the local network.
+    let advertised: AdvertisedHive?
 
-    public init(networkAccess: NetworkAccess, port: Int) {
+    public init(networkAccess: NetworkAccess, port: Int, advertised: AdvertisedHive? = nil) {
         self.networkAccess = networkAccess
         self.port = port
+        self.advertised = advertised
     }
 }
 
 extension HiveSettings {
-    public var listenTarget: ListenTarget {
-        ListenTarget(networkAccess: networkAccess, port: port)
+    public func listenTarget(hiveID: UUID) -> ListenTarget {
+        let advertised = advertisesOnLocalNetwork ? AdvertisedHive(hiveID: hiveID, name: name) : nil
+        return ListenTarget(networkAccess: networkAccess, port: port, advertised: advertised)
     }
 }
 

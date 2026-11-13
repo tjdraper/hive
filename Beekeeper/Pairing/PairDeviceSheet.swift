@@ -49,7 +49,7 @@ struct PairDeviceSheet: View {
             }
             .padding()
         }
-        .frame(width: 520, height: 560)
+        .macSheetSize(width: 520, height: 560)
         .interactiveDismissDisabled()
         .task { await open() }
         .task(id: openWindowID) { await watch() }

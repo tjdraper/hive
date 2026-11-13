@@ -21,7 +21,7 @@ enum DaemonStart {
             let database = try HiveDatabase.open(in: started.dataDirectory, defaultHiveName: defaultHiveName())
             let hiveID = try database.hiveID()
             let settings = HiveSettingsStore(database: database, defaultPort: APIServer.defaultPort(for: mode))
-            let listeners = ListenerCoordinator(target: try settings.settings().listenTarget)
+            let listeners = ListenerCoordinator(target: try settings.settings().listenTarget(hiveID: hiveID))
             let pin = PublicKeyPin(publicKey: keys.identity.publicKey)
 
             let api = HiveAPI(

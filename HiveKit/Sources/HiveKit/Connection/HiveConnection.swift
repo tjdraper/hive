@@ -22,14 +22,20 @@ public enum HiveConnectionError: Error, Equatable {
 /// in order, starting from the last one that worked, and moves on when one can't be reached or shows
 /// another key, which may be another machine with the Hive's old address. A key refused at one address
 /// and shown at none is the Hive's identity having changed.
+///
+/// Addresses found on the local network (`LocalNetworkService`) are tried first, as the most direct
+/// way to the Hive. Anything on the network can advertise any Hive, so another key shown at one of
+/// those says nothing about the Hive's identity, and counts as the Hive not being there.
 public final class HiveConnection: Sendable {
     private let addresses: [HiveAddress]
+    private let discovered: Mutex<[HiveAddress]>
     private let pin: PublicKeyPin
     private let session: URLSession
-    private let preferred = Mutex(0)
+    private let preferred = Mutex<HiveAddress?>(nil)
 
-    public init(addresses: [HiveAddress], pin: PublicKeyPin) {
+    public init(addresses: [HiveAddress], pin: PublicKeyPin, discovered: [HiveAddress] = []) {
         self.addresses = addresses
+        self.discovered = Mutex(discovered)
         self.pin = pin
 
         let configuration = URLSessionConfiguration.ephemeral
@@ -41,6 +47,11 @@ public final class HiveConnection: Sendable {
 
     deinit {
         session.invalidateAndCancel()
+    }
+
+    /// Replaces the addresses found on the local network, such as when the Hive's advertisement goes away.
+    public func useDiscoveredAddresses(_ found: [HiveAddress]) {
+        discovered.withLock { $0 = found }
     }
 
     public func checkHealth() async throws {
@@ -137,19 +148,26 @@ public final class HiveConnection: Sendable {
     }
 
     /// Tries `attempt` at each address, from the last one that worked, until one gets an answer.
-    private func atEachAddress<Value>(method: String, _ attempt: (HiveAddress) async throws -> Value) async throws -> Value {
-        guard !addresses.isEmpty else { throw HiveConnectionError.invalidAddress }
-        let first = preferred.withLock { $0 }
+    func atEachAddress<Value>(method: String, _ attempt: (HiveAddress) async throws -> Value) async throws -> Value {
+        let found = discovered.withLock { $0 }.filter { !addresses.contains($0) }
+        let candidates = found.map { (address: $0, isDiscovered: true) } + addresses.map { (address: $0, isDiscovered: false) }
+        guard !candidates.isEmpty else { throw HiveConnectionError.invalidAddress }
+        let last = preferred.withLock { $0 }
+        let first = candidates.firstIndex { $0.address == last } ?? 0
         var lastError: (any Error)?
         var sawWrongKey = false
-        for offset in addresses.indices {
-            let index = (first + offset) % addresses.count
+        for offset in candidates.indices {
+            let candidate = candidates[(first + offset) % candidates.count]
             do {
-                let value = try await attempt(addresses[index])
-                preferred.withLock { $0 = index }
+                let value = try await attempt(candidate.address)
+                preferred.withLock { $0 = candidate.address }
                 return value
             } catch HiveConnectionError.wrongKey {
-                sawWrongKey = true
+                if candidate.isDiscovered {
+                    lastError = lastError ?? URLError(.cannotConnectToHost)
+                } else {
+                    sawWrongKey = true
+                }
             } catch let error as URLError where Self.neverArrived(error, method: method) {
                 lastError = error
             }

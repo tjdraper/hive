@@ -12,8 +12,9 @@ enum SettingsChangeError: Error, Equatable {
     case refused(SettingsProblem)
 }
 
-/// Changing the Hive's name and where it listens. A listening change takes effect before it's saved, so
-/// a port that's taken is turned down with nothing changed, and nothing waits for the daemon to restart.
+/// Changing the Hive's name, where it listens and whether it advertises itself. A listening change
+/// takes effect before it's saved, so a port that's taken is turned down with nothing changed, and
+/// nothing waits for the daemon to restart.
 struct HiveSettingsWorkflow: Sendable {
     static let ports = 1024 ... 65535
     /// An address option's port can be any, since a port forward or tunnel isn't Hive listening.
@@ -21,6 +22,8 @@ struct HiveSettingsWorkflow: Sendable {
 
     private static let logger = Logger(subsystem: HiveLog.subsystem, category: "Settings")
 
+    /// Named in the Hive's advertisement on the local network.
+    let hiveID: UUID
     let store: HiveSettingsStore
     let listeners: any ListenerControl
     let interfaces: @Sendable () -> [NetworkInterfaceAddress]
@@ -45,10 +48,12 @@ struct HiveSettingsWorkflow: Sendable {
         let old = try store.settings()
         guard new != old else { return try await state() }
 
-        let listeningChanged = new.listenTarget != old.listenTarget
+        let newTarget = new.listenTarget(hiveID: hiveID)
+        let oldTarget = old.listenTarget(hiveID: hiveID)
+        let listeningChanged = newTarget != oldTarget
         if listeningChanged {
             do {
-                try await listeners.apply(new.listenTarget)
+                try await listeners.apply(newTarget)
             } catch ListenerCoordinatorError.loopbackUnavailable {
                 Self.logger.error("Refused a settings change: port unavailable")
                 throw SettingsChangeError.refused(.portUnavailable)
@@ -58,7 +63,7 @@ struct HiveSettingsWorkflow: Sendable {
         do {
             try store.save(new, replacing: old, by: deviceID, at: now())
         } catch {
-            if listeningChanged { try? await listeners.apply(old.listenTarget) }
+            if listeningChanged { try? await listeners.apply(oldTarget) }
             throw error
         }
         Self.logger.notice("Changed the settings")
@@ -82,7 +87,8 @@ struct HiveSettingsWorkflow: Sendable {
             name: name,
             networkAccess: networkAccess,
             port: requested.port,
-            addressOptions: try AddressOptionCheck.validated(requested.addressOptions)
+            addressOptions: try AddressOptionCheck.validated(requested.addressOptions),
+            advertisesOnLocalNetwork: requested.advertisesOnLocalNetwork
         )
     }
 }

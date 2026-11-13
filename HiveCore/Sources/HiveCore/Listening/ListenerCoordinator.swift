@@ -44,16 +44,30 @@ public actor ListenerCoordinator: ListenerControl {
     /// Addresses whose last attempt failed, so a failure that repeats every recheck is logged once.
     private var failing: Set<ListenerAddress> = []
     private let presentAddresses: @Sendable () -> Set<String>
+    private let localNetworks: @Sendable () -> [LocalNetworkInterface]
+    private let advertiser: any LocalNetworkAdvertiser
     private let commands: AsyncStream<Command>
     private let commandInput: AsyncStream<Command>.Continuation
 
     public init(target: ListenTarget) {
-        self.init(target: target, presentAddresses: NetworkInterfaceList.presentAddresses)
+        self.init(
+            target: target,
+            presentAddresses: NetworkInterfaceList.presentAddresses,
+            localNetworks: NetworkInterfaceList.localNetworkInterfaces,
+            advertiser: BonjourAdvertiser()
+        )
     }
 
-    init(target: ListenTarget, presentAddresses: @escaping @Sendable () -> Set<String>) {
+    init(
+        target: ListenTarget,
+        presentAddresses: @escaping @Sendable () -> Set<String>,
+        localNetworks: @escaping @Sendable () -> [LocalNetworkInterface],
+        advertiser: any LocalNetworkAdvertiser
+    ) {
         self.target = target
         self.presentAddresses = presentAddresses
+        self.localNetworks = localNetworks
+        self.advertiser = advertiser
         (commands, commandInput) = AsyncStream.makeStream()
     }
 
@@ -116,7 +130,7 @@ public actor ListenerCoordinator: ListenerControl {
 
     /// Starts what's missing before stopping what's no longer wanted, so a change that fails leaves
     /// Hive listening as before. Only `127.0.0.1` is required. Another address that can't be bound is
-    /// tried again at the next recheck.
+    /// tried again at the next recheck. Then advertises on the local networks it's listening on.
     func reconcile(to target: ListenTarget, using factory: any APIListenerFactory) async throws {
         listeners = listeners.filter { !$0.value.hasStopped }
         let wanted = ListenPlan.addresses(for: target, present: presentAddresses())
@@ -143,9 +157,13 @@ public actor ListenerCoordinator: ListenerControl {
         }
         listeners.merge(started) { _, new in new }
         failing.formIntersection(wanted)
+
+        let hosts = Set(listeners.filter { !$0.value.hasStopped }.keys.map(\.host))
+        advertiser.advertise(AdvertisingPlan.advertisement(for: target, listeningOn: hosts, interfaces: localNetworks()))
     }
 
     private func stopAll() async {
+        advertiser.advertise(nil)
         for listener in listeners.values { await listener.stop() }
         for listener in listeners.values { await listener.waitUntilStopped() }
         listeners = [:]
@@ -158,7 +176,7 @@ public actor ListenerCoordinator: ListenerControl {
         return String(describing: type(of: error))
     }
 
-        private static func describe(_ access: HiveKit.NetworkAccess) -> String {
+    private static func describe(_ access: HiveKit.NetworkAccess) -> String {
         switch access {
         case .thisMacOnly: "on this Mac only"
         case .address: "on this Mac and one chosen address"

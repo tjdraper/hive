@@ -18,7 +18,8 @@ extension FocusedValues {
     @Entry var addHive: AddHiveAction?
 }
 
-/// Pairs this device with a Hive by pasting a pairing code from a device already paired with it.
+/// Pairs this device with a Hive by pasting a pairing code from a device already paired with it, or on
+/// iPhone and iPad by scanning its QR code.
 struct AddHiveSheet: View {
     let onAdded: (UUID) -> Void
 
@@ -27,41 +28,19 @@ struct AddHiveSheet: View {
     @State private var codeText = ""
     @State private var deviceName = ThisDevice.name
     @State private var isPairing = false
+    @State private var isScanning = false
     @State private var failure: String?
 
     var body: some View {
+        sheet
+            // The code's Hive may be found on the local network, at an address the code doesn't carry.
+            .task { store.discoverLocalHives() }
+    }
+
+    #if os(macOS)
+    private var sheet: some View {
         VStack(spacing: 0) {
-            Form {
-                Section {
-                    TextField("Pairing code", text: $codeText, prompt: Text("hive1:…"), axis: .vertical)
-                        .font(.system(.body, design: .monospaced))
-                        .lineLimit(3 ... 6)
-                        .autocorrectionDisabled()
-                } header: {
-                    Text("Pairing Code")
-                } footer: {
-                    Text(
-                        "On a device already paired with the Hive, open its Devices page and choose Pair a Device, "
-                            + "then copy the code it shows."
-                    )
-                    .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    TextField("Name", text: $deviceName)
-                } header: {
-                    Text("This Device")
-                } footer: {
-                    Text("The Hive lists this device by this name.")
-                        .foregroundStyle(.secondary)
-                }
-
-                if let failure {
-                    Text(failure)
-                        .foregroundStyle(.red)
-                }
-            }
-            .formStyle(.grouped)
+            form
             Divider()
             HStack {
                 if isPairing {
@@ -73,15 +52,97 @@ struct AddHiveSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button("Pair") { Task { await pair() } }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(isPairing || codeText.isEmpty || deviceName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(!canPair)
             }
             .padding()
         }
         .frame(width: 520, height: 420)
         .navigationTitle("Add a Hive")
     }
+    #else
+    private var sheet: some View {
+        NavigationStack {
+            form
+                .navigationTitle("Add a Hive")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel", role: .cancel) { dismiss() }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        if isPairing {
+                            ProgressView()
+                        } else {
+                            Button("Pair") { Task { await pair() } }
+                                .disabled(!canPair)
+                        }
+                    }
+                }
+        }
+        .sheet(isPresented: $isScanning) {
+            PairingCodeScanner { code in
+                codeText = code.text
+                Task { await pair() }
+            }
+        }
+    }
+    #endif
+
+    private var form: some View {
+        Form {
+            Section {
+                #if os(iOS)
+                if PairingCodeScanner.isSupported {
+                    Button("Scan the QR Code", systemImage: "qrcode.viewfinder") { isScanning = true }
+                        .disabled(isPairing)
+                }
+                #endif
+                TextField("Pairing code", text: $codeText, prompt: Text("hive1:…"), axis: .vertical)
+                    .font(.system(.body, design: .monospaced))
+                    .lineLimit(3 ... 6)
+                    .autocorrectionDisabled()
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    #endif
+            } header: {
+                Text("Pairing Code")
+            } footer: {
+                Text(Self.codeFooter)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                TextField("Name", text: $deviceName)
+            } header: {
+                Text("This Device")
+            } footer: {
+                Text("The Hive lists this device by this name.")
+                    .foregroundStyle(.secondary)
+            }
+
+            if let failure {
+                Text(failure)
+                    .foregroundStyle(.red)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private static var codeFooter: String {
+        #if os(macOS)
+        "On a device already paired with the Hive, open its Devices page and choose Pair a Device, then copy the code it shows."
+        #else
+        "On a device already paired with the Hive, open its Devices page and choose Pair a Device, then scan the QR code it "
+            + "shows, or paste the code."
+        #endif
+    }
+
+    private var canPair: Bool {
+        !isPairing && !codeText.isEmpty && !deviceName.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     private func pair() async {
+        guard canPair else { return }
         failure = nil
         guard let code = PairingCode(text: codeText) else {
             failure = "That isn't a whole pairing code. Copy it again from the other device."

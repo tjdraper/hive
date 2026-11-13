@@ -123,6 +123,6 @@ private struct OtherAddressSheet: View {
             }
             .padding()
         }
-        .frame(width: 420, height: 240)
+        .macSheetSize(width: 420, height: 240)
     }
 }

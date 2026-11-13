@@ -24,6 +24,10 @@ struct SettingsRoutesTests {
         }
     }
 
+    private func advertised(_ name: String) -> AdvertisedHive {
+        AdvertisedHive(hiveID: fixture.api.hiveID, name: name)
+    }
+
     private static func withOptions(_ options: [AddressOption]) -> HiveSettings {
         HiveSettings(name: "Hive", networkAccess: .allAddresses, port: 4483, addressOptions: options)
     }
@@ -50,7 +54,7 @@ struct SettingsRoutesTests {
         #expect(state.listeningOn == ["127.0.0.1"])
     }
 
-    @Test("Renaming the Hive saves the new name and records who did it")
+    @Test("Renaming the Hive saves the new name, records who did it, and advertises it under the new name")
     func renames() async throws {
         // Arrange
         var settings = try current
@@ -67,7 +71,7 @@ struct SettingsRoutesTests {
         #expect(entry.event == .hiveRenamed(old: "Test Hive", new: "Studio Hive"))
         #expect(entry.deviceID == fixture.signIn.device.id)
         #expect(entry.deviceName == "Test Mac")
-        #expect(fixture.listeners.applied.isEmpty)
+        #expect(fixture.listeners.applied.map(\.advertised) == [advertised("Studio Hive")])
     }
 
     @Test("Choosing an address takes effect at once, in its canonical form, and is recorded")
@@ -81,7 +85,9 @@ struct SettingsRoutesTests {
 
         // Assert
         #expect(status == .ok)
-        #expect(fixture.listeners.applied == [ListenTarget(networkAccess: .address("fd7a:115c:a1e0::1"), port: APIFixture.defaultPort)])
+        #expect(fixture.listeners.applied == [
+            ListenTarget(networkAccess: .address("fd7a:115c:a1e0::1"), port: APIFixture.defaultPort, advertised: advertised("Test Hive")),
+        ])
         #expect(try current.networkAccess == .address("fd7a:115c:a1e0::1"))
         #expect(try fixture.auditEvents().first == .networkAccessChanged(old: .thisMacOnly, new: .address("fd7a:115c:a1e0::1")))
     }
@@ -100,7 +106,36 @@ struct SettingsRoutesTests {
             .networkAccessChanged(old: .thisMacOnly, new: .allAddresses),
             .hiveRenamed(old: "Test Hive", new: "Studio Hive"),
         ])
-        #expect(fixture.listeners.applied == [ListenTarget(networkAccess: .allAddresses, port: 5000)])
+        let target = ListenTarget(networkAccess: .allAddresses, port: 5000, advertised: advertised("Studio Hive"))
+        #expect(fixture.listeners.applied == [target])
+    }
+
+    @Test("Turning off advertising on the local network stops it and is recorded")
+    func turnsOffAdvertising() async throws {
+        // Arrange
+        var settings = try current
+        settings.advertisesOnLocalNetwork = false
+
+        // Act
+        let (status, _) = try await put(settings)
+
+        // Assert
+        #expect(status == .ok)
+        #expect(try current.advertisesOnLocalNetwork == false)
+        #expect(try fixture.auditEvents().first == .localNetworkAdvertisingChanged(isOn: false))
+        #expect(fixture.listeners.applied == [ListenTarget(networkAccess: .thisMacOnly, port: APIFixture.defaultPort, advertised: nil)])
+    }
+
+    @Test("Settings from a Beekeeper that predates advertising leave it on")
+    func missingAdvertisingDecodesAsOn() throws {
+        // Arrange
+        let json = Data(#"{"name":"Hive","networkAccess":{"thisMacOnly":{}},"port":4483,"addressOptions":[]}"#.utf8)
+
+        // Act
+        let settings = try JSONDecoder().decode(HiveSettings.self, from: json)
+
+        // Assert
+        #expect(settings.advertisesOnLocalNetwork)
     }
 
     @Test("Address options are saved in one written form, in order, and recorded")

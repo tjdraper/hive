@@ -108,7 +108,7 @@ extension ConfirmationWorkflow {
         case ConfirmationKeyError.cancelled:
             "Not confirmed."
         case ConfirmationKeyError.notConfirmed:
-            "Touch ID or the password wasn't accepted."
+            "\(ConfirmationKey.askedWith.prefix(1).uppercased())\(ConfirmationKey.askedWith.dropFirst()) wasn't accepted."
         case ConfirmationKeyError.secureEnclaveUnavailable, ConfirmationKeyError.couldNotSetAccessControl:
             "This device can't make a confirmation key."
         case ConfirmationWorkflowError.keyMismatch:
@@ -133,7 +133,7 @@ extension ConfirmationRefusalReason {
 }
 
 extension ConfirmationReason {
-    /// What Touch ID or the password prompt says, after "Beekeeper is trying to", when Hive asked for a
+    /// What the Face ID, Touch ID or password prompt says, after "Beekeeper is trying to", when Hive asked for a
     /// confirmation Beekeeper didn't expect.
     static func prompt(for reasons: [ConfirmationReason]) -> String {
         let parts = reasons.map(\.prompt)

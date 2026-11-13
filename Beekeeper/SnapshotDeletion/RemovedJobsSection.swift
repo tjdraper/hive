@@ -117,6 +117,6 @@ private struct RemovedJobSheet: View {
             }
             .padding()
         }
-        .frame(width: 560, height: 520)
+        .macSheetSize(width: 560, height: 520)
     }
 }

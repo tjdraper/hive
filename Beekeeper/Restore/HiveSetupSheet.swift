@@ -58,7 +58,7 @@ struct HiveSetupSheet: View {
             }
             .padding()
         }
-        .frame(width: 560, height: 330)
+        .macSheetSize(width: 560, height: 330)
     }
 }
 

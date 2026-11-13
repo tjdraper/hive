@@ -38,6 +38,13 @@ struct HiveSettingsView: View {
 
             networkSection(state: state, draft: draft)
 
+            Section {
+                Toggle("Advertise on the Local Network", isOn: draft.advertisesOnLocalNetwork)
+            } footer: {
+                Text(advertisingFooter(draft.wrappedValue))
+                    .foregroundStyle(.secondary)
+            }
+
             AddressOptionsSection(
                 options: draft.addressOptions,
                 networkAccess: draft.wrappedValue.settings.networkAccess,
@@ -146,6 +153,18 @@ struct HiveSettingsView: View {
         }
     }
 
+    private func advertisingFooter(_ draft: SettingsDraft) -> String {
+        guard draft.advertisesOnLocalNetwork else {
+            return "Devices reach the Hive only at the addresses below."
+        }
+        if draft.access == .thisMacOnly {
+            return "Hive advertises itself with Bonjour on the local networks it listens on, which is none while it listens on "
+                + "this Mac only."
+        }
+        return "Paired devices on the same local network as the Mac find the Hive there with Bonjour, even when the addresses "
+            + "below don't reach it. Never over Tailscale."
+    }
+
     private func load() async {
         do {
             let loaded: HiveSettingsState = try await link.perform { try await $0.get(HiveEndpoint.settings) }
@@ -213,11 +232,13 @@ struct SettingsDraft: Equatable {
     var address: String
     var port: Int
     var addressOptions: [AddressOption]
+    var advertisesOnLocalNetwork: Bool
 
     init(_ settings: HiveSettings) {
         name = settings.name
         port = settings.port
         addressOptions = settings.addressOptions
+        advertisesOnLocalNetwork = settings.advertisesOnLocalNetwork
         switch settings.networkAccess {
         case .thisMacOnly:
             access = .thisMacOnly
@@ -237,7 +258,13 @@ struct SettingsDraft: Equatable {
         case .oneAddress: .address(address)
         case .allAddresses: .allAddresses
         }
-        return HiveSettings(name: name, networkAccess: networkAccess, port: port, addressOptions: addressOptions)
+        return HiveSettings(
+            name: name,
+            networkAccess: networkAccess,
+            port: port,
+            addressOptions: addressOptions,
+            advertisesOnLocalNetwork: advertisesOnLocalNetwork
+        )
     }
 }
 

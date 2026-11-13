@@ -22,6 +22,8 @@ struct RecoveryContents: Codable, Equatable {
         let port: Int?
         /// `[AddressOption]` as the store keeps it. Missing from files written before there were any.
         let addressOptions: String?
+        /// Missing from files written before Hive advertised itself, which then starts doing so.
+        let advertisesOnLocalNetwork: Bool?
         /// Chosen again after a restore, since a drive restored from a Mac backup has a new volume UUID.
         let backupDrive: BackupDrive?
     }

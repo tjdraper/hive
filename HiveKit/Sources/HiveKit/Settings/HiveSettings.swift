@@ -6,12 +6,35 @@ public struct HiveSettings: Codable, Hashable, Sendable {
     /// Where other devices reach the Hive, in the order they try them. A pairing code carries them, and
     /// paired devices pick up changes, so they follow the Hive to a new port.
     public var addressOptions: [AddressOption]
+    /// Hive advertises itself with Bonjour on the local networks it listens on, so devices there find it.
+    public var advertisesOnLocalNetwork: Bool
 
-    public init(name: String, networkAccess: NetworkAccess, port: Int, addressOptions: [AddressOption] = []) {
+    public init(
+        name: String,
+        networkAccess: NetworkAccess,
+        port: Int,
+        addressOptions: [AddressOption] = [],
+        advertisesOnLocalNetwork: Bool = true
+    ) {
         self.name = name
         self.networkAccess = networkAccess
         self.port = port
         self.addressOptions = addressOptions
+        self.advertisesOnLocalNetwork = advertisesOnLocalNetwork
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case name, networkAccess, port, addressOptions, advertisesOnLocalNetwork
+    }
+
+    /// A Hive from before Bonjour sends no `advertisesOnLocalNetwork`.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        networkAccess = try container.decode(NetworkAccess.self, forKey: .networkAccess)
+        port = try container.decode(Int.self, forKey: .port)
+        addressOptions = try container.decode([AddressOption].self, forKey: .addressOptions)
+        advertisesOnLocalNetwork = try container.decodeIfPresent(Bool.self, forKey: .advertisesOnLocalNetwork) ?? true
     }
 
     public var addresses: HiveAddresses {

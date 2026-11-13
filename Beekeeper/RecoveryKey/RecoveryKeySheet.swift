@@ -68,7 +68,7 @@ struct RecoveryKeySheet: View {
             }
             .padding()
         }
-        .frame(width: 560, height: isReplacing ? 480 : 420)
+        .macSheetSize(width: 560, height: isReplacing ? 480 : 420)
         .interactiveDismissDisabled()
     }
 

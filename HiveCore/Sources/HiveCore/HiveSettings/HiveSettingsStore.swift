@@ -22,7 +22,7 @@ public struct HiveSettingsStore: Sendable {
 
     public func settings() throws -> HiveSettings {
         try database.writer.read { database in
-            let sql = "SELECT name, networkAccess, listenAddress, port, addressOptions FROM hive"
+            let sql = "SELECT name, networkAccess, listenAddress, port, addressOptions, advertisesOnLocalNetwork FROM hive"
             guard let row = try Row.fetchOne(database, sql: sql) else {
                 throw HiveDatabaseError.missingHiveID
             }
@@ -30,7 +30,8 @@ public struct HiveSettingsStore: Sendable {
                 name: row["name"],
                 networkAccess: Self.networkAccess(kind: row["networkAccess"], address: row["listenAddress"]),
                 port: row["port"] ?? defaultPort,
-                addressOptions: try Self.addressOptions(from: row["addressOptions"])
+                addressOptions: try Self.addressOptions(from: row["addressOptions"]),
+                advertisesOnLocalNetwork: row["advertisesOnLocalNetwork"]
             )
         }
     }
@@ -41,8 +42,13 @@ public struct HiveSettingsStore: Sendable {
         let options = try Self.stored(new.addressOptions)
         try database.writer.write { database in
             try database.execute(
-                sql: "UPDATE hive SET name = ?, networkAccess = ?, listenAddress = ?, port = ?, addressOptions = ?",
-                arguments: [new.name, kind.rawValue, address, new.port == old.port ? (try currentPort(in: database)) : new.port, options]
+                sql: """
+                UPDATE hive SET name = ?, networkAccess = ?, listenAddress = ?, port = ?, addressOptions = ?, advertisesOnLocalNetwork = ?
+                """,
+                arguments: [
+                    new.name, kind.rawValue, address, new.port == old.port ? (try currentPort(in: database)) : new.port, options,
+                    new.advertisesOnLocalNetwork,
+                ]
             )
             for event in Self.changes(from: old, to: new) {
                 try AuditLog.record(event, by: deviceID, at: date, in: database)
@@ -62,6 +68,9 @@ public struct HiveSettingsStore: Sendable {
         if old.port != new.port { events.append(.portChanged(old: old.port, new: new.port)) }
         if old.addressOptions != new.addressOptions {
             events.append(.addressOptionsChanged(old: old.addressOptions, new: new.addressOptions))
+        }
+        if old.advertisesOnLocalNetwork != new.advertisesOnLocalNetwork {
+            events.append(.localNetworkAdvertisingChanged(isOn: new.advertisesOnLocalNetwork))
         }
         return events
     }

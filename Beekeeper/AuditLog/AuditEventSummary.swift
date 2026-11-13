@@ -24,6 +24,8 @@ extension AuditEvent {
             "Changed where Hive listens from \(old.summary) to \(new.summary)"
         case .portChanged(let old, let new):
             "Changed the port from \(old) to \(new)"
+        case .localNetworkAdvertisingChanged(let isOn):
+            isOn ? "Turned on advertising on the local network" : "Turned off advertising on the local network"
         case .server(_, let serverName, let change):
             change.summary(serverName: serverName)
         case .backupJob(_, let serverName, let jobName, let change):
@@ -39,7 +41,7 @@ extension AuditEvent {
         case .snapshotsDeleted(let deletion):
             deletion.summary
         case .confirmationKeyRegistered:
-            "Set up confirming changes with Touch ID or the password"
+            "Set up confirming changes"
         case .identityRegenerated:
             "Gave the Hive a new identity, unpairing every device"
         case .email(let change):

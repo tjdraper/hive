@@ -16,6 +16,10 @@
 	<string>$(BEEKEEPER_BUILD_DATE)</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Beekeeper connects to your Hives over your local network to manage your backups.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Beekeeper asks for Face ID before a change that removes backups, sends a password somewhere new, or lets a new device manage a Hive.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Beekeeper uses the camera to scan the QR code that pairs this device with a Hive.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_hive._tcp</string>

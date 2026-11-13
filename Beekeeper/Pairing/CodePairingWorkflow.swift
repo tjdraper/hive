@@ -15,7 +15,8 @@ struct CodePairingWorkflow {
 
     let keychain: DeviceKeychain
 
-    func pair(_ code: PairingCode, deviceName: String) async throws -> PairingResult {
+    /// `discovered` is where the code's Hive was found on the local network, tried before the code's addresses.
+    func pair(_ code: PairingCode, deviceName: String, discovered: [HiveAddress]) async throws -> PairingResult {
         let key = try DeviceCredential.makeSigningKey()
         let request = PairingRequest(
             token: code.token,
@@ -26,7 +27,7 @@ struct CodePairingWorkflow {
 
         let result: PairingResult
         do {
-            result = try await HiveConnection(addresses: code.addresses, pin: code.pin).pair(request)
+            result = try await HiveConnection(addresses: code.addresses, pin: code.pin, discovered: discovered).pair(request)
         } catch {
             // A URLError's description names the host, which stays out of the system log.
             let kind = (error as? URLError).map { "URLError \($0.code.rawValue)" } ?? String(describing: error)

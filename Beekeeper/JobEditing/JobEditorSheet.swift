@@ -59,7 +59,7 @@ struct JobEditorSheet: View {
             }
             .padding()
         }
-        .frame(width: 640, height: 680)
+        .macSheetSize(width: 640, height: 680)
         // Hive's problems name rows by their place in the list it was sent, which adding or removing one changes.
         .onChange(of: draft.rowIDs) { problems = JobFieldProblems() }
         .task(id: draft.retention) { await estimateRetention() }

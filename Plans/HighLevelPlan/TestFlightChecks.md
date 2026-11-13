@@ -7,4 +7,8 @@ Add a check here whenever a slice leaves one, with the slice it came from. Check
 - [x] **H1:** The TestFlight build installs on the iPhone and opens, with Beekeeper's icon on the Home Screen.
 - [x] **H1:** The same on the iPad.
 - [x] **H1:** TestFlight shows the project's version and the build number the release script printed, with no export compliance question.
-- [ ] **H1:** The first time Beekeeper reaches a Hive on the local network, iOS asks for local network access with Beekeeper's explanation. Allowing it lets the connection through, and turning it off in Settings › Privacy & Security › Local Network stops it. Possible once a device can pair (H2).
+- [x] **H1:** The first time Beekeeper reaches a Hive on the local network, iOS asks for local network access with Beekeeper's explanation. Allowing it lets the connection through, and turning it off in Settings › Privacy & Security › Local Network stops it. Possible once a device can pair (H2).
+- [x] **H2:** On the iPad, Add a Hive › Scan the QR Code asks for camera access, scans the code Pair a Device shows on the Mac, and pairs.
+- [x] **H2:** Live progress for a Run Now on the iPad moves as the run goes, and the run shows in the Job Log.
+- [x] **H2:** Deleting a snapshot on the iPad asks for Face ID, then the snapshot leaves the list.
+- [ ] **H2:** With Tailscale off on the iPad and the Hive's address options holding only its Tailscale name, Beekeeper still reaches the Hive over Wi-Fi through its Bonjour advertisement. Turning off Advertise on the Local Network in the Hive's settings stops that.

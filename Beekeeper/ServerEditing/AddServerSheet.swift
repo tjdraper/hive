@@ -33,7 +33,7 @@ struct AddServerSheet: View {
             footer
                 .padding()
         }
-        .frame(width: 620, height: 560)
+        .macSheetSize(width: 620, height: 560)
     }
 
     @ViewBuilder private var content: some View {

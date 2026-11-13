@@ -59,7 +59,7 @@ struct EditServerSheet: View {
             }
             .padding()
         }
-        .frame(width: 560, height: 560)
+        .macSheetSize(width: 560, height: 560)
         .task { space = try? await servers.space(of: server.id) }
         .task(id: draft.quotaBytes) { await estimateQuota() }
     }

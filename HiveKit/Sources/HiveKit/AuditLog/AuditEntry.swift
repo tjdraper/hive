@@ -32,6 +32,7 @@ public enum AuditEvent: Codable, Hashable, Sendable {
     case hiveRenamed(old: String, new: String)
     case networkAccessChanged(old: NetworkAccess, new: NetworkAccess)
     case portChanged(old: Int, new: Int)
+    case localNetworkAdvertisingChanged(isOn: Bool)
     /// The server's name as it was after the change.
     case server(serverID: UUID, serverName: String, change: ServerChange)
     /// The names as they were after the change.

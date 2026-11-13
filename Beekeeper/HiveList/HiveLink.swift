@@ -38,6 +38,9 @@ final class HiveLink {
     /// The ID this Hive gave this device, so its own row in the device list can be marked.
     private(set) var deviceID: UUID?
     private var session: HiveSession?
+    private var connection: HiveConnection?
+    /// Where the Hive was found on the local network, tried before its own addresses.
+    private var discovered: [HiveAddress] = []
     private let keychain: DeviceKeychain
 
     init(hive: KnownHive, keychain: DeviceKeychain) {
@@ -49,14 +52,17 @@ final class HiveLink {
     /// Starts over with a new session, such as after pairing again or when the addresses changed.
     func connect(to addresses: [HiveAddress]) {
         session = nil
+        connection = nil
         deviceID = nil
         do {
             guard !addresses.isEmpty, let credential = try keychain.credential(for: hiveID) else {
                 status = .notPaired
                 return
             }
+            let connection = HiveConnection(addresses: addresses, pin: credential.pin, discovered: discovered)
+            self.connection = connection
             session = HiveSession(
-                connection: HiveConnection(addresses: addresses, pin: credential.pin),
+                connection: connection,
                 hiveID: hiveID,
                 deviceID: credential.deviceID,
                 key: try credential.signingKey()
@@ -67,6 +73,13 @@ final class HiveLink {
             Self.logger.error("Couldn't read this device's key for a Hive: \(String(describing: error), privacy: .public)")
             status = .failed("Beekeeper couldn't read its key for this Hive.")
         }
+    }
+
+    /// Keeps the session, so a Hive found or lost on the local network doesn't mean signing in again.
+    func useDiscovered(_ addresses: [HiveAddress]) {
+        guard addresses != discovered else { return }
+        discovered = addresses
+        connection?.useDiscoveredAddresses(addresses)
     }
 
     /// Fetches the overview, which also finds out whether the Hive can be reached and signed in to.

@@ -56,7 +56,7 @@ struct EmailSettingsSheet: View {
             }
             .padding()
         }
-        .frame(width: 560, height: 640)
+        .macSheetSize(width: 560, height: 640)
         .confirmationDialog("Turn off email for “\(hive.name)”?", isPresented: $isAskingToTurnOff) {
             Button("Turn Off Email", role: .destructive) { Task { await turnOff() } }
         } message: {

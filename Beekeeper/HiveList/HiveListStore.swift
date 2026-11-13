@@ -17,12 +17,33 @@ final class HiveListStore {
     private var newlyPaired: Set<UUID> = []
     private let file: HiveListFile
     private let keychain = DeviceKeychain()
+    private let browser = LocalHiveBrowser()
 
     init(file: HiveListFile = .standard) {
         self.file = file
         hives = file.load()
         for hive in hives {
             track(hive)
+        }
+        browser.onChange = { [weak self] in self?.useDiscoveredAddresses() }
+        if hives.contains(where: { !$0.isOnThisMac }) { browser.start() }
+    }
+
+    /// Looks for Hives on the local network, such as while pairing with one. Not before, since the first
+    /// time it asks for local network access, which a Mac that only manages its own Hive never needs.
+    func discoverLocalHives() {
+        browser.start()
+    }
+
+    /// Beekeeper on the Hive's Mac reaches it on `127.0.0.1`, and ignores where else it's found.
+    private func useDiscoveredAddresses() {
+        for hive in hives where !hive.isOnThisMac {
+            guard let link = links[hive.id] else { continue }
+            let addresses = browser.addresses(for: hive.id)
+            link.useDiscovered(addresses)
+            if !addresses.isEmpty, link.status == .offline {
+                Task { await refresh(hive.id) }
+            }
         }
     }
 
@@ -64,6 +85,7 @@ final class HiveListStore {
 
     private func track(_ hive: KnownHive) {
         let link = HiveLink(hive: hive, keychain: keychain)
+        if !hive.isOnThisMac { link.useDiscovered(browser.addresses(for: hive.id)) }
         links[hive.id] = link
         let servers = ServerList(link: link)
         serverLists[hive.id] = servers
@@ -104,7 +126,8 @@ final class HiveListStore {
     /// Pairs with a Hive through a pairing code from a device already paired with it, and returns its ID.
     /// Pairing again with a Hive already in the list, such as one whose identity changed, replaces it.
     func pairWithCode(_ code: PairingCode, deviceName: String) async throws -> UUID {
-        let result = try await CodePairingWorkflow(keychain: keychain).pair(code, deviceName: deviceName)
+        let result = try await CodePairingWorkflow(keychain: keychain)
+            .pair(code, deviceName: deviceName, discovered: browser.addresses(for: code.hiveID))
         let addresses = result.addresses.options.isEmpty ? code.addresses : result.addresses.options
 
         if let index = hives.firstIndex(where: { $0.id == result.hiveID }) {
