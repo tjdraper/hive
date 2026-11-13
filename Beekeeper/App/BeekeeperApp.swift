@@ -5,6 +5,7 @@ import SwiftUI
 struct BeekeeperApp: App {
     @State private var hives = HiveListStore()
     #if os(macOS)
+    @NSApplicationDelegateAdaptor private var appDelegate: BeekeeperAppDelegate
     @State private var updater = BeekeeperUpdater()
     #endif
 
