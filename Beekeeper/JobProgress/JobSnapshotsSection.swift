@@ -32,6 +32,9 @@ struct JobSnapshotsSection: View {
                         deletion = SnapshotDeletionRequest(scope: .snapshot(snapshot), name: jobName)
                     }
                 }
+                if let shared = Self.sharedBytes(snapshots) {
+                    SharedFilesRow(bytes: shared, showsFinderSpace: hive.isOnThisMac && snapshots.folderPath != nil)
+                }
                 if deletable > 1 {
                     Button("Delete All Snapshots…", systemImage: "trash", role: .destructive) {
                         deletion = SnapshotDeletionRequest(scope: .job(id: jobID, count: deletable), name: jobName)
@@ -67,7 +70,11 @@ struct JobSnapshotsSection: View {
 
     private func footer(_ snapshots: JobSnapshots) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Each size is what the snapshot alone takes. Files it shares with others are counted once, in the total.")
+            Text(
+                Self.sharedBytes(snapshots) == nil
+                    ? "Each size is what the snapshot alone takes."
+                    : "Each size is what the snapshot alone takes. Files snapshots share are stored once, and counted once, as shared."
+            )
             if snapshots.folderPath != nil, hive.isOnThisMac {
                 Text(
                     "Copy files out of a snapshot before opening them. A file is shared by every snapshot that has it, "
@@ -77,6 +84,18 @@ struct JobSnapshotsSection: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
+    }
+
+    /// The files in more than one snapshot, which deleting any one of them wouldn't free. Hidden until every
+    /// snapshot is counted, since a total and sizes counted at different moments don't subtract.
+    private static func sharedBytes(_ snapshots: JobSnapshots) -> Int64? {
+        guard snapshots.snapshots.count > 1, let used = snapshots.usedBytes else { return nil }
+        var own: Int64 = 0
+        for snapshot in snapshots.snapshots {
+            guard let bytes = snapshot.freesBytes else { return nil }
+            own += bytes
+        }
+        return used > own ? used - own : nil
     }
 
     /// Only on the Hive's Mac, where the folder is.
@@ -94,6 +113,35 @@ struct JobSnapshotsSection: View {
         } catch {
             // A newer load replaced it.
         }
+    }
+}
+
+/// Lines its size up with the snapshots' sizes above it, which have buttons after them.
+private struct SharedFilesRow: View {
+    let bytes: Int64
+    let showsFinderSpace: Bool
+
+    var body: some View {
+        HStack {
+            Text("Shared by these snapshots")
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(bytes.formatted(.byteCount(style: .file)))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+            #if os(macOS)
+            if showsFinderSpace {
+                placeholder("folder")
+            }
+            #endif
+            placeholder("trash")
+        }
+    }
+
+    private func placeholder(_ systemImage: String) -> some View {
+        Image(systemName: systemImage)
+            .hidden()
+            .accessibilityHidden(true)
     }
 }
 
