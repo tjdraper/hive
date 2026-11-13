@@ -13,24 +13,13 @@ struct JobLogView: View {
     @State private var hasLoaded = false
 
     var body: some View {
-        List {
-            ForEach(entries) { entry in
-                switch entry {
-                case .run(let run):
-                    RunLogRow(entry: live(run), showsJob: filter.jobID == nil)
-                case .removal(let removal):
-                    RemovalLogRow(entry: removal, showsJob: filter.jobID == nil)
-                }
-            }
-            if let nextBefore {
-                Button("Show Older") {
-                    Task { await loadOlder(before: nextBefore) }
-                }
-            }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            JobLogFilterBar(filter: $filter, servers: servers)
-        }
+        JobLogList(
+            entries: entries.map(live),
+            filter: $filter,
+            servers: servers.servers,
+            jobs: servers.jobs.jobs,
+            onShowOlder: nextBefore.map { before in { Task { await loadOlder(before: before) } } }
+        )
         .overlay {
             if let failure {
                 ContentUnavailableView("Couldn't Load the Job Log", systemImage: "exclamationmark.triangle", description: Text(failure))
@@ -54,11 +43,11 @@ struct JobLogView: View {
     }
 
     /// A run still going, as far as live updates have it.
-    private func live(_ entry: RunLogEntry) -> RunLogEntry {
-        guard entry.run.finishedAt == nil, let current = servers.statuses.status(of: entry.run.jobID)?.current,
-              current.id == entry.id
+    private func live(_ entry: JobLogEntry) -> JobLogEntry {
+        guard case .run(let run) = entry, run.run.finishedAt == nil,
+              let current = servers.statuses.status(of: run.run.jobID)?.current, current.id == run.id
         else { return entry }
-        return current
+        return .run(current)
     }
 
     /// Keeps older pages already shown when the newest page reaches back to them.
@@ -95,16 +84,50 @@ struct JobLogView: View {
     }
 }
 
+/// The entries with the filters above them, apart from loading them, so a preview can show made-up ones.
+struct JobLogList: View {
+    let entries: [JobLogEntry]
+    @Binding var filter: JobLogFilter
+    let servers: [Server]
+    let jobs: [BackupJob]
+    /// Nil once the oldest page is showing.
+    let onShowOlder: (() -> Void)?
+
+    var body: some View {
+        List {
+            ForEach(entries) { entry in
+                switch entry {
+                case .run(let run):
+                    RunLogRow(entry: run, showsJob: filter.jobID == nil)
+                case .removal(let removal):
+                    RemovalLogRow(entry: removal, showsJob: filter.jobID == nil)
+                }
+            }
+            if let onShowOlder {
+                Button("Show Older", action: onShowOlder)
+            }
+        }
+        #if os(iOS)
+        // Full-width rows, as on the Mac, rather than iOS's inset card.
+        .listStyle(.plain)
+        #endif
+        .safeAreaInset(edge: .top, spacing: 0) {
+            JobLogFilterBar(filter: $filter, servers: servers, allJobs: jobs)
+        }
+    }
+}
+
 private struct JobLogFilterBar: View {
     @Binding var filter: JobLogFilter
-    let servers: ServerList
+    let servers: [Server]
+    let allJobs: [BackupJob]
 
     var body: some View {
         HStack(spacing: 12) {
             Picker("Server", selection: $filter.serverID) {
                 Text("All Servers").tag(UUID?.none)
                 Divider()
-                ForEach(servers.servers) { server in
+                ForEach(servers) { server in
                     Text(server.name).tag(Optional(server.id))
                 }
             }
@@ -119,6 +142,10 @@ private struct JobLogFilterBar: View {
             .fixedSize()
             .disabled(jobs.isEmpty)
             Toggle("Problems Only", isOn: $filter.problemsOnly)
+                #if os(iOS)
+                // A switch would stretch across the bar, away from its label.
+                .toggleStyle(.button)
+                #endif
             Spacer()
         }
         .padding(.horizontal)
@@ -130,6 +157,6 @@ private struct JobLogFilterBar: View {
     }
 
     private var jobs: [BackupJob] {
-        filter.serverID.map { servers.jobs.jobs(onServer: $0) } ?? servers.jobs.jobs
+        filter.serverID.map { serverID in allJobs.filter { $0.serverID == serverID } } ?? allJobs
     }
 }

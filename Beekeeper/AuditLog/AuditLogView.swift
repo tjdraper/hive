@@ -20,6 +20,10 @@ struct AuditLogView: View {
                 }
             }
         }
+        #if os(iOS)
+        // Full-width rows, as on the Mac, rather than iOS's inset card.
+        .listStyle(.plain)
+        #endif
         .overlay {
             if let failure {
                 ContentUnavailableView("Couldn't Load the Audit Log", systemImage: "exclamationmark.triangle", description: Text(failure))
