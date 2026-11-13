@@ -29,10 +29,12 @@ struct HiveSetupSheet: View {
     }
 
     private var choices: some View {
-        VStack(spacing: 0) {
+        SheetLayout(title: "Set Up “\(hive.name)”", cancel: SheetButton(title: "Later") { dismiss() }) {
             VStack(alignment: .leading, spacing: 16) {
+                #if os(macOS)
                 Text("Set Up “\(hive.name)”")
                     .font(.title2.bold())
+                #endif
                 Text("Start a new Hive, or bring back one whose Mac was lost or replaced.")
                     .foregroundStyle(.secondary)
                 ChoiceRow(
@@ -50,13 +52,6 @@ struct HiveSetupSheet: View {
             }
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            Divider()
-            HStack {
-                Spacer()
-                Button("Later", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-            }
-            .padding()
         }
         .macSheetSize(width: 560, height: 330)
     }

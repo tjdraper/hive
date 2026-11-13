@@ -25,7 +25,11 @@ struct EmailSettingsSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        SheetLayout(
+            title: "Email",
+            cancel: SheetButton(title: "Cancel") { dismiss() },
+            confirm: SheetButton(title: "Save", isDisabled: !isChanged || !draft.isComplete || isSaving) { Task { await save() } }
+        ) {
             Form {
                 serverSection
                 signInSection
@@ -45,16 +49,6 @@ struct EmailSettingsSheet: View {
                 }
             }
             .formStyle(.grouped)
-            Divider()
-            HStack {
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Save") { Task { await save() } }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!isChanged || !draft.isComplete || isSaving)
-            }
-            .padding()
         }
         .macSheetSize(width: 560, height: 640)
         .confirmationDialog("Turn off email for “\(hive.name)”?", isPresented: $isAskingToTurnOff) {

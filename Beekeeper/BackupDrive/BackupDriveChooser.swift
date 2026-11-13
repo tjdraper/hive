@@ -13,9 +13,27 @@ struct BackupDriveChooser: View {
     @State private var failure: String?
 
     var body: some View {
+        SheetLayout(
+            title: "Choose the Backup Drive",
+            cancel: SheetButton(title: "Cancel") { dismiss() },
+            confirm: SheetButton(
+                title: "Use This Drive",
+                isDisabled: choice == nil || choice == state.chosen?.drive.volumeUUID || isSaving
+            ) { Task { await choose() } }
+        ) {
+            chooser
+        }
+        #if os(macOS)
+        .frame(minWidth: 480)
+        #endif
+    }
+
+    private var chooser: some View {
         VStack(alignment: .leading, spacing: 12) {
+            #if os(macOS)
             Text("Choose the Backup Drive")
                 .font(.headline)
+            #endif
             Text("Only a case-sensitive APFS volume attached to the Hive's Mac can hold backups.")
                 .foregroundStyle(.secondary)
 
@@ -34,18 +52,8 @@ struct BackupDriveChooser: View {
                 Text(failure)
                     .foregroundStyle(.red)
             }
-
-            HStack {
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Use This Drive") { Task { await choose() } }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(choice == nil || choice == state.chosen?.drive.volumeUUID || isSaving)
-            }
         }
         .padding(20)
-        .frame(minWidth: 480)
     }
 
     private func choose() async {

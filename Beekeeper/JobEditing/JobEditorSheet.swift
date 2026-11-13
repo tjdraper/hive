@@ -26,7 +26,14 @@ struct JobEditorSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        SheetLayout(
+            title: job == nil ? "Add a Job" : "Edit “\(job?.name ?? "")”",
+            cancel: SheetButton(title: "Cancel") { dismiss() },
+            confirm: SheetButton(title: job == nil ? "Add Job" : "Save", isDisabled: !draft.isComplete || isUnchanged || isSaving) {
+                Task { await save() }
+            },
+            message: message
+        ) {
             Form {
                 Section {
                     StackedRow(title: "Name") {
@@ -41,28 +48,16 @@ struct JobEditorSheet: View {
                 RetentionFields(retention: $draft.retention, saved: job?.retention, estimate: retentionEstimate, problems: problems)
             }
             .formStyle(.grouped)
-            Divider()
-            HStack {
-                if let failure {
-                    Text(failure)
-                        .foregroundStyle(.red)
-                } else if !problems.isEmpty {
-                    Label("Hive turned some fields down. Each says why.", systemImage: "exclamationmark.circle")
-                        .foregroundStyle(.red)
-                }
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button(job == nil ? "Add Job" : "Save") { Task { await save() } }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!draft.isComplete || isUnchanged || isSaving)
-            }
-            .padding()
         }
         .macSheetSize(width: 640, height: 680)
         // Hive's problems name rows by their place in the list it was sent, which adding or removing one changes.
         .onChange(of: draft.rowIDs) { problems = JobFieldProblems() }
         .task(id: draft.retention) { await estimateRetention() }
+    }
+
+    private var message: SheetMessage? {
+        if let failure { return .problem(failure) }
+        return problems.isEmpty ? nil : .problem("Hive turned some fields down. Each says why.")
     }
 
     /// Once the tiers stop changing.

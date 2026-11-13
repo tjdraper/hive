@@ -22,7 +22,13 @@ struct EditServerSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        SheetLayout(
+            title: "Edit “\(server.name)”",
+            cancel: SheetButton(title: "Cancel") { dismiss() },
+            confirm: SheetButton(title: "Save", isDisabled: draft == server.draft || !draft.isComplete || isSaving) {
+                Task { await save() }
+            }
+        ) {
             Form {
                 ServerFields(draft: $draft, problems: problems)
                 if changesConnection {
@@ -48,16 +54,6 @@ struct EditServerSheet: View {
                 }
             }
             .formStyle(.grouped)
-            Divider()
-            HStack {
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Save") { Task { await save() } }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(draft == server.draft || !draft.isComplete || isSaving)
-            }
-            .padding()
         }
         .macSheetSize(width: 560, height: 560)
         .task { space = try? await servers.space(of: server.id) }

@@ -30,24 +30,21 @@ struct PairDeviceSheet: View {
     @State private var isCopied = false
 
     var body: some View {
-        VStack(spacing: 0) {
+        SheetLayout(
+            title: title,
+            cancel: isFinished ? nil : SheetButton(title: "Cancel") { close() },
+            confirm: isFinished ? SheetButton(title: "Done") { close() } : nil,
+            secondary: phase == .expired ? SheetButton(title: "New Code") { Task { await open() } } : nil
+        ) {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Pair a Device with “\(hive.name)”")
+                #if os(macOS)
+                Text(title)
                     .font(.title2.bold())
+                #endif
                 content
             }
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            Divider()
-            HStack {
-                if case .expired = phase {
-                    Button("New Code") { Task { await open() } }
-                }
-                Spacer()
-                Button(isFinished ? "Done" : "Cancel") { close() }
-                    .keyboardShortcut(isFinished ? .defaultAction : .cancelAction)
-            }
-            .padding()
         }
         .macSheetSize(width: 520, height: 560)
         .interactiveDismissDisabled()
@@ -128,6 +125,10 @@ struct PairDeviceSheet: View {
             .foregroundStyle(.orange)
             .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var title: String {
+        "Pair a Device with “\(hive.name)”"
     }
 
     private var isFinished: Bool {

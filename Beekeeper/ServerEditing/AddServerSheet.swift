@@ -21,17 +21,16 @@ struct AddServerSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            AddServerStepIndicator(current: step)
-                .padding()
-            Divider()
-            Form {
-                content
+        SheetLayout(title: "Add a Server", cancel: cancelButton, confirm: confirmButton, secondary: backButton) {
+            VStack(spacing: 0) {
+                AddServerStepIndicator(current: step)
+                    .padding()
+                Divider()
+                Form {
+                    content
+                }
+                .formStyle(.grouped)
             }
-            .formStyle(.grouped)
-            Divider()
-            footer
-                .padding()
         }
         .macSheetSize(width: 620, height: 560)
     }
@@ -56,33 +55,31 @@ struct AddServerSheet: View {
         }
     }
 
-    private var footer: some View {
-        HStack {
-            if let serverID {
-                Button("Finish Later") { close(serverID) }
-                    .keyboardShortcut(.cancelAction)
-            } else {
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-            }
-            Spacer()
-            if let previous = step.previous, step != .key {
-                Button("Back") { step = previous }
-            }
-            switch step {
-            case .connection:
-                Button("Continue") { Task { await save() } }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!draft.isComplete || isSaving)
-            case .key, .hostKey:
-                Button("Continue") { step = step.next ?? step }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(step == .hostKey && server?.confirmedHostKey == nil)
-            case .test:
-                Button("Done") { if let serverID { close(serverID) } }
-                    .keyboardShortcut(.defaultAction)
-            }
+    /// Once the server is saved, closing leaves it listed as not set up.
+    private var cancelButton: SheetButton {
+        if let serverID {
+            SheetButton(title: "Finish Later") { close(serverID) }
+        } else {
+            SheetButton(title: "Cancel") { dismiss() }
         }
+    }
+
+    private var confirmButton: SheetButton {
+        switch step {
+        case .connection:
+            SheetButton(title: "Continue", isDisabled: !draft.isComplete || isSaving) { Task { await save() } }
+        case .key, .hostKey:
+            SheetButton(title: "Continue", isDisabled: step == .hostKey && server?.confirmedHostKey == nil) {
+                step = step.next ?? step
+            }
+        case .test:
+            SheetButton(title: "Done") { if let serverID { close(serverID) } }
+        }
+    }
+
+    private var backButton: SheetButton? {
+        guard let previous = step.previous, step != .key else { return nil }
+        return SheetButton(title: "Back") { step = previous }
     }
 
     private func save() async {

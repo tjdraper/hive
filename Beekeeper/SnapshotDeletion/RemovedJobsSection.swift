@@ -96,7 +96,7 @@ private struct RemovedJobSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 0) {
+        SheetLayout(title: "Snapshots of “\(job.jobName)”", confirm: SheetButton(title: "Done") { dismiss() }) {
             Form {
                 Section {
                     Text(
@@ -109,13 +109,6 @@ private struct RemovedJobSheet: View {
                 JobSnapshotsSection(hive: hive, link: link, jobID: job.jobID, jobName: job.jobName, statuses: statuses)
             }
             .formStyle(.grouped)
-            Divider()
-            HStack {
-                Spacer()
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.defaultAction)
-            }
-            .padding()
         }
         .macSheetSize(width: 560, height: 520)
     }

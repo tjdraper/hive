@@ -99,30 +99,33 @@ private struct OtherAddressSheet: View {
     @State private var port: Int?
 
     var body: some View {
-        VStack(spacing: 0) {
+        SheetLayout(
+            title: "Add an Address",
+            cancel: SheetButton(title: "Cancel") { dismiss() },
+            confirm: SheetButton(
+                title: "Add",
+                isDisabled: host.trimmingCharacters(in: .whitespaces).isEmpty || (usesOwnPort && port == nil)
+            ) {
+                onAdd(AddressOption(host: host.trimmingCharacters(in: .whitespaces), port: usesOwnPort ? port : nil))
+                dismiss()
+            }
+        ) {
             Form {
-                TextField("Name or IP address", text: $host, prompt: Text("hive.example.com"))
-                    .autocorrectionDisabled()
+                StackedRow(title: "Name or IP Address") {
+                    TextField("Name or IP Address", text: $host, prompt: Text("hive.example.com"))
+                        .autocorrectionDisabled()
+                        .stackedField("Name or IP Address")
+                }
                 Toggle("Reached on another port", isOn: $usesOwnPort)
                 if usesOwnPort {
-                    TextField("Port", value: $port, format: .number.grouping(.never), prompt: Text(String(hivePort)))
+                    StackedRow(title: "Port") {
+                        TextField("Port", value: $port, format: .number.grouping(.never), prompt: Text(String(hivePort)))
+                            .stackedField("Port")
+                    }
                 }
             }
             .formStyle(.grouped)
-            Divider()
-            HStack {
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Add") {
-                    onAdd(AddressOption(host: host.trimmingCharacters(in: .whitespaces), port: usesOwnPort ? port : nil))
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(host.trimmingCharacters(in: .whitespaces).isEmpty || (usesOwnPort && port == nil))
-            }
-            .padding()
         }
-        .macSheetSize(width: 420, height: 240)
+        .macSheetSize(width: 420, height: 320)
     }
 }

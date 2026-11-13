@@ -32,61 +32,26 @@ struct AddHiveSheet: View {
     @State private var failure: String?
 
     var body: some View {
-        sheet
-            // The code's Hive may be found on the local network, at an address the code doesn't carry.
-            .task { store.discoverLocalHives() }
-    }
-
-    #if os(macOS)
-    private var sheet: some View {
-        VStack(spacing: 0) {
+        SheetLayout(
+            title: "Add a Hive",
+            cancel: SheetButton(title: "Cancel") { dismiss() },
+            confirm: SheetButton(title: "Pair", isDisabled: !canPair) { Task { await pair() } },
+            message: isPairing ? .working(nil) : nil
+        ) {
             form
-            Divider()
-            HStack {
-                if isPairing {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Pair") { Task { await pair() } }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!canPair)
-            }
-            .padding()
         }
-        .frame(width: 520, height: 420)
-        .navigationTitle("Add a Hive")
-    }
-    #else
-    private var sheet: some View {
-        NavigationStack {
-            form
-                .navigationTitle("Add a Hive")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel", role: .cancel) { dismiss() }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        if isPairing {
-                            ProgressView()
-                        } else {
-                            Button("Pair") { Task { await pair() } }
-                                .disabled(!canPair)
-                        }
-                    }
-                }
-        }
+        .macSheetSize(width: 520, height: 420)
+        #if os(iOS)
         .sheet(isPresented: $isScanning) {
             PairingCodeScanner { code in
                 codeText = code.text
                 Task { await pair() }
             }
         }
+        #endif
+        // The code's Hive may be found on the local network, at an address the code doesn't carry.
+        .task { store.discoverLocalHives() }
     }
-    #endif
 
     private var form: some View {
         Form {
@@ -97,24 +62,26 @@ struct AddHiveSheet: View {
                         .disabled(isPairing)
                 }
                 #endif
-                TextField("Pairing code", text: $codeText, prompt: Text("hive1:…"), axis: .vertical)
-                    .font(.system(.body, design: .monospaced))
-                    .lineLimit(3 ... 6)
-                    .autocorrectionDisabled()
-                    #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    #endif
-            } header: {
-                Text("Pairing Code")
+                StackedRow(title: "Pairing Code") {
+                    TextField("Pairing Code", text: $codeText, prompt: Text("hive1:…"), axis: .vertical)
+                        .font(.system(.body, design: .monospaced))
+                        .lineLimit(3 ... 6)
+                        .autocorrectionDisabled()
+                        #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        #endif
+                        .stackedField("Pairing Code")
+                }
             } footer: {
                 Text(Self.codeFooter)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                TextField("Name", text: $deviceName)
-            } header: {
-                Text("This Device")
+                StackedRow(title: "This Device's Name") {
+                    TextField("This Device's Name", text: $deviceName)
+                        .stackedField("This Device's Name")
+                }
             } footer: {
                 Text("The Hive lists this device by this name.")
                     .foregroundStyle(.secondary)

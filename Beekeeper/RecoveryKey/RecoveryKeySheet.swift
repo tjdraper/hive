@@ -14,10 +14,16 @@ struct RecoveryKeySheet: View {
     @State private var isCopied = false
 
     var body: some View {
-        VStack(spacing: 0) {
+        SheetLayout(
+            title: isReplacing ? "Save the New Recovery Key for “\(hiveName)”" : "Save the Recovery Key for “\(hiveName)”",
+            cancel: SheetButton(title: "Cancel") { dismiss() },
+            confirm: SheetButton(title: "I've Saved It", isDisabled: setup.isSaving) { Task { await save() } }
+        ) {
             VStack(alignment: .leading, spacing: 16) {
+                #if os(macOS)
                 Text(isReplacing ? "Save the New Recovery Key for “\(hiveName)”" : "Save the Recovery Key for “\(hiveName)”")
                     .font(.title2.bold())
+                #endif
                 Text(
                     "If this Hive's Mac is lost, this key brings the Hive back on another Mac with its servers, jobs, "
                         + "passwords and SSH keys. Save it in your password manager."
@@ -57,16 +63,6 @@ struct RecoveryKeySheet: View {
             }
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            Divider()
-            HStack {
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Button("I've Saved It") { Task { await save() } }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(setup.isSaving)
-            }
-            .padding()
         }
         .macSheetSize(width: 560, height: isReplacing ? 480 : 420)
         .interactiveDismissDisabled()

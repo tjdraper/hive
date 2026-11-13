@@ -17,12 +17,19 @@ struct RestoreSheet: View {
     @State private var fileProblem: String?
 
     var body: some View {
-        VStack(spacing: 0) {
+        SheetLayout(
+            title: "Restore from a Recovery File",
+            cancel: SheetButton(title: "Cancel", isDisabled: draft.isRestoring) { dismiss() },
+            confirm: SheetButton(title: "Restore", isDisabled: !draft.isComplete || draft.isRestoring) { Task { await restore() } },
+            message: draft.isRestoring ? .working("Restoring…") : nil
+        ) {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
+                        #if os(macOS)
                         Text("Restore from a Recovery File")
                             .font(.title2.bold())
+                        #endif
                         Text(
                             "Brings back a Hive whose Mac was lost or replaced, with its servers, jobs, passwords and SSH keys. "
                                 + "This Mac's Hive takes its place, and every other device pairs with it again."
@@ -38,23 +45,6 @@ struct RestoreSheet: View {
                 }
             }
             .formStyle(.grouped)
-            Divider()
-            HStack {
-                if draft.isRestoring {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Restoring…")
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                    .disabled(draft.isRestoring)
-                Button("Restore") { Task { await restore() } }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!draft.isComplete || draft.isRestoring)
-            }
-            .padding()
         }
         .macSheetSize(width: 560, height: 520)
         .interactiveDismissDisabled(draft.isRestoring)
