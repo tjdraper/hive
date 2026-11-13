@@ -3,6 +3,26 @@
     <channel>
         <title>Hive</title>
         <item>
+            <title>2026.2</title>
+            <pubDate>Fri, 13 Nov 2026 11:28:15 -0600</pubDate>
+            <link>https://github.com/tjdraper/hive</link>
+            <sparkle:version>2026.2</sparkle:version>
+            <sparkle:shortVersionString>2026.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## [2026.2] - 2026-11-13
+
+### Added
+
+- If opened in a location other than `/Applications`, Beekeeper offers to move itself to the Applications folder, where it can update itself.
+- A job's snapshot list shows how much its snapshots share, so the sizes add up to the total.
+
+### Fixed
+
+- Beekeeper can connect to a Hive at a Tailscale address.
+]]></description>
+            <enclosure url="https://github.com/tjdraper/hive/releases/download/v2026.2/Hive-2026.2.zip" length="19901430" type="application/octet-stream" sparkle:edSignature="n1uKiV7tpYrFNyalOgZPLw4uJt7kw/YkQPgEm9VTJuED18nOS3aTZHOwkX4jQEKXu7LyFthiceLYxVYSTxisCA=="/>
+        </item>
+        <item>
             <title>2026.1</title>
             <pubDate>Thu, 12 Nov 2026 07:53:45 -0600</pubDate>
             <link>https://github.com/tjdraper/hive</link>
