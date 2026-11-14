@@ -63,8 +63,12 @@ struct SSHKeyRotationSection: View {
         }
         ForEach(state.results) { result in
             LabeledContent(result.serverName) {
-                Label(result.outcome.summary, systemImage: result.outcome.systemImage)
-                    .foregroundStyle(result.outcome.isProblem ? .orange : .secondary)
+                // Not a `Label`: as a form row's value on iPad, one leaves the row hundreds of points tall.
+                HStack(spacing: 6) {
+                    Image(systemName: result.outcome.systemImage)
+                    Text(result.outcome.summary)
+                }
+                .foregroundStyle(result.outcome.isProblem ? .orange : .secondary)
             }
         }
     }

@@ -100,10 +100,10 @@ struct RunOutcome: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
-            Label {
-                Text((run.finishedAt ?? run.startedAt).spoken)
-            } icon: {
+            // Not a `Label`: as a form row's value on iPad, one leaves the row hundreds of points tall.
+            HStack(spacing: 6) {
                 RunResultIcon(failure: run.failure)
+                Text((run.finishedAt ?? run.startedAt).spoken)
             }
             if let failure = run.failure {
                 Text(failure.message)
