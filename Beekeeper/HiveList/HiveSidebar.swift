@@ -17,18 +17,22 @@ struct HiveSidebar: View {
     var body: some View {
         List(selection: $selection) {
             ForEach(store.hives) { hive in
-                DisclosureGroup(isExpanded: expanded(hive.id)) {
+                SidebarOutline(isExpanded: expanded(hive.id)) {
+                    NavigationLink(value: SidebarItem.hive(hive.id)) {
+                        HiveSidebarRow(
+                            hive: hive,
+                            status: store.link(for: hive.id)?.status ?? .notPaired,
+                            isExpanded: Binding(expanded(hive.id))
+                        )
+                    }
+                    .contextMenu {
+                        Button("Remove from Beekeeper…", role: .destructive) { removing = hive }
+                    }
+                } children: {
                     if let servers = store.servers(for: hive.id) {
                         ForEach(servers.servers) { server in
                             serverRow(server, in: servers, hiveID: hive.id)
                         }
-                    }
-                } label: {
-                    NavigationLink(value: SidebarItem.hive(hive.id)) {
-                        HiveSidebarRow(hive: hive, status: store.link(for: hive.id)?.status ?? .notPaired)
-                    }
-                    .contextMenu {
-                        Button("Remove from Beekeeper…", role: .destructive) { removing = hive }
                     }
                 }
             }
@@ -72,8 +76,13 @@ struct HiveSidebar: View {
     @ViewBuilder
     private func serverRow(_ server: Server, in servers: ServerList, hiveID: UUID) -> some View {
         let jobs = servers.jobs.jobs(onServer: server.id)
+        let isExpanded = expanded(server: server.id, hiveID: hiveID)
         let link = NavigationLink(value: SidebarItem.server(hiveID: hiveID, serverID: server.id)) {
-            ServerSidebarRow(server: server, health: JobHealth(jobs: jobs, in: servers.statuses))
+            ServerSidebarRow(
+                server: server,
+                health: JobHealth(jobs: jobs, in: servers.statuses),
+                isExpanded: jobs.isEmpty ? .constant(nil) : Binding(isExpanded)
+            )
         }
         .contextMenu {
             Button("Add Job…") { onAddJob(server.id, hiveID) }
@@ -87,7 +96,9 @@ struct HiveSidebar: View {
         if jobs.isEmpty {
             link
         } else {
-            DisclosureGroup(isExpanded: expanded(server: server.id, hiveID: hiveID)) {
+            SidebarOutline(isExpanded: isExpanded) {
+                link
+            } children: {
                 ForEach(jobs) { job in
                     NavigationLink(value: SidebarItem.job(hiveID: hiveID, serverID: server.id, jobID: job.id)) {
                         HStack(spacing: 6) {
@@ -105,8 +116,6 @@ struct HiveSidebar: View {
                         }
                     }
                 }
-            } label: {
-                link
             }
         }
     }
@@ -164,6 +173,7 @@ struct HiveSidebar: View {
 private struct HiveSidebarRow: View {
     let hive: KnownHive
     let status: HiveLink.Status
+    @Binding var isExpanded: Bool?
 
     var body: some View {
         HStack(spacing: 6) {
@@ -171,6 +181,7 @@ private struct HiveSidebarRow: View {
                 .lineLimit(1)
             Spacer()
             HiveStatusBadge(status: status)
+            SidebarDisclosureButton(isExpanded: $isExpanded)
         }
         .tappableAcrossRow()
     }
@@ -179,6 +190,8 @@ private struct HiveSidebarRow: View {
 private struct ServerSidebarRow: View {
     let server: Server
     let health: JobHealth
+    /// Nil without jobs under it.
+    @Binding var isExpanded: Bool?
 
     var body: some View {
         HStack(spacing: 6) {
@@ -193,6 +206,7 @@ private struct ServerSidebarRow: View {
             } else {
                 JobHealthBadge(health: health)
             }
+            SidebarDisclosureButton(isExpanded: $isExpanded)
         }
         .tappableAcrossRow()
     }
