@@ -60,7 +60,7 @@ Check off a slice here when its "done when" is true.
 
 - [x] [H1. iOS release script and first TestFlight build](26-H1-IOSReleaseScriptAndFirstTestFlightBuild.md) — Engine, 1 session, needs you
 - [x] [H2. Beekeeper on iPad](27-H2-BeekeeperOnIPad.md) — Mixed, 1–2 sessions, TestFlight
-- [ ] [H3. Beekeeper on iPhone](28-H3-BeekeeperOnIPhone.md) — UI, 1–2 sessions, TestFlight
+- [x] [H3. Beekeeper on iPhone](28-H3-BeekeeperOnIPhone.md) — UI, 1–2 sessions, TestFlight
 - [ ] [H4. Build expiry warnings](29-H4-BuildExpiryWarnings.md) — Engine, 1 session, TestFlight
 
 ### Phase I — Open source release

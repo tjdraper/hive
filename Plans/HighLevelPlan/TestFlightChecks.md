@@ -17,8 +17,8 @@ Add a check here whenever a slice leaves one, with the slice it came from. Check
 - [x] **H2:** The selected sidebar row stays highlighted, including at launch and after a sheet closes, and the arrows on Hive and server rows open and close them without selecting them.
 - [x] **H2:** On a server or job page, the path shows the Hive, the server and the job once each. In a narrow window it shows only their icons, with the page's name beneath, and Edit and the trash button stay in the toolbar.
 - [x] **H2:** The sheets in a Hive's Settings, such as Change… for the backup drive, stay open the first time they open.
-- [ ] **H3:** On the iPhone, Add a Hive › Scan the QR Code scans the code Pair a Device shows on the Mac, pairs, and opens the Hive.
-- [ ] **H3:** On the iPhone, the list of Hives shows each Hive's status, and a Hive's page, its servers, jobs and the Job Log, Audit Log, Devices and Settings rows each open and go back.
-- [ ] **H3:** Live progress for a Run Now on the iPhone moves as the run goes, and the run shows in the Job Log.
-- [ ] **H3:** Deleting a snapshot on the iPhone asks for Face ID, then the snapshot leaves the list.
-- [ ] **H3:** The sheets on the iPhone, such as Add Server, Edit for a job, and Change… for the backup drive, fit the screen, with Cancel at the top left and the confirming button at the top right.
+- [x] **H3:** On the iPhone, Add a Hive › Scan the QR Code scans the code Pair a Device shows on the Mac, pairs, and opens the Hive.
+- [x] **H3:** On the iPhone, the list of Hives shows each Hive's status, and a Hive's page, its servers, jobs and the Job Log, Audit Log, Devices and Settings rows each open and go back.
+- [x] **H3:** Live progress for a Run Now on the iPhone moves as the run goes, and the run shows in the Job Log.
+- [x] **H3:** Deleting a snapshot on the iPhone asks for Face ID, then the snapshot leaves the list.
+- [x] **H3:** The sheets on the iPhone, such as Add Server, Edit for a job, and Change… for the backup drive, fit the screen, with Cancel at the top left and the confirming button at the top right.
