@@ -64,6 +64,7 @@ enum HiveDatabaseMigrator {
         }
         migrator.registerMigration("Add address options", migrate: addAddressOptions)
         migrator.registerMigration("Add advertising on the local network", migrate: addLocalNetworkAdvertising)
+        migrator.registerMigration("Add the builds devices report", migrate: addDeviceBuilds)
 
         return migrator
     }
@@ -272,6 +273,9 @@ enum HiveDatabaseMigrator {
         }
     }
 
+}
+
+extension HiveDatabaseMigrator {
     private static func addServersAndJobs(_ database: Database) throws {
         try database.create(table: "server") { table in
             table.primaryKey("id", .blob)
@@ -332,6 +336,18 @@ extension HiveDatabaseMigrator {
     static func addLocalNetworkAdvertising(_ database: Database) throws {
         try database.alter(table: "hive") { table in
             table.add(column: "advertisesOnLocalNetwork", .boolean).notNull().defaults(to: true)
+        }
+    }
+
+    static func addDeviceBuilds(_ database: Database) throws {
+        try database.alter(table: "device") { table in
+            // `BeekeeperBuild` as JSON.
+            table.add(column: "build", .text)
+            // `BuildExpiryWarning`: the latest one opened for this build.
+            table.add(column: "buildWarning", .text)
+        }
+        try database.alter(table: "hive") { table in
+            table.add(column: "sendsBuildExpiryWarnings", .boolean).notNull().defaults(to: true)
         }
     }
 }

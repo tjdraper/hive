@@ -69,7 +69,8 @@ struct SignInFixture {
         key: P256.Signing.PrivateKey? = nil,
         deviceID: UUID? = nil,
         challenge: Data? = nil,
-        apiVersions: APIVersions = .thisBuild
+        apiVersions: APIVersions = .thisBuild,
+        build: BeekeeperBuild? = nil
     ) throws -> SignInRequest {
         let deviceID = deviceID ?? device.id
         let challenge = challenge ?? workflow.issueChallenge().challenge
@@ -78,7 +79,8 @@ struct SignInFixture {
             deviceID: deviceID,
             challenge: challenge,
             signature: try (key ?? deviceKey).signature(for: statement).rawRepresentation,
-            apiVersions: apiVersions
+            apiVersions: apiVersions,
+            build: build
         )
     }
 }

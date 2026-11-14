@@ -21,14 +21,17 @@ public actor HiveSession {
     private let hiveID: UUID
     private let deviceID: UUID
     private let key: any DeviceSigningKey
+    private let build: BeekeeperBuild?
     private var session: (token: String, expiresAt: Date)?
     private var signingIn: Task<String, any Error>?
 
-    public init(connection: HiveConnection, hiveID: UUID, deviceID: UUID, key: any DeviceSigningKey) {
+    /// `build` is reported each time it signs in.
+    public init(connection: HiveConnection, hiveID: UUID, deviceID: UUID, key: any DeviceSigningKey, build: BeekeeperBuild?) {
         self.connection = connection
         self.hiveID = hiveID
         self.deviceID = deviceID
         self.key = key
+        self.build = build
     }
 
     public func checkHealth() async throws {
@@ -137,7 +140,7 @@ public actor HiveSession {
         if let signingIn { return try await signingIn.value }
 
         let task = Task {
-            let signedIn = try await connection.signIn(hiveID: hiveID, deviceID: deviceID, key: key)
+            let signedIn = try await connection.signIn(hiveID: hiveID, deviceID: deviceID, key: key, build: build)
             session = (signedIn.token, Date().addingTimeInterval(TimeInterval(signedIn.expiresInSeconds)))
             return signedIn.token
         }

@@ -61,7 +61,7 @@ Check off a slice here when its "done when" is true.
 - [x] [H1. iOS release script and first TestFlight build](26-H1-IOSReleaseScriptAndFirstTestFlightBuild.md) — Engine, 1 session, needs you
 - [x] [H2. Beekeeper on iPad](27-H2-BeekeeperOnIPad.md) — Mixed, 1–2 sessions, TestFlight
 - [x] [H3. Beekeeper on iPhone](28-H3-BeekeeperOnIPhone.md) — UI, 1–2 sessions, TestFlight
-- [ ] [H4. Build expiry warnings](29-H4-BuildExpiryWarnings.md) — Engine, 1 session, TestFlight
+- [x] [H4. Build expiry warnings](29-H4-BuildExpiryWarnings.md) — Engine, 1 session, TestFlight
 
 ### Phase I — Open source release
 
@@ -282,7 +282,7 @@ Read the brainstorm's "Warnings before an iOS build expires".
 
 - **iPhone and iPad builds expire:** TestFlight builds after 90 days, ad hoc builds when their provisioning profile does. The Mac apps never expire.
 - **Beekeeper works out its own expiry date:** for ad hoc builds, `ExpirationDate` in `embedded.mobileprovision`; for TestFlight, the build date stamped into `Info.plist` by the release script, plus 90 days.
-- **It reports its build details at sign-in:** platform, device name, version, build, how it was distributed, and when it expires.
+- **It reports its build details at sign-in:** platform, version, build, how it was distributed, and when it expires. The device's name is the one it paired with (H4).
 - **Hive checks once a day** and emails 14 days before, then 3 days before, once per build. A new build resets the warnings. Expired builds are marked in the device list. Each Hive has a setting to turn these off, so only one Hive needs to send them.
 - **Known limitation:** Hive only knows the build a device last reported, so a new build that hasn't been opened yet can get a stale warning.
 

@@ -112,7 +112,8 @@ struct SignInWorkflowTests {
             deviceID: signed.deviceID,
             challenge: fixture.workflow.issueChallenge().challenge,
             signature: signed.signature,
-            apiVersions: signed.apiVersions
+            apiVersions: signed.apiVersions,
+            build: nil
         )
 
         // Act

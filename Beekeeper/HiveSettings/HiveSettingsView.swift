@@ -56,6 +56,8 @@ struct HiveSettingsView: View {
 
             EmailSection(hive: hive, link: link)
 
+            BuildExpiryWarningsSection(isOn: state.settings.sendsBuildExpiryWarnings) { await saveBuildExpiryWarnings($0) }
+
             RecoverySection(hive: hive, link: link, copies: recovery)
 
             SSHKeyRotationSection(hive: hive, link: link)
@@ -203,6 +205,21 @@ struct HiveSettingsView: View {
         }
     }
 
+    /// Saved on its own, keeping any changes above that are waiting for Save.
+    private func saveBuildExpiryWarnings(_ isOn: Bool) async -> String? {
+        guard let state else { return nil }
+        var new = state.settings
+        new.sendsBuildExpiryWarnings = isOn
+        do {
+            let saved: HiveSettingsState = try await link.perform { try await $0.put(HiveEndpoint.settings, body: new) }
+            self.state = saved
+            draft?.sendsBuildExpiryWarnings = saved.settings.sendsBuildExpiryWarnings
+            return nil
+        } catch {
+            return HiveLink.message(for: error)
+        }
+    }
+
     private static func message(for problem: SettingsProblem) -> String {
         switch problem {
         case .invalidName: "Enter a name of up to 100 characters."
@@ -241,12 +258,14 @@ struct SettingsDraft: Equatable {
     var port: Int
     var addressOptions: [AddressOption]
     var advertisesOnLocalNetwork: Bool
+    var sendsBuildExpiryWarnings: Bool
 
     init(_ settings: HiveSettings) {
         name = settings.name
         port = settings.port
         addressOptions = settings.addressOptions
         advertisesOnLocalNetwork = settings.advertisesOnLocalNetwork
+        sendsBuildExpiryWarnings = settings.sendsBuildExpiryWarnings
         switch settings.networkAccess {
         case .thisMacOnly:
             access = .thisMacOnly
@@ -271,7 +290,8 @@ struct SettingsDraft: Equatable {
             networkAccess: networkAccess,
             port: port,
             addressOptions: addressOptions,
-            advertisesOnLocalNetwork: advertisesOnLocalNetwork
+            advertisesOnLocalNetwork: advertisesOnLocalNetwork,
+            sendsBuildExpiryWarnings: sendsBuildExpiryWarnings
         )
     }
 }

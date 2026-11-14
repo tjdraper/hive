@@ -31,6 +31,8 @@ let package = Package(
                 .product(name: "SwiftASN1", package: "swift-asn1"),
                 .product(name: "X509", package: "swift-certificates"),
             ],
+            // Signed with a throwaway certificate, holding made-up values in an ad hoc profile's shape.
+            resources: [.copy("BuildExpiry/SampleAdHoc.mobileprovision")],
             swiftSettings: swiftSettings,
             plugins: [swiftLint]
         ),

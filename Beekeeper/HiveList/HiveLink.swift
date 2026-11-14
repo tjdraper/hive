@@ -65,7 +65,8 @@ final class HiveLink {
                 connection: connection,
                 hiveID: hiveID,
                 deviceID: credential.deviceID,
-                key: try credential.signingKey()
+                key: try credential.signingKey(),
+                build: ThisBuild.current
             )
             deviceID = credential.deviceID
             status = .connecting

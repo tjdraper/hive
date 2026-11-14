@@ -35,6 +35,8 @@ struct AlertMessageBuilder: Sendable {
                 return driveFillingUp(drive, text: text)
             case .quotasExceedDrive:
                 return try quotasExceedDrive(drive, text: text)
+            case .buildExpiring(_, let deviceName, let build, let warning):
+                return try BuildExpiryEmail.message(deviceName: deviceName, build: build, warning: warning, text: text)
             }
         }
     }
@@ -232,7 +234,7 @@ struct AlertMessageBuilder: Sendable {
 }
 
 /// Names, dates and sizes as an email gives them.
-private struct AlertText {
+struct AlertText {
     let database: Database
     let calendar: Calendar
 
@@ -261,6 +263,15 @@ private struct AlertText {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "EEEE d MMMM yyyy 'at' HH:mm zzz"
+        return formatter.string(from: date)
+    }
+
+    /// Such as “Saturday 28 November”, for a subject.
+    func day(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "EEEE d MMMM"
         return formatter.string(from: date)
     }
 

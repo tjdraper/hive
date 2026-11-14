@@ -26,6 +26,8 @@ extension AuditEvent {
             "Changed the port from \(old) to \(new)"
         case .localNetworkAdvertisingChanged(let isOn):
             isOn ? "Turned on advertising on the local network" : "Turned off advertising on the local network"
+        case .buildExpiryWarningsChanged(let isOn):
+            isOn ? "Turned on build expiry warnings" : "Turned off build expiry warnings"
         case .server(_, let serverName, let change):
             change.summary(serverName: serverName)
         case .backupJob(_, let serverName, let jobName, let change):

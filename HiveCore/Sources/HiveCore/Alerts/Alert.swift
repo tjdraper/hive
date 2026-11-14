@@ -37,6 +37,8 @@ enum AlertFacts: Codable, Equatable, Sendable {
     /// Notices, sent once.
     case backingUpAgain(jobID: UUID, logEntryID: Int64)
     case snapshotShrank(jobID: UUID, logEntryID: Int64, parts: [ShrunkPart])
+    /// The device's name is kept, since it may be revoked before the email goes.
+    case buildExpiring(deviceID: UUID, deviceName: String, build: BeekeeperBuild, warning: BuildExpiryWarning)
 
     /// Nil for a notice.
     var condition: AlertCondition? {
@@ -48,7 +50,7 @@ enum AlertFacts: Codable, Equatable, Sendable {
         case .overQuota(let serverID, _): .overQuota(serverID: serverID)
         case .driveFillingUp: .driveFillingUp
         case .quotasExceedDrive: .quotasExceedDrive
-        case .backingUpAgain, .snapshotShrank: nil
+        case .backingUpAgain, .snapshotShrank, .buildExpiring: nil
         }
     }
 
@@ -64,15 +66,18 @@ enum AlertFacts: Codable, Equatable, Sendable {
         case .quotasExceedDrive: "quotasExceedDrive"
         case .backingUpAgain: "backingUpAgain"
         case .snapshotShrank: "snapshotShrank"
+        case .buildExpiring(_, _, let build, let warning): "buildExpiring(\(build.distribution.rawValue), \(warning.rawValue))"
         }
     }
 
-    /// Unique among alerts. A notice's names the run it's about, so working through that run again
-    /// can't send it twice.
+    /// Unique among alerts. A notice's names the run or build it's about, so working through that run
+    /// again can't send it twice.
     var key: String {
         switch self {
         case .backingUpAgain(_, let logEntryID): "backingUpAgain:\(logEntryID)"
         case .snapshotShrank(_, let logEntryID, _): "snapshotShrank:\(logEntryID)"
+        case .buildExpiring(let deviceID, _, let build, let warning):
+            "buildExpiring:\(deviceID.uuidString):\(build.version):\(build.build):\(warning.rawValue)"
         default: condition?.key ?? ""
         }
     }

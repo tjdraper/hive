@@ -13,6 +13,7 @@ actor AlertMonitor {
     private let store: AlertStore
     private let finishedRuns: FinishedRunAlerts
     private let standing: StandingAlertCheck
+    private let buildExpiry: BuildExpiryCheck
     private let now: @Sendable () -> Date
 
     init(
@@ -33,6 +34,7 @@ actor AlertMonitor {
             fullDiskAccess: fullDiskAccess
         )
         standing = StandingAlertCheck(database: database, drives: drives, statuses: statuses, fullDiskAccess: fullDiskAccess)
+        buildExpiry = BuildExpiryCheck(database: database)
         mailer = AlertMailer(
             store: store,
             messages: AlertMessageBuilder(database: database, drives: drives, calendar: calendar),
@@ -60,6 +62,7 @@ actor AlertMonitor {
             try await workThroughFinishedRuns()
             let changes = try await standing.changes(open: store.all())
             log(try store.apply(changes, at: now()))
+            log(try buildExpiry.openDueWarnings(at: now()))
             let reminders = try store.oweReminders(at: now())
             if reminders > 0 { Self.logger.notice("Reminders owed for \(reminders, privacy: .public) alerts") }
         } catch {

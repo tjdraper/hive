@@ -60,7 +60,7 @@ public final class HiveConnection: Sendable {
     }
 
     /// Answers a fresh challenge with the device's key and returns the session that follows.
-    public func signIn(hiveID: UUID, deviceID: UUID, key: some DeviceSigningKey) async throws -> SignInSession {
+    public func signIn(hiveID: UUID, deviceID: UUID, key: some DeviceSigningKey, build: BeekeeperBuild?) async throws -> SignInSession {
         let (challengeData, challengeResponse) = try await send(path: HiveEndpoint.signInChallenge, method: "POST")
         try checkSignInStatus(challengeResponse, body: challengeData)
         let challenge = try decode(SignInChallenge.self, from: challengeData)
@@ -70,7 +70,8 @@ public final class HiveConnection: Sendable {
             deviceID: deviceID,
             challenge: challenge.challenge,
             signature: try key.signature(for: statement).rawRepresentation,
-            apiVersions: .thisBuild
+            apiVersions: .thisBuild,
+            build: build
         )
         let (data, response) = try await send(path: HiveEndpoint.signIn, method: "POST", body: try JSONEncoder().encode(request))
         try checkSignInStatus(response, body: data)

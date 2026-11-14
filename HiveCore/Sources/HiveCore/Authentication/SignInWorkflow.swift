@@ -87,7 +87,7 @@ public struct SignInWorkflow: Sendable {
         }
 
         do {
-            try devices.recordSignIn(id: device.id, at: now)
+            try devices.recordSignIn(id: device.id, build: ReportedBuildCheck.validated(request.build), at: now)
         } catch {
             Self.logger.error("Couldn't record when a device was last seen: \(String(describing: error), privacy: .public)")
         }

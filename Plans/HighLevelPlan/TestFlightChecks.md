@@ -22,3 +22,5 @@ Add a check here whenever a slice leaves one, with the slice it came from. Check
 - [x] **H3:** Live progress for a Run Now on the iPhone moves as the run goes, and the run shows in the Job Log.
 - [x] **H3:** Deleting a snapshot on the iPhone asks for Face ID, then the snapshot leaves the list.
 - [x] **H3:** The sheets on the iPhone, such as Add Server, Edit for a job, and Change… for the backup drive, fit the screen, with Cancel at the top left and the confirming button at the top right.
+- [x] **H4:** After the iPhone opens a TestFlight build, the Hive's device list in Beekeeper on the Mac shows the iPhone's version and build, TestFlight, and the expiry date the release script printed.
+- [x] **H4:** On the iPhone, the device list shows each device's build and expiry under its name.

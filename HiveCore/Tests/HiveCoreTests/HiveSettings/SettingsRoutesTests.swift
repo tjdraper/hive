@@ -126,7 +126,23 @@ struct SettingsRoutesTests {
         #expect(fixture.listeners.applied == [ListenTarget(networkAccess: .thisMacOnly, port: APIFixture.defaultPort, advertised: nil)])
     }
 
-    @Test("Settings from a Beekeeper that predates advertising leave it on")
+    @Test("Turning off build expiry warnings is saved and recorded, and leaves listening alone")
+    func turnsOffBuildExpiryWarnings() async throws {
+        // Arrange
+        var settings = try current
+        settings.sendsBuildExpiryWarnings = false
+
+        // Act
+        let (status, _) = try await put(settings)
+
+        // Assert
+        #expect(status == .ok)
+        #expect(try current.sendsBuildExpiryWarnings == false)
+        #expect(try fixture.auditEvents().first == .buildExpiryWarningsChanged(isOn: false))
+        #expect(fixture.listeners.applied.isEmpty)
+    }
+
+    @Test("Settings from a Beekeeper that predates advertising and build expiry warnings leave both on")
     func missingAdvertisingDecodesAsOn() throws {
         // Arrange
         let json = Data(#"{"name":"Hive","networkAccess":{"thisMacOnly":{}},"port":4483,"addressOptions":[]}"#.utf8)
@@ -136,6 +152,7 @@ struct SettingsRoutesTests {
 
         // Assert
         #expect(settings.advertisesOnLocalNetwork)
+        #expect(settings.sendsBuildExpiryWarnings)
     }
 
     @Test("Address options are saved in one written form, in order, and recorded")

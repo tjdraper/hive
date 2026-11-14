@@ -35,28 +35,34 @@ struct AlertStore: Sendable {
     func apply(_ changes: [Change], at date: Date, checkedThrough logEntryID: Int64? = nil) throws -> Applied {
         guard !changes.isEmpty || logEntryID != nil else { return Applied() }
         return try database.writer.write { database in
-            var applied = Applied()
-            for change in changes {
-                switch change {
-                case .open(let facts):
-                    guard try !AlertRecord.exists(database, key: facts.key) else { continue }
-                    try AlertRecord(facts: facts, openedAt: date).insert(database)
-                    applied.opened.append(facts)
-                case .resolve(let condition, let notice):
-                    guard let record = try AlertRecord.fetchOne(database, key: condition.key) else { continue }
-                    try record.delete(database)
-                    applied.ended.append(record.facts)
-                    if let notice, record.lastEmailAt != nil, try !AlertRecord.exists(database, key: notice.key) {
-                        try AlertRecord(facts: notice, openedAt: date).insert(database)
-                        applied.opened.append(notice)
-                    }
-                }
-            }
+            let applied = try Self.apply(changes, at: date, in: database)
             if let logEntryID {
                 try database.execute(sql: "UPDATE hive SET alertsCheckedThrough = ?", arguments: [logEntryID])
             }
             return applied
         }
+    }
+
+    /// Within a transaction that also records what the changes came from.
+    static func apply(_ changes: [Change], at date: Date, in database: Database) throws -> Applied {
+        var applied = Applied()
+        for change in changes {
+            switch change {
+            case .open(let facts):
+                guard try !AlertRecord.exists(database, key: facts.key) else { continue }
+                try AlertRecord(facts: facts, openedAt: date).insert(database)
+                applied.opened.append(facts)
+            case .resolve(let condition, let notice):
+                guard let record = try AlertRecord.fetchOne(database, key: condition.key) else { continue }
+                try record.delete(database)
+                applied.ended.append(record.facts)
+                if let notice, record.lastEmailAt != nil, try !AlertRecord.exists(database, key: notice.key) {
+                    try AlertRecord(facts: notice, openedAt: date).insert(database)
+                    applied.opened.append(notice)
+                }
+            }
+        }
+        return applied
     }
 
     /// Owes a reminder for each condition that reminds daily and was last emailed a day or more ago.

@@ -8,26 +8,32 @@ public struct HiveSettings: Codable, Hashable, Sendable {
     public var addressOptions: [AddressOption]
     /// Hive advertises itself with Bonjour on the local networks it listens on, so devices there find it.
     public var advertisesOnLocalNetwork: Bool
+    /// Hive emails before a device's iPhone or iPad build expires. With several Hives, it can be left
+    /// on for just one, so each warning comes once.
+    public var sendsBuildExpiryWarnings: Bool
 
     public init(
         name: String,
         networkAccess: NetworkAccess,
         port: Int,
         addressOptions: [AddressOption] = [],
-        advertisesOnLocalNetwork: Bool = true
+        advertisesOnLocalNetwork: Bool = true,
+        sendsBuildExpiryWarnings: Bool = true
     ) {
         self.name = name
         self.networkAccess = networkAccess
         self.port = port
         self.addressOptions = addressOptions
         self.advertisesOnLocalNetwork = advertisesOnLocalNetwork
+        self.sendsBuildExpiryWarnings = sendsBuildExpiryWarnings
     }
 
     private enum CodingKeys: String, CodingKey {
-        case name, networkAccess, port, addressOptions, advertisesOnLocalNetwork
+        case name, networkAccess, port, addressOptions, advertisesOnLocalNetwork, sendsBuildExpiryWarnings
     }
 
-    /// A Hive from before Bonjour sends no `advertisesOnLocalNetwork`.
+    /// A Hive from before Bonjour sends no `advertisesOnLocalNetwork`, and one from before build expiry
+    /// warnings no `sendsBuildExpiryWarnings`.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decode(String.self, forKey: .name)
@@ -35,6 +41,7 @@ public struct HiveSettings: Codable, Hashable, Sendable {
         port = try container.decode(Int.self, forKey: .port)
         addressOptions = try container.decode([AddressOption].self, forKey: .addressOptions)
         advertisesOnLocalNetwork = try container.decodeIfPresent(Bool.self, forKey: .advertisesOnLocalNetwork) ?? true
+        sendsBuildExpiryWarnings = try container.decodeIfPresent(Bool.self, forKey: .sendsBuildExpiryWarnings) ?? true
     }
 
     public var addresses: HiveAddresses {

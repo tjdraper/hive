@@ -6,7 +6,7 @@ enum DeviceRoutes {
     static func add(to router: Router<HiveRequestContext>, devices: DeviceStore, revocation: DeviceRevocationWorkflow) {
         router.get(RouterPath(HiveEndpoint.devices)) { _, _ in
             try JSONResponse(devices.all().map {
-                DeviceSummary(id: $0.id, name: $0.name, pairedAt: $0.pairedAt, lastSeenAt: $0.lastSeenAt)
+                DeviceSummary(id: $0.id, name: $0.name, pairedAt: $0.pairedAt, lastSeenAt: $0.lastSeenAt, build: $0.build)
             })
         }
 

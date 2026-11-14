@@ -17,12 +17,30 @@ public struct SignInRequest: Codable, Sendable {
     /// The raw form of a P-256 ECDSA signature over `SignInStatement`.
     public let signature: Data
     public let apiVersions: APIVersions
+    /// Nil from a Beekeeper from before builds were reported.
+    public let build: BeekeeperBuild?
 
-    public init(deviceID: UUID, challenge: Data, signature: Data, apiVersions: APIVersions) {
+    public init(deviceID: UUID, challenge: Data, signature: Data, apiVersions: APIVersions, build: BeekeeperBuild?) {
         self.deviceID = deviceID
         self.challenge = challenge
         self.signature = signature
         self.apiVersions = apiVersions
+        self.build = build
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case deviceID, challenge, signature, apiVersions, build
+    }
+
+    /// A build this Hive can't read, such as one from a platform added later, is left out rather than
+    /// turning the sign-in down.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        deviceID = try container.decode(UUID.self, forKey: .deviceID)
+        challenge = try container.decode(Data.self, forKey: .challenge)
+        signature = try container.decode(Data.self, forKey: .signature)
+        apiVersions = try container.decode(APIVersions.self, forKey: .apiVersions)
+        build = (try? container.decodeIfPresent(BeekeeperBuild.self, forKey: .build))
     }
 }
 

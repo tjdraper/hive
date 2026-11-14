@@ -332,6 +332,7 @@ struct RecoveryFileDownloadTests {
         port: nil,
         addressOptions: nil,
         advertisesOnLocalNetwork: nil,
+        sendsBuildExpiryWarnings: nil,
         backupDrive: nil
     )
 }

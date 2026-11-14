@@ -46,6 +46,31 @@ struct DeviceRoutesTests {
         #expect(devices[1].lastSeenAt == nil)
     }
 
+    @Test("The device list shows the build each device reported when it last signed in")
+    func listsBuilds() async throws {
+        // Arrange
+        let build = BeekeeperBuild(
+            platform: .iPad,
+            version: "2026.3",
+            build: "12",
+            distribution: .testFlight,
+            expiresAt: fixture.signIn.clock.now.addingTimeInterval(90 * 24 * 60 * 60)
+        )
+        let request = try fixture.signIn.request(key: otherKey, deviceID: other.id, build: build)
+        _ = fixture.signIn.workflow.signIn(request, from: ClientAddress(key: "192.0.2.1"))
+        let token = try fixture.token()
+
+        // Act
+        let devices = try await fixture.application.test(.router) { client in
+            try await client.execute(uri: HiveEndpoint.devices, method: .get, headers: fixture.headers(token: token)) { response in
+                try response.decoded(as: [DeviceSummary].self)
+            }
+        }
+
+        // Assert
+        #expect(devices.map(\.build) == [nil, build])
+    }
+
     @Test("Revoking a device ends its session at once and its key can't sign in again")
     func revokesAnotherDevice() async throws {
         // Arrange

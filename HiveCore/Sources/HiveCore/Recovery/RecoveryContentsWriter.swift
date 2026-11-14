@@ -40,14 +40,14 @@ enum RecoveryContentsWriter {
             sql: """
             UPDATE hive SET
                 id = ?, createdAt = ?, name = ?, networkAccess = ?, listenAddress = ?, port = ?, addressOptions = ?,
-                advertisesOnLocalNetwork = ?,
+                advertisesOnLocalNetwork = ?, sendsBuildExpiryWarnings = ?,
                 backupDriveUUID = ?, backupDriveName = ?,
                 recoveryPublicKey = ?, recoveryKeySavedAt = ?, recoveryFileWrittenAt = NULL, recoveryFileDigest = NULL,
                 retentionPausedSince = ?
             """,
             arguments: [
                 hive.id, hive.createdAt, hive.name, hive.networkAccess, hive.listenAddress, hive.port, addressOptions ?? "[]",
-                hive.advertisesOnLocalNetwork ?? true,
+                hive.advertisesOnLocalNetwork ?? true, hive.sendsBuildExpiryWarnings ?? true,
                 hive.backupDrive?.volumeUUID, hive.backupDrive?.name,
                 recoveryKey.rawRepresentation, date,
                 date,

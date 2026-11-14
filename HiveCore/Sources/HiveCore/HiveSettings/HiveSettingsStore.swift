@@ -22,7 +22,9 @@ public struct HiveSettingsStore: Sendable {
 
     public func settings() throws -> HiveSettings {
         try database.writer.read { database in
-            let sql = "SELECT name, networkAccess, listenAddress, port, addressOptions, advertisesOnLocalNetwork FROM hive"
+            let sql = """
+            SELECT name, networkAccess, listenAddress, port, addressOptions, advertisesOnLocalNetwork, sendsBuildExpiryWarnings FROM hive
+            """
             guard let row = try Row.fetchOne(database, sql: sql) else {
                 throw HiveDatabaseError.missingHiveID
             }
@@ -31,7 +33,8 @@ public struct HiveSettingsStore: Sendable {
                 networkAccess: Self.networkAccess(kind: row["networkAccess"], address: row["listenAddress"]),
                 port: row["port"] ?? defaultPort,
                 addressOptions: try Self.addressOptions(from: row["addressOptions"]),
-                advertisesOnLocalNetwork: row["advertisesOnLocalNetwork"]
+                advertisesOnLocalNetwork: row["advertisesOnLocalNetwork"],
+                sendsBuildExpiryWarnings: row["sendsBuildExpiryWarnings"]
             )
         }
     }
@@ -43,11 +46,12 @@ public struct HiveSettingsStore: Sendable {
         try database.writer.write { database in
             try database.execute(
                 sql: """
-                UPDATE hive SET name = ?, networkAccess = ?, listenAddress = ?, port = ?, addressOptions = ?, advertisesOnLocalNetwork = ?
+                UPDATE hive SET name = ?, networkAccess = ?, listenAddress = ?, port = ?, addressOptions = ?, advertisesOnLocalNetwork = ?,
+                    sendsBuildExpiryWarnings = ?
                 """,
                 arguments: [
                     new.name, kind.rawValue, address, new.port == old.port ? (try currentPort(in: database)) : new.port, options,
-                    new.advertisesOnLocalNetwork,
+                    new.advertisesOnLocalNetwork, new.sendsBuildExpiryWarnings,
                 ]
             )
             for event in Self.changes(from: old, to: new) {
@@ -71,6 +75,9 @@ public struct HiveSettingsStore: Sendable {
         }
         if old.advertisesOnLocalNetwork != new.advertisesOnLocalNetwork {
             events.append(.localNetworkAdvertisingChanged(isOn: new.advertisesOnLocalNetwork))
+        }
+        if old.sendsBuildExpiryWarnings != new.sendsBuildExpiryWarnings {
+            events.append(.buildExpiryWarningsChanged(isOn: new.sendsBuildExpiryWarnings))
         }
         return events
     }

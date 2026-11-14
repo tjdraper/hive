@@ -9,16 +9,31 @@ struct DeviceListView: View {
     @State private var failure: String?
     @State private var isConfirmingSelfRevoke = false
     @State private var isPairing = false
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
 
     var body: some View {
         Table(devices) {
             TableColumn("Name") { device in
-                HStack(spacing: 6) {
-                    Text(device.name)
-                    if device.id == link.deviceID {
-                        Text(Self.thisDeviceLabel)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(device.name)
+                        if device.id == link.deviceID {
+                            Text(Self.thisDeviceLabel)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if isCompact {
+                        // A compact table shows only its first column.
+                        DeviceBuildLabel(build: device.build)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        if device.build?.expiresAt != nil {
+                            DeviceExpiryLabel(build: device.build, isLabeled: true)
+                                .font(.caption)
+                        }
                     }
                 }
             }
@@ -31,6 +46,12 @@ struct DeviceListView: View {
                 } else {
                     Text("Never").foregroundStyle(.secondary)
                 }
+            }
+            TableColumn("Beekeeper") { device in
+                DeviceBuildLabel(build: device.build)
+            }
+            TableColumn("Expires") { device in
+                DeviceExpiryLabel(build: device.build)
             }
             TableColumn("") { device in
                 Button("Revoke", role: .destructive) {
@@ -73,6 +94,14 @@ struct DeviceListView: View {
             Text(selfRevokeMessage)
         }
         .task { await load() }
+    }
+
+    private var isCompact: Bool {
+        #if os(iOS)
+        sizeClass == .compact
+        #else
+        false
+        #endif
     }
 
     private static var thisDeviceLabel: String {
