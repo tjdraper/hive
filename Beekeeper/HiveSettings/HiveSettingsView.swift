@@ -106,9 +106,16 @@ struct HiveSettingsView: View {
                 failure = nil
             }
             .disabled(!isChanged(state) || isSaving)
+            #if os(iOS)
+            // A section's footer otherwise draws them as plain text on iPad.
+            .buttonStyle(.bordered)
+            #endif
             Button("Save") { Task { await save(draft) } }
                 .keyboardShortcut("s")
                 .disabled(!isChanged(state) || isSaving)
+                #if os(iOS)
+                .buttonStyle(.borderedProminent)
+                #endif
         }
     }
 

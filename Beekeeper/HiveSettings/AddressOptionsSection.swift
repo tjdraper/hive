@@ -23,23 +23,16 @@ struct AddressOptionsSection<Controls: View>: View {
             ForEach(Array(options.enumerated()), id: \.offset) { index, option in
                 row(option, at: index)
             }
+            #if os(macOS)
             HStack {
-                Menu("Add Address", systemImage: "plus") {
-                    ForEach(suggestions, id: \.host) { suggestion in
-                        Button {
-                            options.append(AddressOption(host: suggestion.host))
-                        } label: {
-                            Text(suggestion.host)
-                            Text(suggestion.label)
-                        }
-                    }
-                    if !suggestions.isEmpty { Divider() }
-                    Button("Other Address…") { isAddingOther = true }
-                }
-                .fixedSize()
-                .disabled(options.count >= PairingCode.largestAddressCount)
+                addMenu
+                    .fixedSize()
                 Spacer()
             }
+            #else
+            // A form row of its own, as iPad's other actions are. Sized to fit, iPadOS stretches the row.
+            addMenu
+            #endif
         } header: {
             Text("Addresses for Other Devices")
         } footer: {
@@ -52,6 +45,22 @@ struct AddressOptionsSection<Controls: View>: View {
         .sheet(isPresented: $isAddingOther) {
             OtherAddressSheet(hivePort: hivePort) { options.append($0) }
         }
+    }
+
+    private var addMenu: some View {
+        Menu("Add Address…", systemImage: "plus") {
+            ForEach(suggestions, id: \.host) { suggestion in
+                Button {
+                    options.append(AddressOption(host: suggestion.host))
+                } label: {
+                    Text(suggestion.host)
+                    Text(suggestion.label)
+                }
+            }
+            if !suggestions.isEmpty { Divider() }
+            Button("Other Address…") { isAddingOther = true }
+        }
+        .disabled(options.count >= PairingCode.largestAddressCount)
     }
 
     private func row(_ option: AddressOption, at index: Int) -> some View {
