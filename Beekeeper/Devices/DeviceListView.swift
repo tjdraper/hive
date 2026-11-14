@@ -40,8 +40,10 @@ struct DeviceListView: View {
                         Task { await revoke(device.id) }
                     }
                 }
+                // A table cell otherwise draws it as plain text, which doesn't read as a button.
+                .buttonStyle(.bordered)
             }
-            .width(80)
+            .width(100)
         }
         .overlay(alignment: .bottom) {
             if let failure {
