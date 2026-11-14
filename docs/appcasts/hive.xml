@@ -3,6 +3,29 @@
     <channel>
         <title>Hive</title>
         <item>
+            <title>2026.3</title>
+            <pubDate>Sat, 14 Nov 2026 15:00:59 -0600</pubDate>
+            <link>https://github.com/tjdraper/hive</link>
+            <sparkle:version>2026.3</sparkle:version>
+            <sparkle:shortVersionString>2026.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## [2026.3] - 2026-11-14
+
+### Added
+
+- Beekeeper for iPhone and iPad.
+- Hive advertises itself on the local network with Bonjour, so nearby devices find it.
+- Pairing by scanning the QR code with the camera.
+- Hive emails 14 days, and again at 3 days before the TestFlight of Beekeeper on an iPhone or iPad expires.
+- The device list shows each device’s Beekeeper build and when it expires.
+
+### Changed
+
+- A Hive’s overview uses the same grouped layout as its server and job pages.
+]]></description>
+            <enclosure url="https://github.com/tjdraper/hive/releases/download/v2026.3/Hive-2026.3.zip" length="19991440" type="application/octet-stream" sparkle:edSignature="xXMzmqLtptVX9PtFG13qOAf4crxFPZVBURI066mTkEgkyYuL+CrpGntVBx6cOtn+SDQiuIvxVQ5njVvJnfSqAw=="/>
+        </item>
+        <item>
             <title>2026.2</title>
             <pubDate>Fri, 13 Nov 2026 11:28:15 -0600</pubDate>
             <link>https://github.com/tjdraper/hive</link>
