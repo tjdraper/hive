@@ -16,7 +16,7 @@ struct RetentionPausedSection: View {
     @State private var failure: String?
 
     var body: some View {
-        GroupBox {
+        Section {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: "pause.circle.fill")
                     .foregroundStyle(.orange)
@@ -28,19 +28,17 @@ struct RetentionPausedSection: View {
                             + "retention and quotas again. Backups run as usual meanwhile."
                     )
                     .foregroundStyle(.secondary)
-                    ForEach(state.servers) { server in
-                        ServerTakenOver(server: server)
-                    }
-                    if let failure {
-                        Text(failure)
-                            .foregroundStyle(.red)
-                    }
-                    Button("Start Retention and Quotas…") { isAsking = true }
-                        .disabled(isStarting)
                 }
-                Spacer(minLength: 0)
             }
-            .padding(4)
+            ForEach(state.servers) { server in
+                ServerTakenOver(server: server)
+            }
+            if let failure {
+                Text(failure)
+                    .foregroundStyle(.red)
+            }
+            Button("Start Retention and Quotas…") { isAsking = true }
+                .disabled(isStarting)
         }
         .confirmationDialog("Start retention and quotas for “\(hive.name)”?", isPresented: $isAsking) {
             Button("Start Retention and Quotas") { Task { await start() } }

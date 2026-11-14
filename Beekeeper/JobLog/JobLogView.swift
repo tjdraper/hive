@@ -123,6 +123,20 @@ private struct JobLogFilterBar: View {
     let allJobs: [BackupJob]
 
     var body: some View {
+        #if os(iOS)
+        // A server or job with a long name pushes the rest past an iPhone's width.
+        ScrollView(.horizontal) {
+            filters
+        }
+        .scrollIndicators(.hidden)
+        .background(.bar)
+        #else
+        filters
+            .background(.bar)
+        #endif
+    }
+
+    private var filters: some View {
         HStack(spacing: 12) {
             Picker("Server", selection: $filter.serverID) {
                 Text("All Servers").tag(UUID?.none)
@@ -145,12 +159,12 @@ private struct JobLogFilterBar: View {
                 #if os(iOS)
                 // A switch would stretch across the bar, away from its label.
                 .toggleStyle(.button)
+                .fixedSize()
                 #endif
             Spacer()
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(.bar)
         .onChange(of: filter.serverID) {
             if let jobID = filter.jobID, !jobs.contains(where: { $0.id == jobID }) { filter.jobID = nil }
         }

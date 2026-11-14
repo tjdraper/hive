@@ -57,11 +57,85 @@ struct MainWindow: View {
     @State private var addingJob: AddJobRequest?
     @State private var isAddingHive = false
     #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var windowWidth: CGFloat = 0
     @State private var detailWidth: CGFloat = 0
     #endif
 
     var body: some View {
+        navigation
+            #if os(macOS)
+            // A floor for the window, so no page's content can make its smallest size larger than the screen.
+            .frame(minWidth: 640, minHeight: 400)
+            #else
+            .groupBoxStyle(LabelAboveGroupBoxStyle())
+            #endif
+            .sheet(item: $addingServer) { request in
+                if let link = store.link(for: request.hiveID), let servers = store.servers(for: request.hiveID) {
+                    AddServerSheet(link: link, servers: servers) { serverID in
+                        selection = .server(hiveID: request.hiveID, serverID: serverID)
+                    }
+                }
+            }
+            .sheet(item: $addingJob) { request in
+                if let servers = store.servers(for: request.hiveID) {
+                    JobEditorSheet(jobs: servers.jobs, serverID: request.serverID, job: nil) { job in
+                        selection = .job(hiveID: request.hiveID, serverID: job.serverID, jobID: job.id)
+                    }
+                }
+            }
+            .sheet(isPresented: $isAddingHive) {
+                AddHiveSheet { hiveID in
+                    selection = .hive(hiveID)
+                }
+            }
+            .environment(\.addHive, addHive)
+            .focusedSceneValue(\.addHive, addHive)
+            .task {
+                var retry = Self.firstRetry
+                while !Task.isCancelled {
+                    await store.refreshAll()
+                    if store.hasOfflineHive {
+                        try? await Task.sleep(for: retry)
+                        retry = min(retry * 2, Self.refreshInterval)
+                    } else {
+                        retry = Self.firstRetry
+                        try? await Task.sleep(for: Self.refreshInterval)
+                    }
+                }
+            }
+            .onAppear {
+                // At iPhone width the list of Hives is the first page, and selecting one would leave it.
+                if !isCompact, selection == nil, let first = store.hives.first {
+                    selection = .hive(first.id)
+                }
+            }
+    }
+
+    @ViewBuilder private var navigation: some View {
+        #if os(iOS)
+        if isCompact {
+            CompactNavigation(selection: $selection) { item in
+                detail(for: item)
+            }
+        } else {
+            splitView
+                .onGeometryChange(for: CGFloat.self, of: \.size.width) { windowWidth = $0 }
+        }
+        #else
+        splitView
+        #endif
+    }
+
+    private var isCompact: Bool {
+        #if os(iOS)
+        sizeClass == .compact
+        #else
+        false
+        #endif
+    }
+
+    private var splitView: some View {
         NavigationSplitView {
             HiveSidebar(selection: $selection, onAddServer: addServer, onAddJob: addJob)
                 #if os(macOS)
@@ -74,69 +148,26 @@ struct MainWindow: View {
                 .ignoresSafeArea(.keyboard)
         } detail: {
             #if os(macOS)
-            detail
+            detail(for: selection)
             #else
-            detail
+            detail(for: selection)
                 .onGeometryChange(for: CGFloat.self, of: \.size.width) { detailWidth = $0 }
                 .environment(\.locationPathRoom, locationPathRoom)
             #endif
         }
-        #if os(macOS)
-        // A floor for the window, so no page's content can make its smallest size larger than the screen.
-        .frame(minWidth: 640, minHeight: 400)
-        #else
-        .onGeometryChange(for: CGFloat.self, of: \.size.width) { windowWidth = $0 }
-        .groupBoxStyle(LabelAboveGroupBoxStyle())
-        #endif
-        .sheet(item: $addingServer) { request in
-            if let link = store.link(for: request.hiveID), let servers = store.servers(for: request.hiveID) {
-                AddServerSheet(link: link, servers: servers) { serverID in
-                    selection = .server(hiveID: request.hiveID, serverID: serverID)
-                }
-            }
-        }
-        .sheet(item: $addingJob) { request in
-            if let servers = store.servers(for: request.hiveID) {
-                JobEditorSheet(jobs: servers.jobs, serverID: request.serverID, job: nil) { job in
-                    selection = .job(hiveID: request.hiveID, serverID: job.serverID, jobID: job.id)
-                }
-            }
-        }
-        .sheet(isPresented: $isAddingHive) {
-            AddHiveSheet { hiveID in
-                selection = .hive(hiveID)
-            }
-        }
-        .environment(\.addHive, addHive)
-        .focusedSceneValue(\.addHive, addHive)
-        .task {
-            var retry = Self.firstRetry
-            while !Task.isCancelled {
-                await store.refreshAll()
-                if store.hasOfflineHive {
-                    try? await Task.sleep(for: retry)
-                    retry = min(retry * 2, Self.refreshInterval)
-                } else {
-                    retry = Self.firstRetry
-                    try? await Task.sleep(for: Self.refreshInterval)
-                }
-            }
-        }
-        .onAppear {
-            if selection == nil, let first = store.hives.first {
-                selection = .hive(first.id)
-            }
-        }
     }
 
-    @ViewBuilder private var detail: some View {
-        if let selection, let hive = store.hive(selection.hiveID), let link = store.link(for: hive.id),
+    @ViewBuilder
+    private func detail(for item: SidebarItem?) -> some View {
+        if let item, let hive = store.hive(item.hiveID), let link = store.link(for: hive.id),
            let servers = store.servers(for: hive.id), let recovery = store.recoveryCopies(for: hive.id) {
-            switch selection {
+            switch item {
             case .hive:
                 HiveDetail(hive: hive, link: link, servers: servers, recovery: recovery, page: $page, selection: $selection) {
                     addServer(to: hive.id)
                 }
+                // Otherwise another Hive's page keeps this one's state, and its loads stay on this Hive.
+                .id(hive.id)
             case .server(_, let serverID):
                 ServerDetail(
                     hive: hive,

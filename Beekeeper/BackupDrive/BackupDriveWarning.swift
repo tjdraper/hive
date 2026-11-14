@@ -4,42 +4,25 @@ import SwiftUI
 /// Shown on the Hive's overview while backups can't be written: no drive chosen, or the chosen one
 /// missing or unusable.
 struct BackupDriveWarning: View {
-    let link: HiveLink
+    let state: BackupDriveState?
     let onOpenSettings: () -> Void
 
-    /// Often enough that ejecting the drive shows here soon after.
-    private static let refreshInterval = Duration.seconds(15)
-
-    @State private var state: BackupDriveState?
-
     var body: some View {
-        Group {
-            if let state, let warning = Self.warning(for: state.chosen) {
-                GroupBox {
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Image(systemName: "externaldrive.badge.exclamationmark")
-                            .foregroundStyle(.orange)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(warning.title)
-                                .font(.headline)
-                            Text(warning.detail)
-                                .foregroundStyle(.secondary)
-                            if warning.offersSettings {
-                                Button("Choose a Drive…", action: onOpenSettings)
-                            }
-                        }
-                        Spacer(minLength: 0)
+        if let state, let warning = Self.warning(for: state.chosen) {
+            Section {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Image(systemName: "externaldrive.badge.exclamationmark")
+                        .foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(warning.title)
+                            .font(.headline)
+                        Text(warning.detail)
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(4)
                 }
-            }
-        }
-        .task {
-            while !Task.isCancelled {
-                if let loaded: BackupDriveState = try? await link.perform({ try await $0.get(HiveEndpoint.backupDrive) }) {
-                    state = loaded
+                if warning.offersSettings {
+                    Button("Choose a Drive…", action: onOpenSettings)
                 }
-                try? await Task.sleep(for: Self.refreshInterval)
             }
         }
     }
@@ -71,5 +54,24 @@ struct BackupDriveWarning: View {
             detail: "“\(chosen.drive.name)”: \(problem.chosenDriveMessage)",
             offersSettings: true
         )
+    }
+}
+
+/// The backup drive as Hive last reported it. The overview keeps it, since a form runs nothing for a
+/// section that isn't showing.
+@Observable
+final class BackupDriveWatch {
+    /// Often enough that ejecting the drive shows on the overview soon after.
+    private static let refreshInterval = Duration.seconds(15)
+
+    private(set) var state: BackupDriveState?
+
+    func watch(_ link: HiveLink) async {
+        while !Task.isCancelled {
+            if let loaded: BackupDriveState = try? await link.perform({ try await $0.get(HiveEndpoint.backupDrive) }) {
+                state = loaded
+            }
+            try? await Task.sleep(for: Self.refreshInterval)
+        }
     }
 }

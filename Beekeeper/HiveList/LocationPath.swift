@@ -41,27 +41,17 @@ extension View {
     /// Shows `parts` in place of the toolbar's title. The title stays the window's name, for the Window menu.
     /// A page with tabs in the toolbar's middle keeps the title on iPad, where removing it takes the tabs too.
     func locationPath(_ parts: [LocationPath.Part], besideTabs: Bool = false) -> some View {
+        #if os(macOS)
         toolbar {
             // Without the glass capsule toolbar items get, so it reads as the title it stands in for.
             ToolbarItem(placement: .navigation) {
-                #if os(macOS)
                 LocationPath(parts: parts)
-                #else
-                if besideTabs {
-                    LocationPath(parts: parts)
-                        // iPadOS otherwise gives the item only enough room for its first icon.
-                        .fixedSize()
-                } else {
-                    FittingLocationPath(parts: parts)
-                }
-                #endif
             }
             .sharedBackgroundVisibility(.hidden)
         }
-        #if os(macOS)
         .toolbar(removing: .title)
         #else
-        .modifier(InlineTitle(removesTitle: !besideTabs))
+        modifier(PadLocationPath(parts: parts, besideTabs: besideTabs))
         #endif
     }
 }
@@ -71,6 +61,37 @@ extension EnvironmentValues {
     /// How wide the path can be in the detail's toolbar beside the page's own buttons, or nil before
     /// it's known.
     @Entry var locationPathRoom: CGFloat?
+}
+
+/// At iPhone width each part of the path is a page of its own, which the Back button returns to, so the
+/// page keeps only its title.
+private struct PadLocationPath: ViewModifier {
+    let parts: [LocationPath.Part]
+    let besideTabs: Bool
+
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    func body(content: Content) -> some View {
+        if sizeClass == .compact {
+            content
+                .navigationBarTitleDisplayMode(.inline)
+        } else {
+            content
+                .toolbar {
+                    ToolbarItem(placement: .navigation) {
+                        if besideTabs {
+                            LocationPath(parts: parts)
+                                // iPadOS otherwise gives the item only enough room for its first icon.
+                                .fixedSize()
+                        } else {
+                            FittingLocationPath(parts: parts)
+                        }
+                    }
+                    .sharedBackgroundVisibility(.hidden)
+                }
+                .modifier(InlineTitle(removesTitle: !besideTabs))
+        }
+    }
 }
 
 /// iPadOS shows an inline title beside the path otherwise, repeating its last part.

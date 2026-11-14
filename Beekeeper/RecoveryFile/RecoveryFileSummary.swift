@@ -10,37 +10,28 @@ struct RecoveryFileSummary: View {
     let copies: RecoveryFileCopies
 
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 0) {
-                LabeledContent("Last written") {
-                    if let written = copies.hiveState?.fileWrittenAt {
-                        // Each minute, and without seconds, so it never sits on a stale "47 seconds ago".
-                        TimelineView(.everyMinute) { _ in
-                            Text(written.formatted(Self.ago))
-                        }
-                        .help(written.formatted(date: .long, time: .shortened))
-                    } else {
-                        Text("Not yet")
+        Section("Recovery File") {
+            LabeledContent("Last written") {
+                if let written = copies.hiveState?.fileWrittenAt {
+                    // Each minute, and without seconds, so it never sits on a stale "47 seconds ago".
+                    TimelineView(.everyMinute) { _ in
+                        Text(written.formatted(Self.ago))
                     }
+                    .help(written.formatted(date: .long, time: .shortened))
+                } else {
+                    Text("Not yet")
                 }
-                Divider()
-                LabeledContent(Self.thisDevice) {
-                    deviceCopy
-                }
-                #if os(macOS)
-                if copies.folder != nil {
-                    Divider()
-                    LabeledContent("In “\(copies.folderName ?? "the chosen folder")”") {
-                        folderCopy
-                    }
-                }
-                #endif
             }
-            .padding(.horizontal, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .labeledContentStyle(SpreadLabeledContentStyle())
-        } label: {
-            Text("Recovery File")
+            LabeledContent(Self.thisDevice) {
+                deviceCopy
+            }
+            #if os(macOS)
+            if copies.folder != nil {
+                LabeledContent("In “\(copies.folderName ?? "the chosen folder")”") {
+                    folderCopy
+                }
+            }
+            #endif
         }
     }
 
@@ -48,7 +39,7 @@ struct RecoveryFileSummary: View {
         if copies.hasLatest {
             HasLatestLabel()
         } else if copies.copyDigest != nil {
-            Label("Has an older one", systemImage: "clock.arrow.circlepath")
+            IconAndText(text: "Has an older one", systemImage: "clock.arrow.circlepath")
                 .foregroundStyle(.orange)
         } else {
             Text("Doesn't have it yet")
@@ -59,7 +50,7 @@ struct RecoveryFileSummary: View {
     #if os(macOS)
     @ViewBuilder private var folderCopy: some View {
         if copies.folderProblem != nil {
-            Label("Couldn't update it", systemImage: "exclamationmark.triangle.fill")
+            IconAndText(text: "Couldn't update it", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
         } else if copies.hasLatest {
             HasLatestLabel()
@@ -87,25 +78,23 @@ struct RecoveryFileSummary: View {
 
 private struct HasLatestLabel: View {
     var body: some View {
-        Label {
-            Text("Has the latest")
-        } icon: {
+        HStack(spacing: 6) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
+            Text("Has the latest")
         }
     }
 }
 
-/// Laid out as the server rows above: the label at the leading edge, the value at the trailing one.
-/// Outside a form, the Mac otherwise puts the value straight after the label.
-private struct SpreadLabeledContentStyle: LabeledContentStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack {
-            configuration.label
-            Spacer()
-            configuration.content
-                .foregroundStyle(.secondary)
+/// A `Label` as a form row's value leaves the row hundreds of points tall on iPad.
+private struct IconAndText: View {
+    let text: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+            Text(text)
         }
-        .padding(.vertical, 6)
     }
 }

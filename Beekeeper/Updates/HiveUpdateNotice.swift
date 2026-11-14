@@ -13,7 +13,7 @@ struct HiveUpdateNotice: View {
     let isOnThisMac: Bool
 
     var body: some View {
-        GroupBox {
+        Section {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: "arrow.down.circle.fill")
                     .foregroundStyle(.tint)
@@ -22,15 +22,13 @@ struct HiveUpdateNotice: View {
                         .font(.headline)
                     Text(explanation)
                         .foregroundStyle(.secondary)
-                    #if os(macOS)
-                    if isOnThisMac {
-                        OpenHiveButton()
-                    }
-                    #endif
                 }
-                Spacer(minLength: 0)
             }
-            .padding(4)
+            #if os(macOS)
+            if isOnThisMac {
+                OpenHiveButton()
+            }
+            #endif
         }
     }
 

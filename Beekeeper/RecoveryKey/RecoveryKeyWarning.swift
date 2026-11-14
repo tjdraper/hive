@@ -7,7 +7,7 @@ struct RecoveryKeyWarning: View {
     var onRestore: (() -> Void)?
 
     var body: some View {
-        GroupBox {
+        Section {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: "key.fill")
                     .foregroundStyle(.orange)
@@ -19,16 +19,12 @@ struct RecoveryKeyWarning: View {
                             + "and it writes no recovery files."
                     )
                     .foregroundStyle(.secondary)
-                    HStack {
-                        Button("Set Up Recovery Key…", action: onSetUp)
-                        if let onRestore {
-                            Button("Restore from a Recovery File…", action: onRestore)
-                        }
-                    }
                 }
-                Spacer(minLength: 0)
             }
-            .padding(4)
+            Button("Set Up Recovery Key…", action: onSetUp)
+            if let onRestore {
+                Button("Restore from a Recovery File…", action: onRestore)
+            }
         }
     }
 }

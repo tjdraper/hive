@@ -12,7 +12,7 @@ struct MacSleepWarning: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        GroupBox {
+        Section {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: "moon.zzz.fill")
                     .foregroundStyle(.orange)
@@ -24,15 +24,13 @@ struct MacSleepWarning: View {
                             + "automatically in System Settings › Energy, or Battery on a laptop."
                     )
                     .foregroundStyle(.secondary)
-                    #if os(macOS)
-                    if isOnThisMac, let url = Self.settingsURL {
-                        Button("Open Energy Settings") { openURL(url) }
-                    }
-                    #endif
                 }
-                Spacer(minLength: 0)
             }
-            .padding(4)
+            #if os(macOS)
+            if isOnThisMac, let url = Self.settingsURL {
+                Button("Open Energy Settings") { openURL(url) }
+            }
+            #endif
         }
     }
 }

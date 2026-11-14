@@ -44,15 +44,7 @@ struct HiveSidebar: View {
         .jobEditing($jobEditRequest) { removed in
             if case .job(let hiveID, let serverID, removed.id) = selection { selection = .server(hiveID: hiveID, serverID: serverID) }
         }
-        .confirmationDialog(
-            "Remove “\(removing?.name ?? "")” from Beekeeper?",
-            isPresented: Binding { removing != nil } set: { if !$0 { removing = nil } },
-            presenting: removing
-        ) { hive in
-            Button("Remove", role: .destructive) { Task { await remove(hive) } }
-        } message: { hive in
-            Text(removalMessage(for: hive))
-        }
+        .hiveRemoval($removing, onRemove: remove)
         .onChange(of: selection) { _, selected in
             if let selected, let serverID = selected.serverID {
                 collapsed.remove(selected.hiveID)
@@ -124,17 +116,6 @@ struct HiveSidebar: View {
         if selection?.hiveID == hive.id { selection = nil }
         await store.removeRevokingThisDevice(hive.id)
         if selection == nil, let first = store.hives.first { selection = .hive(first.id) }
-    }
-
-    private func removalMessage(for hive: KnownHive) -> String {
-        let again = hive.isOnThisMac
-            ? "This Mac can pair with it again with no code."
-            : "Pairing again takes a code from a device that's paired with it."
-        if store.link(for: hive.id)?.status == .connected {
-            return "Beekeeper revokes this device on the Hive, so it leaves the Hive's device list, and forgets its key. " + again
-        }
-        return "Beekeeper can't reach the Hive, so this device stays in the Hive's device list until it's revoked from another "
-            + "device. Beekeeper forgets its key. " + again
     }
 
     /// The selected Hive, or the only one.

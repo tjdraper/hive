@@ -11,26 +11,25 @@ struct HiveDetail: View {
     let onAddServer: () -> Void
 
     @Environment(HiveListStore.self) private var store
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
 
     var body: some View {
+        #if os(iOS)
+        if sizeClass == .compact {
+            compactPage
+        } else {
+            tabbedPage
+        }
+        #else
+        tabbedPage
+        #endif
+    }
+
+    private var tabbedPage: some View {
         HiveConnectionGate(hive: hive, link: link) {
-            switch page {
-            case .overview:
-                HiveOverviewView(
-                    hive: hive,
-                    link: link,
-                    servers: servers,
-                    recovery: recovery,
-                    onAddServer: onAddServer,
-                    onOpenSettings: { page = .settings },
-                    onSelectServer: { selection = .server(hiveID: hive.id, serverID: $0) },
-                    onRestored: restored
-                )
-            case .jobLog: JobLogView(link: link, servers: servers)
-            case .devices: DeviceListView(hive: hive, link: link)
-            case .auditLog: AuditLogView(link: link)
-            case .settings: HiveSettingsView(hive: hive, link: link, recovery: recovery)
-            }
+            pageView(page)
         }
         .navigationTitle(hive.name)
         .locationPath([LocationPath.Part(title: hive.name, systemImage: "hexagon")], besideTabs: true)
@@ -44,6 +43,64 @@ struct HiveDetail: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
             }
+        }
+    }
+
+    #if os(iOS)
+    /// At iPhone width the Overview is the Hive's page, and the others open from rows at its end.
+    private var compactPage: some View {
+        HiveConnectionGate(hive: hive, link: link) {
+            overview { page = $0 }
+        }
+        .navigationTitle(hive.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Add Server", systemImage: "plus", action: onAddServer)
+                    .disabled(link.status != .connected)
+            }
+        }
+        .navigationDestination(item: openPage) { page in
+            HiveConnectionGate(hive: hive, link: link) {
+                pageView(page)
+            }
+            .navigationTitle(page.title)
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    /// The page pushed over the Overview, which is nil for the Overview itself.
+    private var openPage: Binding<HivePage?> {
+        Binding {
+            page == .overview ? nil : page
+        } set: {
+            page = $0 ?? .overview
+        }
+    }
+    #endif
+
+    private func overview(onOpenPage: ((HivePage) -> Void)?) -> some View {
+        HiveOverviewView(
+            hive: hive,
+            link: link,
+            servers: servers,
+            recovery: recovery,
+            onAddServer: onAddServer,
+            onOpenSettings: { page = .settings },
+            onOpenPage: onOpenPage,
+            onSelectServer: { selection = .server(hiveID: hive.id, serverID: $0) },
+            onRestored: restored
+        )
+    }
+
+    @ViewBuilder
+    private func pageView(_ page: HivePage) -> some View {
+        switch page {
+        case .overview: overview(onOpenPage: nil)
+        case .jobLog: JobLogView(link: link, servers: servers)
+        case .devices: DeviceListView(hive: hive, link: link)
+        case .auditLog: AuditLogView(link: link)
+        case .settings: HiveSettingsView(hive: hive, link: link, recovery: recovery)
         }
     }
 }

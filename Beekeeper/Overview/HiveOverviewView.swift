@@ -8,6 +8,8 @@ struct HiveOverviewView: View {
     let recovery: RecoveryFileCopies
     let onAddServer: () -> Void
     let onOpenSettings: () -> Void
+    /// Rows for the Hive's other pages at the end, where they aren't tabs.
+    let onOpenPage: ((HivePage) -> Void)?
     let onSelectServer: (UUID) -> Void
     let onRestored: (RestoreOutcome) -> Void
 
@@ -24,12 +26,14 @@ struct HiveOverviewView: View {
     @Environment(HiveListStore.self) private var store
     @State private var setupSheet: SetupSheet?
     @State private var restoreState: RestoreState?
+    @State private var drive = BackupDriveWatch()
+    @State private var removedJobs = RemovedJobList()
     /// Handed on once the sheet has closed. The restored Hive takes this one's place in the list, and
     /// removing the view a sheet came from while it closes leaves the window drawing nothing.
     @State private var restored: RestoreOutcome?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        Form {
             if let overview = link.overview, overview.fullDiskAccess != .granted {
                 FullDiskAccessWarning(isOnThisMac: hive.isOnThisMac)
             }
@@ -48,29 +52,21 @@ struct HiveOverviewView: View {
                     Task { await loadRestoreState() }
                 }
             }
-            BackupDriveWarning(link: link, onOpenSettings: onOpenSettings)
+            BackupDriveWarning(state: drive.state, onOpenSettings: onOpenSettings)
             if case .afterIdle(let minutes) = link.overview?.macSleep {
                 MacSleepWarning(minutes: minutes, isOnThisMac: hive.isOnThisMac)
             }
-            if servers.servers.isEmpty {
-                ContentUnavailableView {
-                    Label("No Servers Yet", systemImage: "server.rack")
-                } description: {
-                    Text("Add a server for this Hive to back up.")
-                } actions: {
-                    Button("Add Server…", action: onAddServer)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ServerOverviewList(servers: servers, onSelect: onSelectServer)
-            }
+            ServerOverviewList(servers: servers, onAddServer: onAddServer, onSelect: onSelectServer)
             if recovery.hiveState?.hasKey == true {
                 RecoveryFileSummary(copies: recovery)
             }
-            RemovedJobsSection(hive: hive, link: link, statuses: servers.statuses)
+            RemovedJobsSection(hive: hive, link: link, statuses: servers.statuses, removed: removedJobs)
+            if let onOpenPage {
+                HivePageLinks(onOpen: onOpenPage)
+            }
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .formStyle(.grouped)
+        .hostsFormSheets()
         .sheet(item: $setupSheet, onDismiss: handOnRestore) { sheet in
             switch sheet {
             case .choice:
@@ -87,6 +83,8 @@ struct HiveOverviewView: View {
             await loadRecoveryKey()
             await servers.refresh()
         }
+        .task { await drive.watch(link) }
+        .task(id: servers.statuses.logRevision) { await removedJobs.load(link) }
     }
 
     private func handOnRestore() {
@@ -118,37 +116,56 @@ struct HiveOverviewView: View {
 
 private struct ServerOverviewList: View {
     let servers: ServerList
+    let onAddServer: () -> Void
     let onSelect: (UUID) -> Void
 
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(servers.servers) { server in
-                    Button { onSelect(server.id) } label: {
-                        HStack {
-                            Label(server.name, systemImage: "server.rack")
-                            Spacer()
-                            if server.isSetUp {
-                                ServerHealthLabel(jobs: servers.jobs.jobs(onServer: server.id), statuses: servers.statuses)
-                            } else {
-                                Label("Not set up yet", systemImage: "exclamationmark.circle")
-                                    .foregroundStyle(.orange)
-                            }
-                            Image(systemName: "chevron.forward")
-                                .foregroundStyle(.tertiary)
-                        }
-                        .contentShape(.rect)
-                        .padding(.vertical, 6)
-                    }
-                    .buttonStyle(.plain)
-                    if server.id != servers.servers.last?.id {
-                        Divider()
-                    }
-                }
+        Section("Servers") {
+            if servers.servers.isEmpty {
+                Text("No servers yet. Add one for this Hive to back up.")
+                    .foregroundStyle(.secondary)
+                Button("Add Server…", systemImage: "plus", action: onAddServer)
             }
-            .padding(.horizontal, 4)
-        } label: {
-            Text("Servers")
+            ForEach(servers.servers) { server in
+                Button { onSelect(server.id) } label: {
+                    HStack {
+                        #if os(macOS)
+                        Label(server.name, systemImage: "server.rack")
+                        Spacer()
+                        status(of: server)
+                        #else
+                        // Under the name, as a long name beside it would leave both wrapping at iPhone width.
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(server.name)
+                                status(of: server)
+                                    .font(.subheadline)
+                            }
+                        } icon: {
+                            Image(systemName: "server.rack")
+                        }
+                        Spacer(minLength: 0)
+                        #endif
+                        Image(systemName: "chevron.forward")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func status(of server: Server) -> some View {
+        if server.isSetUp {
+            ServerHealthLabel(jobs: servers.jobs.jobs(onServer: server.id), statuses: servers.statuses)
+        } else {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.circle")
+                Text("Not set up yet")
+            }
+            .foregroundStyle(.orange)
         }
     }
 }
@@ -200,7 +217,7 @@ private struct FullDiskAccessWarning: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        GroupBox {
+        Section {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
@@ -212,15 +229,13 @@ private struct FullDiskAccessWarning: View {
                             + "in System Settings › Privacy & Security on the Hive's Mac."
                     )
                         .foregroundStyle(.secondary)
-                    #if os(macOS)
-                    if isOnThisMac, let url = Self.settingsURL {
-                        Button("Open Full Disk Access Settings") { openURL(url) }
-                    }
-                    #endif
                 }
-                Spacer(minLength: 0)
             }
-            .padding(4)
+            #if os(macOS)
+            if isOnThisMac, let url = Self.settingsURL {
+                Button("Open Full Disk Access Settings") { openURL(url) }
+            }
+            #endif
         }
     }
 }
