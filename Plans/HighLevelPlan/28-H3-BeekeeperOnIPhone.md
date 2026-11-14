@@ -13,3 +13,4 @@ Built with you:
 - **From H1:** on iPhone, `MainWindow`'s split view collapses to the sidebar, which is empty with no Hives, with a disabled Add Server at the bottom. The first-run screen, `EmptyHiveList`, is in the detail column and never shows.
 
 **Done when:** on your iPhone through TestFlight, Beekeeper pairs by scanning the QR code, shows live progress for a run, and deletes a snapshot on the test drive after Face ID; and the checks are added to [TestFlightChecks.md](TestFlightChecks.md).
+- **From H2:** the path's compact form, icons with the page's name beneath, suits the iPhone's toolbar. Its room in `MainWindow` was measured on iPad, and the iPhone's toolbar differs. The backup drive chooser keeps a minimum width of 480 on the Mac only, and hasn't been seen on an iPhone.

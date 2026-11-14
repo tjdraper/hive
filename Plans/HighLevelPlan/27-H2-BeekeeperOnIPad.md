@@ -29,3 +29,12 @@ Built with you:
 - **Scanning uses VisionKit's `DataScannerViewController`,** and pairs as soon as it reads a whole code.
 - **Face ID prompts** read "Allow Beekeeper to …", since iOS shows the reason as it is, where macOS puts "Beekeeper is trying to" before it.
 - **Sheets keep their fixed sizes on the Mac only** (`macSheetSize`). iPadOS sizes its own.
+- **Sheets lay out their buttons through `SheetLayout`:** on the Mac in a bar along the bottom, and on iPad in the navigation bar, Cancel at the leading edge and the confirming button at the trailing, with anything else, such as Back or a failure, in a bar along the bottom that only shows when there's something in it.
+- **Text fields have their labels above them** (`StackedRow`), as in Locus Calendar and Locus ToDo. Controls, such as a number with a stepper, keep the label at the side.
+- **Group boxes take the Mac's look on iPad** (`LabelAboveGroupBoxStyle`): the label above a softly filled box, rather than iOS's card with the label inside it.
+- **On iPad the sidebar is plain rows** (`SidebarOutline`), the rows under a Hive or server indented, with the row drawing its own arrow. iPadOS doesn't keep a `DisclosureGroup` label highlighted: the highlight goes when a sheet closes, and a selection made in code never shows. The Mac keeps its native outline.
+- **A `Label` is never a form row's value on iPad.** As the value of a `LabeledContent` in a form, one leaves the row hundreds of points tall, so those rows use an `HStack` of the icon and text.
+- **Sheets opened from inside a form open from outside it** (`hostsFormSheets()`). On iPad, a sheet attached to a form's section could close a moment after it first opened.
+- **The path in the toolbar fits itself on iPad:** the whole path when it leaves room for the page's buttons, and otherwise only its icons, with the page's name beneath. The room is the detail's width less 200 points for the page's buttons and the toolbar's margins, and 130 more for the window's controls while the sidebar is hidden, both measured on iPadOS 26. Server and job pages hide iPadOS's inline title, which repeated the path's last part. The Hive page keeps it, since removing it takes the tabs with it.
+- **The sidebar ignores the keyboard,** as Locus Calendar's main window does, since nothing in it takes typing. Sheets and pages needed nothing for the floating keyboard once their forms filled them.
+- **The sidebar is at least 280 points wide on iPad,** and a Hive's status gives way to its dot alone before its name is cut short.

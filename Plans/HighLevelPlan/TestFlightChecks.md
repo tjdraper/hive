@@ -11,5 +11,9 @@ Add a check here whenever a slice leaves one, with the slice it came from. Check
 - [x] **H2:** On the iPad, Add a Hive › Scan the QR Code asks for camera access, scans the code Pair a Device shows on the Mac, and pairs.
 - [x] **H2:** Live progress for a Run Now on the iPad moves as the run goes, and the run shows in the Job Log.
 - [x] **H2:** Deleting a snapshot on the iPad asks for Face ID, then the snapshot leaves the list.
-- [ ] **H2:** With Tailscale off on the iPad and the Hive's address options holding only its Tailscale name, Beekeeper still reaches the Hive over Wi-Fi through its Bonjour advertisement. Turning off Advertise on the Local Network in the Hive's settings stops that.
-- [ ] **H2:** With the floating keyboard on the iPad, typing in a sheet or the Hive's settings leaves the sheet and window their full size. With the docked keyboard, the field being typed in stays above it. The sidebar never moves for either.
+- [x] **H2:** With Tailscale off on the iPad and the Hive's address options holding only its Tailscale name, Beekeeper still reaches the Hive over Wi-Fi through its Bonjour advertisement. Turning off Advertise on the Local Network in the Hive's settings stops that.
+- [x] **H2:** With the floating keyboard on the iPad, typing in a sheet or the Hive's settings leaves the sheet and window their full size. With the docked keyboard, the field being typed in stays above it. The sidebar never moves for either.
+- [x] **H2:** In each sheet on the iPad, Cancel is at the top left and the confirming button at the top right, with the title between, and text fields have their labels above them.
+- [x] **H2:** The selected sidebar row stays highlighted, including at launch and after a sheet closes, and the arrows on Hive and server rows open and close them without selecting them.
+- [x] **H2:** On a server or job page, the path shows the Hive, the server and the job once each. In a narrow window it shows only their icons, with the page's name beneath, and Edit and the trash button stay in the toolbar.
+- [x] **H2:** The sheets in a Hive's Settings, such as Change… for the backup drive, stay open the first time they open.
