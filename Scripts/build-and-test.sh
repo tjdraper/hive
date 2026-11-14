@@ -2,7 +2,7 @@
 #
 # Builds the bundled rsync if it isn't yet, Hive for macOS and Beekeeper for macOS and iOS, builds
 # HiveKit for iOS, and runs the HiveKit and HiveCore tests. Fails if any step fails or logs a single
-# warning, SwiftLint's included.
+# warning, SwiftLint's included, or if the apps' third-party notices don't match what they link.
 #
 # Usage: Scripts/build-and-test.sh
 
@@ -80,5 +80,17 @@ run_step beekeeper-ios -scheme Beekeeper -destination "generic/platform=iOS Simu
 run_step hivekit-ios -scheme HiveKit -destination "generic/platform=iOS Simulator" -configuration Debug build
 run_step hivekit-tests -scheme HiveKit -destination "platform=macOS" test
 run_step hivecore-tests -scheme HiveCore -destination "platform=macOS" test
+
+# Reads what the builds above linked, so only a run whose builds all passed can check it.
+printf '%-16s' "notices"
+if [[ $failed -ne 0 ]]; then
+    echo "skipped"
+elif notices_problem=$(Scripts/write-third-party-notices.sh --check 2>&1); then
+    echo "ok"
+else
+    failed=1
+    echo "FAILED"
+    echo "$notices_problem" | sed 's/^/    /'
+fi
 
 exit $failed

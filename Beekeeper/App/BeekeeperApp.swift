@@ -27,6 +27,9 @@ struct BeekeeperApp: App {
                 AddHiveCommand()
             }
             #if os(macOS)
+            CommandGroup(replacing: .appInfo) {
+                Button("About Beekeeper") { AboutPanel.show() }
+            }
             CommandGroup(after: .appInfo) {
                 if updater.updatesItself {
                     Button("Check for Updates…") { updater.checkForUpdates() }

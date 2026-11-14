@@ -10,6 +10,9 @@ struct HiveApp: App {
         }
         .windowResizability(.contentSize)
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About Hive") { AboutPanel.show() }
+            }
             CommandGroup(after: .appInfo) {
                 if updater.updatesItself {
                     Button("Check for Updates…") { updater.checkForUpdates() }

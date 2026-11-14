@@ -65,7 +65,7 @@ Check off a slice here when its "done when" is true.
 
 ### Phase I — Open source release
 
-- [ ] [I1. README and public release](30-I1-READMEAndPublicRelease.md) — Mixed, 1 session, needs you
+- [x] [I1. README and public release](30-I1-READMEAndPublicRelease.md) — Mixed, 1 session, needs you
 
 ---
 
@@ -291,7 +291,7 @@ Read the brainstorm's "Warnings before an iOS build expires".
 - **The team ID and bundle ID prefix** live in a gitignored `.xcconfig`, with a template checked in.
 - **The README** covers building it, that builds from free Apple accounts expire after 7 days, Full Disk Access, auto-login and the FileVault limitation (§4), the case-sensitive drive and copying files out of snapshots (§9), and that every Hive Mac needs its own full Mac backup.
 - **Signed builds of both Mac apps** are published.
-- **The license:** see §19.
+- **The license:** MIT, in `LICENSE`. The bundled rsync stays GPLv3 (I1).
 
 ## §18. Later phases
 
@@ -320,7 +320,7 @@ Each gets its own plan once this one is done. Until then, features not in Part 1
 - [x] Default retention tiers and quota: 30 daily and 12 monthly snapshots, and no quota, which stays allowed (C6)
 - [x] An SMTP library, or a small client of Hive's own over SwiftNIO: Hive's own, over SwiftNIO and NIOSSL, which Hive already uses. SMTP for sending is small, and owning it keeps certificate checks, what's logged and the order commands go out in Hive's hands (§13, E1)
 - [x] How Hive updates itself: Sparkle in `Hive.app`, prompted by Beekeeper, and the daemon restarts when its executable is replaced (§2, G2)
-- [ ] The license (I1). The other open-source Locus apps use MIT.
+- [x] The license: MIT, as the other open-source Locus apps use (I1)
 
 ---
 
