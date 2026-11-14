@@ -176,14 +176,22 @@ private struct HiveSidebarRow: View {
     @Binding var isExpanded: Bool?
 
     var body: some View {
+        // The status's word gives way before the Hive's name does, leaving its dot.
+        ViewThatFits(in: .horizontal) {
+            row(showsStatusWord: true)
+            row(showsStatusWord: false)
+        }
+        .tappableAcrossRow()
+    }
+
+    private func row(showsStatusWord: Bool) -> some View {
         HStack(spacing: 6) {
             Label(hive.name, systemImage: "hexagon")
                 .lineLimit(1)
             Spacer()
-            HiveStatusBadge(status: status)
+            HiveStatusBadge(status: status, showsWord: showsStatusWord)
             SidebarDisclosureButton(isExpanded: $isExpanded)
         }
-        .tappableAcrossRow()
     }
 }
 
@@ -222,17 +230,22 @@ private extension View {
 /// A dot and a word for how the Hive's connection stands.
 struct HiveStatusBadge: View {
     let status: HiveLink.Status
+    var showsWord = true
 
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "circle.fill")
                 .font(.system(size: 7))
                 .foregroundStyle(color)
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if showsWord {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
     }
 
     private var label: String {

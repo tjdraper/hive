@@ -63,6 +63,7 @@ struct HiveSettingsView: View {
             IdentitySection(hive: hive, link: link)
         }
         .formStyle(.grouped)
+        .hostsFormSheets()
     }
 
     private func networkSection(state: HiveSettingsState, draft: Binding<SettingsDraft>) -> some View {

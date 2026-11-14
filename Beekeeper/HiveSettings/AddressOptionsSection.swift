@@ -12,7 +12,7 @@ struct AddressOptionsSection<Controls: View>: View {
     let hivePort: Int
     @ViewBuilder let controls: () -> Controls
 
-    @State private var isAddingOther = false
+    @Environment(\.presentFormSheet) private var presentSheet
 
     var body: some View {
         Section {
@@ -42,9 +42,6 @@ struct AddressOptionsSection<Controls: View>: View {
                 controls()
             }
         }
-        .sheet(isPresented: $isAddingOther) {
-            OtherAddressSheet(hivePort: hivePort) { options.append($0) }
-        }
     }
 
     private var addMenu: some View {
@@ -58,7 +55,11 @@ struct AddressOptionsSection<Controls: View>: View {
                 }
             }
             if !suggestions.isEmpty { Divider() }
-            Button("Other Address…") { isAddingOther = true }
+            Button("Other Address…") {
+                presentSheet? {
+                    OtherAddressSheet(hivePort: hivePort) { options.append($0) }
+                }
+            }
         }
         .disabled(options.count >= PairingCode.largestAddressCount)
     }

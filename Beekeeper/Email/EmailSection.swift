@@ -8,7 +8,7 @@ struct EmailSection: View {
 
     @State private var state: EmailSettingsState?
     @State private var failure: String?
-    @State private var isEditing = false
+    @Environment(\.presentFormSheet) private var presentSheet
     @State private var isSendingTest = false
     @State private var testOutcome: TestEmailOutcome?
     @State private var testFailure: String?
@@ -30,15 +30,6 @@ struct EmailSection: View {
             Text("Hive emails when a backup fails or something needs your attention, through your own email provider.")
                 .foregroundStyle(.secondary)
         }
-        .sheet(isPresented: $isEditing) {
-            if let state {
-                EmailSettingsSheet(hive: hive, link: link, saved: state) { saved in
-                    self.state = saved
-                    testOutcome = nil
-                    testFailure = nil
-                }
-            }
-        }
         .task { await load() }
     }
 
@@ -47,7 +38,7 @@ struct EmailSection: View {
             HStack(spacing: 12) {
                 Text(state.settings.map { "\($0.host):\($0.port)" } ?? "Not set up")
                     .foregroundStyle(.secondary)
-                Button(state.settings == nil ? "Set Up…" : "Change…") { isEditing = true }
+                Button(state.settings == nil ? "Set Up…" : "Change…") { edit(state) }
             }
         }
         if let settings = state.settings {
@@ -71,6 +62,16 @@ struct EmailSection: View {
             if let testFailure {
                 Text(testFailure)
                     .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private func edit(_ state: EmailSettingsState) {
+        presentSheet? {
+            EmailSettingsSheet(hive: hive, link: link, saved: state) { saved in
+                self.state = saved
+                testOutcome = nil
+                testFailure = nil
             }
         }
     }

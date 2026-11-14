@@ -7,7 +7,7 @@ struct BackupDriveSection: View {
 
     @State private var state: BackupDriveState?
     @State private var failure: String?
-    @State private var isChoosing = false
+    @Environment(\.presentFormSheet) private var presentSheet
 
     var body: some View {
         Section {
@@ -29,12 +29,14 @@ struct BackupDriveSection: View {
             )
             .foregroundStyle(.secondary)
         }
-        .sheet(isPresented: $isChoosing) {
-            if let state {
-                BackupDriveChooser(link: link, state: state) { self.state = $0 }
-            }
-        }
         .task { await load() }
+    }
+
+    private func choose() {
+        guard let state else { return }
+        presentSheet? {
+            BackupDriveChooser(link: link, state: state) { self.state = $0 }
+        }
     }
 
     @ViewBuilder private func chosen(_ chosen: ChosenBackupDrive?) -> some View {
@@ -42,7 +44,7 @@ struct BackupDriveSection: View {
             HStack(spacing: 12) {
                 Text(chosen?.drive.name ?? "None chosen")
                     .foregroundStyle(.secondary)
-                Button(chosen == nil ? "Choose…" : "Change…") { isChoosing = true }
+                Button(chosen == nil ? "Choose…" : "Change…") { choose() }
             }
         }
         if let problem = chosen?.problem {

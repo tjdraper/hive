@@ -40,6 +40,7 @@ private struct AddressOptionsPreview: View {
             }
         }
         .formStyle(.grouped)
+        .hostsFormSheets()
     }
 }
 

@@ -8,17 +8,8 @@ struct RecoverySection: View {
     let link: HiveLink
     let copies: RecoveryFileCopies
 
-    private enum KeySheet: Identifiable {
-        case setUp
-        case replacement
-
-        var id: Self {
-            self
-        }
-    }
-
+    @Environment(\.presentFormSheet) private var presentSheet
     @State private var isAskingForNewKey = false
-    @State private var keySheet: KeySheet?
 
     var body: some View {
         Section {
@@ -30,7 +21,7 @@ struct RecoverySection: View {
                         if state.hasKey {
                             Button("New Recovery Key…") { isAskingForNewKey = true }
                         } else {
-                            Button("Set Up…") { keySheet = .setUp }
+                            Button("Set Up…") { showKeySheet(isReplacing: false) }
                         }
                     }
                 }
@@ -45,17 +36,20 @@ struct RecoverySection: View {
                 .foregroundStyle(.secondary)
         }
         .confirmationDialog("Make a new recovery key for “\(hive.name)”?", isPresented: $isAskingForNewKey) {
-            Button("Make New Key") { keySheet = .replacement }
+            Button("Make New Key") { showKeySheet(isReplacing: true) }
         } message: {
             Text(
                 "Recovery files from then on open only with the new key, and Beekeeper deletes the copies it keeps. "
                     + "Copies already in Mac backups still open with the old key."
             )
         }
-        .sheet(item: $keySheet) { sheet in
-            RecoveryKeySheet(hiveName: hive.name, link: link, isReplacing: sheet == .replacement) { copies.receive($0) }
-        }
         .task { await copies.refresh() }
+    }
+
+    private func showKeySheet(isReplacing: Bool) {
+        presentSheet? {
+            RecoveryKeySheet(hiveName: hive.name, link: link, isReplacing: isReplacing) { copies.receive($0) }
+        }
     }
 
     private var keyDescription: String {

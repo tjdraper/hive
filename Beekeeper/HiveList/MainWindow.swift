@@ -56,20 +56,36 @@ struct MainWindow: View {
     @State private var addingServer: AddServerRequest?
     @State private var addingJob: AddJobRequest?
     @State private var isAddingHive = false
+    #if os(iOS)
+    @State private var windowWidth: CGFloat = 0
+    @State private var detailWidth: CGFloat = 0
+    #endif
 
     var body: some View {
         NavigationSplitView {
             HiveSidebar(selection: $selection, onAddServer: addServer, onAddJob: addJob)
+                #if os(macOS)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240)
+                #else
+                // Wide enough for a server's name beside its status, which iPad's larger text needs more room for.
+                .navigationSplitViewColumnWidth(min: 280, ideal: 320)
+                #endif
                 // Nothing in it takes typing, so a keyboard for the detail or a sheet leaves it alone.
                 .ignoresSafeArea(.keyboard)
         } detail: {
+            #if os(macOS)
             detail
+            #else
+            detail
+                .onGeometryChange(for: CGFloat.self, of: \.size.width) { detailWidth = $0 }
+                .environment(\.locationPathRoom, locationPathRoom)
+            #endif
         }
         #if os(macOS)
         // A floor for the window, so no page's content can make its smallest size larger than the screen.
         .frame(minWidth: 640, minHeight: 400)
         #else
+        .onGeometryChange(for: CGFloat.self, of: \.size.width) { windowWidth = $0 }
         .groupBoxStyle(LabelAboveGroupBoxStyle())
         #endif
         .sheet(item: $addingServer) { request in
@@ -151,6 +167,17 @@ struct MainWindow: View {
             ContentUnavailableView("Choose a Hive", systemImage: "hexagon")
         }
     }
+
+    #if os(iOS)
+    /// The detail's toolbar, less what the page's buttons and the toolbar's margins take. With the sidebar
+    /// hidden, the window's controls and the sidebar button are in it too. Measured on iPadOS 26.
+    private var locationPathRoom: CGFloat? {
+        guard detailWidth > 0 else { return nil }
+        let pageButtonsAndMargins: CGFloat = 200
+        let windowControls: CGFloat = windowWidth - detailWidth < 1 ? 130 : 0
+        return detailWidth - pageButtonsAndMargins - windowControls
+    }
+    #endif
 
     private var addHive: AddHiveAction {
         AddHiveAction { isAddingHive = true }
