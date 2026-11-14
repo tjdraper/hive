@@ -18,20 +18,21 @@ public enum HiveConnectionError: Error, Equatable {
     case pairingRefused
 }
 
-/// HTTPS to one Hive, trusting only the pinned key, at whichever of its addresses answers. It tries them
-/// in order, starting from the last one that worked, and moves on when one can't be reached or shows
-/// another key, which may be another machine with the Hive's old address. A key refused at one address
-/// and shown at none is the Hive's identity having changed.
-///
-/// Addresses found on the local network (`LocalNetworkService`) are tried first, as the most direct
-/// way to the Hive. Anything on the network can advertise any Hive, so another key shown at one of
-/// those says nothing about the Hive's identity, and counts as the Hive not being there.
+/// HTTPS to one Hive, trusting only the pinned key, at whichever of its addresses answers. Requests go
+/// to the address that last worked. Without one, or once it stops answering, every address is asked at
+/// once and the first to answer is used (`ReachableAddressResolver`), so an address on a network the
+/// device isn't on costs a few seconds rather than a request's whole timeout. Addresses found on the
+/// local network (`LocalNetworkService`) are asked alongside the Hive's own.
 public final class HiveConnection: Sendable {
+    /// Long enough for Tailscale to set up a connection it doesn't have yet, short enough that an
+    /// address the device can't reach is given up on quickly.
+    private static let probeTimeout: TimeInterval = 5
+
     private let addresses: [HiveAddress]
     private let discovered: Mutex<[HiveAddress]>
     private let pin: PublicKeyPin
     private let session: URLSession
-    private let preferred = Mutex<HiveAddress?>(nil)
+    private let preferred = PreferredAddressStore()
 
     public init(addresses: [HiveAddress], pin: PublicKeyPin, discovered: [HiveAddress] = []) {
         self.addresses = addresses
@@ -125,7 +126,7 @@ public final class HiveConnection: Sendable {
         token: String? = nil,
         confirmation: ConfirmationProof? = nil
     ) async throws -> (Data, HTTPURLResponse) {
-        try await atEachAddress(method: method) { address in
+        try await atReachableAddress(method: method, probe: probe) { address in
             var request = try request(to: address, path: path, method: method, body: body, token: token)
             if let confirmation {
                 request.setValue(confirmation.headerValue, forHTTPHeaderField: ConfirmationProof.headerName)
@@ -139,7 +140,7 @@ public final class HiveConnection: Sendable {
 
     /// A `GET` whose body is read as it arrives.
     func stream(path: String, token: String) async throws -> (URLSession.AsyncBytes, HTTPURLResponse) {
-        try await atEachAddress(method: "GET") { address in
+        try await atReachableAddress(method: "GET", probe: probe) { address in
             let request = try request(to: address, path: path, method: "GET", body: nil, token: token)
             let delegate = PinnedTaskDelegate(pin: pin)
             let (bytes, response) = try await refusingWrongKey(delegate) { try await session.bytes(for: request, delegate: delegate) }
@@ -148,46 +149,70 @@ public final class HiveConnection: Sendable {
         }
     }
 
-    /// Tries `attempt` at each address, from the last one that worked, until one gets an answer.
-    func atEachAddress<Value>(method: String, _ attempt: (HiveAddress) async throws -> Value) async throws -> Value {
-        let found = discovered.withLock { $0 }.filter { !addresses.contains($0) }
-        let candidates = found.map { (address: $0, isDiscovered: true) } + addresses.map { (address: $0, isDiscovered: false) }
-        guard !candidates.isEmpty else { throw HiveConnectionError.invalidAddress }
-        let last = preferred.withLock { $0 }
-        let first = candidates.firstIndex { $0.address == last } ?? 0
-        var lastError: (any Error)?
-        var sawWrongKey = false
-        for offset in candidates.indices {
-            let candidate = candidates[(first + offset) % candidates.count]
+    /// Sends `attempt` to the address that last worked, or else to the first that answers `probe`. Only a
+    /// request that can't have reached Hive is sent again (`neverArrived`), so a `POST` that timed out at
+    /// the remembered address fails rather than risk being made twice.
+    func atReachableAddress<Value>(
+        method: String,
+        probe: @escaping @Sendable (HiveAddress) async throws -> Void,
+        _ attempt: (HiveAddress) async throws -> Value
+    ) async throws -> Value {
+        let candidates = candidates()
+        if let known = preferred.address, candidates.contains(where: { $0.address == known }) {
             do {
-                let value = try await attempt(candidate.address)
-                preferred.withLock { $0 = candidate.address }
-                return value
-            } catch HiveConnectionError.wrongKey {
-                if candidate.isDiscovered {
-                    lastError = lastError ?? URLError(.cannotConnectToHost)
-                } else {
-                    sawWrongKey = true
-                }
-            } catch let error as URLError where Self.neverArrived(error, method: method) {
-                lastError = error
+                return try await attempt(known)
+            } catch let error where Self.unreachable(error) {
+                preferred.forget(known)
+                guard Self.neverArrived(error, method: method) else { throw error }
             }
         }
-        if sawWrongKey { throw HiveConnectionError.wrongKey }
-        throw lastError ?? HiveConnectionError.invalidAddress
+        let address = try await ReachableAddressResolver(candidates: candidates, probe: probe).firstToAnswer()
+        preferred.remember(address)
+        do {
+            return try await attempt(address)
+        } catch let error where Self.unreachable(error) {
+            preferred.forget(address)
+            throw error
+        }
+    }
+
+    private func candidates() -> [ReachableAddressResolver.Candidate] {
+        let found = discovered.withLock { $0 }.filter { !addresses.contains($0) }
+        return found.map { .init(address: $0, isDiscovered: true) } + addresses.map { .init(address: $0, isDiscovered: false) }
+    }
+
+    /// Any answer over a connection showing the pinned key means the Hive is there.
+    private func probe(_ address: HiveAddress) async throws {
+        var request = try request(to: address, path: HiveEndpoint.health, method: "GET", body: nil, token: nil)
+        request.timeoutInterval = Self.probeTimeout
+        let delegate = PinnedTaskDelegate(pin: pin)
+        _ = try await refusingWrongKey(delegate) { try await session.data(for: request, delegate: delegate) }
     }
 
     /// Errors after which the request can be sent to another address without being made twice. A
     /// request that timed out may have reached Hive, so only a `GET` is tried again after one.
-    private static func neverArrived(_ error: URLError, method: String) -> Bool {
-        switch error.code {
-        case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .notConnectedToInternet, .secureConnectionFailed:
+    private static func neverArrived(_ error: any Error, method: String) -> Bool {
+        switch error {
+        case HiveConnectionError.wrongKey:
             true
-        case .timedOut:
-            method == "GET"
+        case let error as URLError:
+            switch error.code {
+            case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .notConnectedToInternet, .secureConnectionFailed:
+                true
+            case .timedOut:
+                method == "GET"
+            default:
+                false
+            }
         default:
             false
         }
+    }
+
+    /// Errors that say the address may no longer lead to the Hive, such as after the device moved to
+    /// another network.
+    private static func unreachable(_ error: any Error) -> Bool {
+        neverArrived(error, method: "GET") || (error as? URLError)?.code == .networkConnectionLost
     }
 
     private func request(to address: HiveAddress, path: String, method: String, body: Data?, token: String?) throws -> URLRequest {
