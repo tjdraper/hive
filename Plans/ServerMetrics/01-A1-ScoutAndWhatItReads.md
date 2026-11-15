@@ -32,4 +32,28 @@ Answers the first open question before anything depends on it: can a static Swif
 - Rates across a counter that wrapped, a server that rebooted between readings, and a reused PID
 - Grouping: forty workers of one command become one line with their total and count, without counting shared memory forty times
 
-**Done when:** both binaries print plausible samples in Docker containers of Debian, Ubuntu, Alpine and Rocky, on x86_64 and aarch64; in the test VM, with a pinned TLS connection to the development Hive held open, Scout stays within §3's CPU and memory budget; and the tests pass. If it doesn't fit, record the measurements here and stop for a decision.
+**Done when:** both binaries print plausible samples in Docker containers of Debian, Ubuntu, Alpine and Rocky, on x86_64 and aarch64; in the test VM, with a pinned TLS connection to the development Hive held open, Scout stays within §3's CPU budget, with its memory measured against the goal; and the tests pass. If the CPU doesn't fit, record the measurements here and stop for a decision. If memory is over 20 MB, record it here and keep going.
+
+## Session 1: the package, the build and the connection
+
+Done: the `Scout/` package with the server-facts reader, `hive-scout sample` and `watch`, the pinned connection, `Scripts/build-scout.sh`, `Scripts/scout-test-vm.sh`, and Scout's steps in `Scripts/build-and-test.sh`. Left for session 2: every other reader in §4, their tests, and measuring again with them in place.
+
+What was decided along the way:
+
+- **Swift 6.4.2 and Static Linux SDK 0.1.0,** the image pinned by digest and the SDK by checksum, after its signature checked out against swift.org's release key. The two have to move together.
+- **Everything runs on one SwiftNIO event loop** (`ScoutEventLoop`), set as the task executor for all of Scout's work. Swift's default executor on Linux is libdispatch, which starts and stops worker threads between samples: that tripled the CPU used, and under `Nice=10` each new thread logged a failure to set its priority, writing to the journal. NIO's own way of taking over the global executor needs `dlsym`, which a static musl binary doesn't have. So Scout waits with the event loop's timers, never `Task.sleep`, and looks up addresses with `getaddrinfo` on a thread of its own, never NIO's resolver, which hands lookups to libdispatch.
+- **Every address a name stands for is tried in turn,** with no `AI_ADDRCONFIG`, which on glibc refuses an IPv6 address on a server without one of its own.
+- **`watch --tls` keeps the connection open with Hive's health check** on every sample, since Hive closes a connection that's quiet for 30 seconds. A3 replaces it with the samples themselves.
+- **The test VM is an OrbStack machine:** Debian 12 on arm64, with its own systemd, users, processes and Docker in Swarm mode, on a kernel shared with OrbStack's other machines. It reaches the Mac's loopback at `host.orb.internal`. Its kernel has no `/proc/pressure`.
+- **SwiftLint runs on Scout directly** in `build-and-test.sh`, since SwiftPM shows the plugin's warnings only when it reruns the plugin, which an incremental build skips.
+
+Measured in the test VM, with 334 processes and 9 containers, Scout reading only the server facts, as its own user under §3's caps, with a pinned TLS 1.3 connection to the development Hive held open, over 5 minutes:
+
+| | Measured | Budget |
+| --- | --- | --- |
+| CPU | 0.023–0.033% of one core | under 0.1% |
+| Memory | 15.5 MB resident, 19.3 MB at its peak | goal: under 20 MB |
+| Journal | nothing written | nothing unless something goes wrong |
+| Binary | 18 MB (x86_64), 17 MB (aarch64), stripped | |
+
+Without the connection, it used 0.017% and 9.4 MB, with a 12.8 MB peak. Memory is the tight one: the peak is under a megabyte from the 20 MB goal before the readers and A3's buffer. If session 2 goes over, record it and look first at what makes the peak 4 MB above the steady figure, then at linking without PIE, whose relocations copy the binary's data pages. The binary's size is mostly two copies of BoringSSL, NIOSSL's and swift-crypto's, and the Swift runtime. No internationalization data is linked.

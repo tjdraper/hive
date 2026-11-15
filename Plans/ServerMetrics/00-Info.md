@@ -53,7 +53,7 @@ Check off a slice here when its "done when" is true.
 
 - **Scout is one program, `hive-scout`,** that runs on each server as a service, reads the figures in §4 every 10 seconds, and sends them to one Hive. It's named for the bees that fly out and report back.
 - **Scout only sends.** It never listens on a port, and never runs, reads or changes anything because Hive asked over its connection. Hive's answers to it carry only acknowledgements and refusals. A Hive taken over by someone else can't use Scout to reach into a server. Installing and updating go over SSH instead, under their own rules (§2).
-- **It's written in Swift,** in a package of its own (`Scout/`), and built for Linux with Swift's Static Linux SDK: a fully static binary on musl, one for x86_64 and one for aarch64, that runs on any distribution with nothing to install alongside it. One language for the whole project, and Scout shares its wire types with Hive. A1 measures it, with its TLS and crypto linked in, against the budget in §3 first. If Swift can't meet it, stop and decide before going further; Go is the fallback.
+- **It's written in Swift,** in a package of its own (`Scout/`), and built for Linux with Swift's Static Linux SDK: a fully static binary on musl, one for x86_64 and one for aarch64, that runs on any distribution with nothing to install alongside it. One language for the whole project, and Scout shares its wire types with Hive. A1 measures it, with its TLS and crypto linked in, against the budget in §3 first. If Swift can't meet the CPU budget, stop and decide before going further; Go is the fallback. Memory is a goal, not a reason to leave Swift (§3).
 - **Linux first,** since your servers run it. macOS comes in Phase C, with the same program and its own readers.
 - **The Hive Mac reports itself,** with nothing to install (C2). It's usually doing a server's work too. Hive reads it with Scout's macOS readers and writes straight to its metrics, with no enrollment or connection, and it shows on the dashboard beside the servers. The daemon runs as your user and never takes back root for this, so C2 finds out which other users' processes it can see.
 - **Scout runs unprivileged,** as a `hive-scout` system user. Installing and updating it need root (§2). Linux lets any user read every process's CPU and memory figures in `/proc`, unless `/proc` is mounted with `hidepid`. Scout still installs there, reports that processes are hidden, and sends everything else.
@@ -85,7 +85,7 @@ Check off a slice here when its "done when" is true.
 Collecting must never be the reason a server is slow. The budget, measured in A1 and checked again in A4:
 
 - **CPU:** under 0.1% of one core on average, on a server with a few hundred processes and a few dozen containers
-- **Memory:** under 20 MB resident, with its buffer full and its connection open
+- **Memory:** under 20 MB resident, with its buffer full and its connection open. This is a goal to keep working toward, not a limit: going over it is recorded in the slice that measured it and worked on, but never stops a slice or means leaving Swift. `MemoryMax` below is the hard limit.
 - **Disk:** no writes while running, apart from the system journal when something goes wrong. Its key and settings are written at enrollment.
 - **Network:** one TLS connection kept open, a few KB a sample
 - **Caps the service manager enforces,** so a fault in Scout can't hurt the server either: under systemd, `CPUQuota=5%`, `MemoryMax=64M`, `Nice=10` and an idle I/O class
@@ -180,7 +180,7 @@ Logs will also need things metrics don't: reading the journal or `/var/log` mean
 
 ## §11. Open questions
 
-- [ ] Does a static Swift binary, with its TLS and crypto, meet §3's budget? (A1)
+- [ ] Does a static Swift binary, with its TLS and crypto, meet §3's CPU budget, and how close does it come to the memory goal? (A1)
 - [x] How Scouts update: from Beekeeper over SSH where Hive has root or A4's `sudo` rule, otherwise a pasted command, which keeps the key. Never by updating themselves (§2, A5, B3).
 - [ ] What can an unprivileged process read of other users' processes on macOS? Hive's own Mac depends on it (C2), and whether Scout on other Macs runs as root (C3).
 - [x] Container names without Docker's socket: Hive names them over SSH with `docker ps`, and Scout sends only IDs (§4, B7)

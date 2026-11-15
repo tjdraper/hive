@@ -6,10 +6,13 @@ included:
   - HiveKit/Tests
   - HiveCore/Sources
   - HiveCore/Tests
+  - Scout/Sources
+  - Scout/Tests
 
 excluded:
   - HiveKit/.build
   - HiveCore/.build
+  - Scout/.build
 
 disabled_rules:
   - todo
@@ -41,9 +44,9 @@ custom_rules:
     severity: warning
   core_ui_framework_import:
     name: "Core UI Framework Import"
-    included: '^.*/(HiveKit|HiveCore|HiveDaemon)/.*\.swift$'
+    included: '^.*/(HiveKit|HiveCore|HiveDaemon|Scout)/.*\.swift$'
     regex: '^\s*(@\w+\s+)*import\s+(AppKit|UIKit|SwiftUI|Cocoa)\b'
-    message: "HiveKit, HiveCore and the daemon have no interface. Keep AppKit, UIKit and SwiftUI in Hive.app and Beekeeper."
+    message: "HiveKit, HiveCore, the daemon and Scout have no interface. Keep AppKit, UIKit and SwiftUI in Hive.app and Beekeeper."
     severity: error
 
 # A public type in a package needs an explicit public init, which is often empty.

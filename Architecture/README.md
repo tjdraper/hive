@@ -86,6 +86,16 @@ Only move something into `Shared/` when:
 
 HiveKit holds the API types and the client that Beekeeper uses to talk to Hive. Nothing else goes there. Don't move daemon logic into HiveKit because two targets could import it; HiveKit is the wire contract, not a `Shared/` folder for the whole project.
 
+## Scout
+
+Scout, the reporter that runs on each server, is a package of its own in `Scout/`, built for Linux with the Static Linux SDK by `Scripts/build-scout.sh`.
+
+- `ScoutProtocol` holds the types Scout sends to Hive, and only those. It's Scout's wire contract, as HiveKit is Beekeeper's; Hive imports it, Beekeeper never does.
+- `ScoutCore` holds the readers, the sampler and the connection to Hive, by what each reads or does, such as `ServerInfo/` and `HiveConnection/`. Each reader parses text it's given, apart from reading the file, so tests run against files captured from real servers.
+- `hive-scout` is the executable: argument parsing and the loops that compose `ScoutCore`.
+
+Scout imports `FoundationEssentials` on Linux, never all of Foundation, whose internationalization data alone would add tens of megabytes to the binary.
+
 ## Refactor Heuristics
 
 When changing code:
