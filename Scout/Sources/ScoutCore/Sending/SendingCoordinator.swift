@@ -15,17 +15,17 @@ public enum SendingError: Error, Equatable {
 
 /// Sends what Scout holds to Hive: keeps a connection open to the first of its addresses that answers
 /// with the pinned key, sends after every sample until nothing is waiting, and waits longer between
-/// tries while Hive can't be reached, so a sleeping Mac doesn't make every server spin.
+/// tries while Hive can't be reached, so a sleeping Mac doesn't make every server spin. A run can be
+/// ended and another started with a new enrollment, keeping what's held and the status.
 public final class SendingCoordinator: Sendable {
     /// Between tries while Hive is unreachable, the last repeated.
     static let backoff: [Duration] = [.seconds(10), .seconds(20), .seconds(40), .seconds(60)]
     /// While Hive refuses this Scout for good, such as after it was removed. Enrolling again and
-    /// reloading (A4) connects at once.
+    /// reloading connects at once.
     static let refusedRetry: Duration = .seconds(3_600)
     /// How long Hive's lockout of the server's address lasts.
     static let lockoutWait: Duration = .seconds(15 * 60)
 
-    private let enrollment: SavedEnrollment
     private let connector: any HiveConnecting
     private let metrics: MetricsQueue
     /// Metrics first, so a backlog of any other kind never holds up a sample (§10).
@@ -39,14 +39,12 @@ public final class SendingCoordinator: Sendable {
     ///   - now: the wall clock, in seconds since 1970.
     ///   - wait: waits for a time, throwing when cancelled.
     public init(
-        enrollment: SavedEnrollment,
         connector: any HiveConnecting,
         metrics: MetricsQueue,
         log: @escaping @Sendable (String) -> Void,
         now: @escaping @Sendable () -> Int64,
         wait: @escaping @Sendable (Duration) async throws -> Void
     ) {
-        self.enrollment = enrollment
         self.connector = connector
         self.metrics = metrics
         queues = [metrics]
@@ -63,15 +61,16 @@ public final class SendingCoordinator: Sendable {
         return status
     }
 
-    /// Sends after each of `marks` until they end.
-    public func run(marks: AsyncStream<Void>) async throws {
+    /// Sends after each of `marks` until they end or the task is cancelled. One run at a time.
+    public func run(enrollment: SavedEnrollment, marks: AsyncStream<Void>) async throws {
         var marks = marks.makeAsyncIterator()
         var keeper = ScoutSessionKeeper(enrollment: enrollment)
         var failures = 0
+        progress.withLock { $0.state = .connecting; $0.problem = nil }
         while true {
             let pause: Duration
             do {
-                try await connect { connection in
+                try await connect(to: enrollment) { connection in
                     try await keepSending(on: connection, keeper: &keeper, marks: &marks, failures: &failures)
                 }
                 return
@@ -94,10 +93,12 @@ public final class SendingCoordinator: Sendable {
 
     /// Tries each address in turn, like enrolling. Only a Hive that answered decides; an address that
     /// couldn't be reached, or showed another key, moves on to the next.
-    private func connect(_ body: (any HiveRequesting) async throws -> Void) async throws {
+    private func connect(to enrollment: SavedEnrollment, _ body: (any HiveRequesting) async throws -> Void) async throws {
         var lastError: (any Error)?
         var keyRefused = false
         for address in enrollment.hiveAddresses {
+            // Connecting doesn't notice a reload cancelling the run, which would otherwise wait on every address.
+            try Task.checkCancellation()
             do {
                 try await connector.withConnection(to: address, pin: enrollment.hivePin, body)
                 return

@@ -17,6 +17,10 @@ enum ScoutCommand: Equatable {
     case run(stateDirectory: String, runtimeDirectory: String)
     /// Prints whether the running Scout is sending, from its runtime folder.
     case status(runtimeDirectory: String)
+    /// Installs this binary as a service, run as root, enrolling through a code read from standard
+    /// input, and lets Hive's SSH user run Scout's management command as root when named.
+    case install(sshUser: String?)
+    case uninstall
 
     static let usage = """
         usage: hive-scout sample
@@ -24,33 +28,57 @@ enum ScoutCommand: Equatable {
                hive-scout enroll [--state-directory <path>] < code
                hive-scout run [--state-directory <path>] [--runtime-directory <path>]
                hive-scout status [--runtime-directory <path>]
+               sudo hive-scout install [--ssh-user <name>] < code
+               sudo hive-scout uninstall
         """
 
     init?(arguments: [String]) {
+        let options = arguments.dropFirst()
         switch arguments.first {
-        case "sample" where arguments.count == 1:
+        case "sample" where options.isEmpty:
             self = .sample
         case "watch":
-            guard let target = Self.hiveTarget(from: arguments.dropFirst()) else { return nil }
+            guard let target = Self.hiveTarget(from: options) else { return nil }
             self = .watch(target)
+        case "install":
+            guard let sshUser = Self.sshUser(from: options) else { return nil }
+            self = .install(sshUser: sshUser)
+        case "uninstall" where options.isEmpty:
+            self = .uninstall
+        case let name?:
+            guard let command = Self.withFolders(name, options: options) else { return nil }
+            self = command
+        default:
+            return nil
+        }
+    }
+
+    /// Commands that take only folders as options.
+    private static func withFolders(_ name: String, options: ArraySlice<String>) -> Self? {
+        switch name {
         case "enroll":
             // Never the code itself, which an argument would show in `ps`, `sudo`'s log and the journal.
-            guard let folders = Self.folders(from: arguments.dropFirst(), allowed: ["--state-directory"]) else { return nil }
-            self = .enroll(stateDirectory: folders["--state-directory"] ?? EnrollmentStore.defaultDirectory)
+            guard let folders = folders(from: options, allowed: ["--state-directory"]) else { return nil }
+            return .enroll(stateDirectory: folders["--state-directory"] ?? EnrollmentStore.defaultDirectory)
         case "run":
-            guard let folders = Self.folders(from: arguments.dropFirst(), allowed: ["--state-directory", "--runtime-directory"]) else {
-                return nil
-            }
-            self = .run(
+            guard let folders = folders(from: options, allowed: ["--state-directory", "--runtime-directory"]) else { return nil }
+            return .run(
                 stateDirectory: folders["--state-directory"] ?? EnrollmentStore.defaultDirectory,
                 runtimeDirectory: folders["--runtime-directory"] ?? SendingStatusFile.defaultDirectory
             )
         case "status":
-            guard let folders = Self.folders(from: arguments.dropFirst(), allowed: ["--runtime-directory"]) else { return nil }
-            self = .status(runtimeDirectory: folders["--runtime-directory"] ?? SendingStatusFile.defaultDirectory)
+            guard let folders = folders(from: options, allowed: ["--runtime-directory"]) else { return nil }
+            return .status(runtimeDirectory: folders["--runtime-directory"] ?? SendingStatusFile.defaultDirectory)
         default:
             return nil
         }
+    }
+
+    /// The name is checked when installing, so a wrong one is refused with a reason.
+    private static func sshUser(from options: ArraySlice<String>) -> String?? {
+        guard !options.isEmpty else { return .some(nil) }
+        guard options.count == 2, options.first == "--ssh-user" else { return nil }
+        return .some(options.last)
     }
 
     /// Options naming folders, each at most once and as an absolute path. Nil for anything else.

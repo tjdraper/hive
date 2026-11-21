@@ -13,7 +13,7 @@ Check off a slice here when its "done when" is true.
 - [x] [A1. Scout and what it reads](01-A1-ScoutAndWhatItReads.md) — Engine, 2 sessions
 - [x] [A2. Enrolling a Scout](02-A2-EnrollingAScout.md) — Engine, 1–2 sessions
 - [x] [A3. Sending and storing samples](03-A3-SendingAndStoringSamples.md) — Engine, 2 sessions
-- [ ] [A4. Installing on Linux](04-A4-InstallingOnLinux.md) — Engine, 1–2 sessions, needs you
+- [x] [A4. Installing on Linux](04-A4-InstallingOnLinux.md) — Engine, 1–2 sessions, needs you
 - [ ] [A5. Signed Scout releases](05-A5-SignedScoutReleases.md) — Engine, 1–2 sessions, needs you
 
 ### Phase B — Metrics in Beekeeper

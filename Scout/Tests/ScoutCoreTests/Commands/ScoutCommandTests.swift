@@ -52,6 +52,18 @@ struct ScoutCommandTests {
         #expect(ScoutCommand(arguments: ["run", "--state-directory"]) == nil)
     }
 
+    @Test("Install takes only the SSH user's name, reading the code from standard input, and uninstall takes nothing")
+    func installAndUninstall() {
+        #expect(ScoutCommand(arguments: ["install"]) == .install(sshUser: nil))
+        #expect(ScoutCommand(arguments: ["install", "--ssh-user", "deploy"]) == .install(sshUser: "deploy"))
+        #expect(ScoutCommand(arguments: ["uninstall"]) == .uninstall)
+
+        #expect(ScoutCommand(arguments: ["install", "scout1:AQIDBAUG"]) == nil)
+        #expect(ScoutCommand(arguments: ["install", "--ssh-user", "deploy", "scout1:AQIDBAUG"]) == nil)
+        #expect(ScoutCommand(arguments: ["install", "--code", "scout1:AQIDBAUG"]) == nil)
+        #expect(ScoutCommand(arguments: ["uninstall", "--ssh-user", "deploy"]) == nil)
+    }
+
     @Test("Unknown commands and extra arguments are refused")
     func unknown() {
         #expect(ScoutCommand(arguments: []) == nil)

@@ -17,6 +17,18 @@ guard let command = ScoutCommand(arguments: Array(CommandLine.arguments.dropFirs
 }
 
 switch command {
+case .enroll, .run, .status:
+    do {
+        try ScoutUser.dropRoot()
+    } catch {
+        Console.log(ScoutUser.message(for: error))
+        exit(77)
+    }
+case .sample, .watch, .install, .uninstall:
+    break
+}
+
+switch command {
 case .sample:
     let sample = try await ScoutEventLoop.shared.run {
         var sampler = Sampler()
@@ -35,7 +47,7 @@ case .watch(let target):
         exit(1)
     }
 case .enroll(let stateDirectory):
-    guard let code = CodeInput.read() else {
+    guard case .code(let code) = CodeInput.read(prompt: "Paste the enrollment code from Beekeeper, then press Return:") else {
         Console.log("That isn't a whole enrollment code. Copy it again from Beekeeper.")
         exit(65)
     }
@@ -62,7 +74,11 @@ case let .run(stateDirectory, runtimeDirectory):
         exit(78)
     }
     do {
-        let loop = RunLoop(enrollment: enrollment, statusFile: SendingStatusFile(directory: runtimeDirectory))
+        let loop = RunLoop(
+            enrollment: enrollment,
+            store: EnrollmentStore(directory: stateDirectory),
+            statusFile: SendingStatusFile(directory: runtimeDirectory)
+        )
         try await ScoutEventLoop.shared.run { try await loop.run() }
     } catch {
         Console.log("Stopped: \(error)")
@@ -74,6 +90,28 @@ case .status(let runtimeDirectory):
         Console.log(StatusReport.text(for: status, now: SampleSchedule.now() / 1_000_000_000))
     } catch {
         Console.log("Couldn't read the running Scout's status: \(error)")
+        exit(1)
+    }
+case .install(let sshUser):
+    do {
+        try InstallWorkflow { Console.log($0) }.install(sshUser: sshUser) { () throws(InstallError) in
+            let prompt = "Paste the enrollment code from Beekeeper, then press Return. "
+                + "To keep this server's enrollment, press Return alone:"
+            switch CodeInput.read(prompt: prompt) {
+            case .code(let code): return code
+            case .nothing: return nil
+            case .notACode: throw .notACode
+            }
+        }
+    } catch {
+        Console.log(InstallMessage.text(for: error))
+        exit(1)
+    }
+case .uninstall:
+    do {
+        try UninstallWorkflow { Console.log($0) }.uninstall()
+    } catch {
+        Console.log(InstallMessage.text(for: error))
         exit(1)
     }
 }

@@ -24,11 +24,9 @@ struct SendingCoordinatorTests {
 
     /// `onWait` is given how many waits there have been, and stops the coordinator by default.
     private func coordinator(
-        _ enrollment: SavedEnrollment,
         onWait: @escaping @Sendable (Int) throws -> Void = { _ in throw CancellationError() }
     ) -> SendingCoordinator {
         SendingCoordinator(
-            enrollment: enrollment,
             connector: hive,
             metrics: queue,
             log: { [logs] in logs.append($0) },
@@ -41,10 +39,10 @@ struct SendingCoordinatorTests {
     }
 
     /// Runs until everything waiting is sent, with no more samples coming.
-    private func sendWaiting(_ coordinator: SendingCoordinator) async throws {
+    private func sendWaiting(_ coordinator: SendingCoordinator, as enrollment: SavedEnrollment) async throws {
         let (marks, input) = AsyncStream.makeStream(of: Void.self)
         input.finish()
-        try await coordinator.run(marks: marks)
+        try await coordinator.run(enrollment: enrollment, marks: marks)
     }
 
     private func logged(_ text: String) -> Int {
@@ -58,12 +56,12 @@ struct SendingCoordinatorTests {
         let samples = TestSamples.run(count: 5)
         for sample in samples { queue.add(sample) }
         hive.set { $0.reach = ["hive": .unreachable] }
-        let coordinator = coordinator(enrollment) { [hive] count in
+        let coordinator = coordinator { [hive] count in
             if count == 5 { hive.set { $0.reach = [:] } }
         }
 
         // Act
-        try await sendWaiting(coordinator)
+        try await sendWaiting(coordinator, as: enrollment)
 
         // Assert
         #expect(waits.all == [.seconds(10), .seconds(20), .seconds(40), .seconds(60), .seconds(60)])
@@ -87,7 +85,7 @@ struct SendingCoordinatorTests {
         }
 
         // Act
-        try await sendWaiting(coordinator(enrollment))
+        try await sendWaiting(coordinator(), as: enrollment)
 
         // Assert: one sign-in while enrolling, one to start sending, and one after the restart.
         #expect(hive.reports.map { $0.samples.map(\.takenAt) } == [[samples[1].takenAt], [samples[0].takenAt]])
@@ -103,7 +101,7 @@ struct SendingCoordinatorTests {
         hive.set { $0.metricsStatuses = [422, 422]; $0.metricsRefusal = .clockAhead }
 
         // Act
-        try await sendWaiting(coordinator(enrollment))
+        try await sendWaiting(coordinator(), as: enrollment)
 
         // Assert
         #expect(hive.reports.count == 2)
@@ -120,12 +118,12 @@ struct SendingCoordinatorTests {
         let enrollment = try await enroll()
         for sample in TestSamples.run(count: 3) { queue.add(sample) }
         hive.set { $0.signInStatus = signInStatus }
-        let coordinator = coordinator(enrollment) { count in
+        let coordinator = coordinator { count in
             if count == 2 { throw CancellationError() }
         }
 
         // Act
-        await #expect(throws: CancellationError.self) { try await sendWaiting(coordinator) }
+        await #expect(throws: CancellationError.self) { try await sendWaiting(coordinator, as: enrollment) }
 
         // Assert
         #expect(waits.all == [.seconds(3_600), .seconds(3_600)])
@@ -133,6 +131,27 @@ struct SendingCoordinatorTests {
         #expect(coordinator.status.state == .refused)
         #expect(queue.held.samples == 3)
         #expect(hive.reports.isEmpty)
+    }
+
+    @Test("A run ended for a reload and started again with a new enrollment connects at once and keeps what's held")
+    func reload() async throws {
+        // Arrange: Hive has removed this Scout, so the first run waits an hour.
+        let removed = try await enroll()
+        for sample in TestSamples.run(count: 3) { queue.add(sample) }
+        hive.set { $0.signInStatus = 401 }
+        let coordinator = coordinator()
+        await #expect(throws: CancellationError.self) { try await sendWaiting(coordinator, as: removed) }
+        hive.set { $0.signInStatus = nil }
+        let enrolledAgain = try await enroll()
+
+        // Act
+        try await sendWaiting(coordinator, as: enrolledAgain)
+
+        // Assert
+        #expect(waits.all == [.seconds(3_600)])
+        #expect(hive.reports.flatMap(\.samples).count == 3)
+        #expect(coordinator.status.state == .sending)
+        #expect(queue.held.samples == 0)
     }
 
     @Test("Another key at every address is refused hourly, but beside an address that can't be reached it counts as unreachable")
@@ -143,14 +162,14 @@ struct SendingCoordinatorTests {
 
         // Act, Assert
         hive.set { $0.reach = ["first": .otherKey, "second": .otherKey] }
-        let everyAddress = coordinator(enrollment)
-        await #expect(throws: CancellationError.self) { try await sendWaiting(everyAddress) }
+        let everyAddress = coordinator()
+        await #expect(throws: CancellationError.self) { try await sendWaiting(everyAddress, as: enrollment) }
         #expect(waits.all == [.seconds(3_600)])
         #expect(everyAddress.status.state == .refused)
 
         hive.set { $0.reach = ["first": .otherKey, "second": .unreachable] }
-        let oneAddress = coordinator(enrollment)
-        await #expect(throws: CancellationError.self) { try await sendWaiting(oneAddress) }
+        let oneAddress = coordinator()
+        await #expect(throws: CancellationError.self) { try await sendWaiting(oneAddress, as: enrollment) }
         #expect(waits.all == [.seconds(3_600), .seconds(10)])
         #expect(oneAddress.status.state == .unreachable)
         #expect(hive.reports.isEmpty)

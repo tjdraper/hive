@@ -1,37 +1,54 @@
 #!/bin/bash
 #
-# A disposable Linux machine for trying Scout on something shaped like a real server: systemd, Docker
-# in Swarm mode running a few services, and a few hundred processes. It's an OrbStack machine, which
-# has its own systemd, users, processes and Docker, on a kernel shared with OrbStack's other machines.
+# Disposable Linux machines for trying Scout on something shaped like a real server. Each is an
+# OrbStack machine, which has its own init system, users, processes and Docker, on a kernel shared
+# with OrbStack's other machines.
+#
+#   Debian (the default): systemd, Docker in Swarm mode running a few services, a few hundred
+#   processes, and /home on a filesystem of its own.
+#   Alpine (--alpine): OpenRC and doas instead of sudo, and a few hundred processes.
 #
 # Usage:
-#   Scripts/scout-test-vm.sh create            Make the machine and start its services
-#   Scripts/scout-test-vm.sh copy              Copy the Linux build from Scripts/build-scout.sh into it
+#   Scripts/scout-test-vm.sh [--alpine] create       Make the machine and start its services
+#   Scripts/scout-test-vm.sh [--alpine] install [--ssh-user <name>] < code
+#                                                    Install Scout as the pasted command does, from
+#                                                    the Linux build of Scripts/build-scout.sh
+#   Scripts/scout-test-vm.sh [--alpine] uninstall    Uninstall Scout
+#   Scripts/scout-test-vm.sh [--alpine] measure-installed <seconds>
+#                                                    Report the installed service's CPU and memory
+#   Scripts/scout-test-vm.sh [--alpine] delete       Remove the machine
+#   Scripts/scout-test-vm.sh copy                    Copy the Linux build into the Debian machine
 #   Scripts/scout-test-vm.sh measure <seconds> [--tls <host>:<port> --pin <hex>]
-#                                              Run Scout as its own user and report its CPU and memory
-#   Scripts/scout-test-vm.sh delete            Remove the machine
+#                                                    Run hive-scout watch as Scout's user and report
+#                                                    its CPU and memory
 #
-# From inside the machine, the Mac is host.orb.internal.
+# From inside a machine, the Mac is host.orb.internal.
 
 set -euo pipefail
 
 cd -P "$(dirname "$0")/.."
 
 machine="hive-scout-vm"
+alpine=false
+if [[ ${1:-} == --alpine ]]; then
+    machine="hive-scout-alpine"
+    alpine=true
+    shift
+fi
 
 in_machine() {
     orb run -m "$machine" -u root bash -euo pipefail -c "$1"
 }
 
-create() {
+create_debian() {
     orb create debian:bookworm "$machine"
 
     in_machine "
         apt-get update -qq
-        DEBIAN_FRONTEND=noninteractive apt-get install -qq -y docker.io > /dev/null
+        DEBIAN_FRONTEND=noninteractive apt-get install -qq -y docker.io sudo > /dev/null
         systemctl enable --now docker
         docker swarm init > /dev/null
-        useradd --system --no-create-home --shell /usr/sbin/nologin hive-scout
+        useradd --create-home --shell /bin/bash deploy
     "
 
     # A web server, a cache, a database and some workers, as a small server might run, adding up to
@@ -65,45 +82,125 @@ STACK
             bash -c 'for i in \$(seq 60); do sleep infinity & done; wait'
     "
 
+    # /home on an ext4 filesystem of its own, as many servers have, so Scout's service can be seen
+    # to report it although the service mounts /home read-only. What /home held is copied onto it.
+    in_machine "
+        truncate -s 2G /var/home.img
+        mkfs.ext4 -q /var/home.img
+        mkdir -p /mnt/new-home
+        mount -o loop /var/home.img /mnt/new-home
+        cp -a /home/. /mnt/new-home/
+        umount /mnt/new-home
+        rmdir /mnt/new-home
+        echo '/var/home.img /home ext4 loop 0 2' >> /etc/fstab
+        mount /home
+    "
+
     echo "Waiting for the services to start..."
     sleep 30
     in_machine "echo \"\$(ls /proc | grep -c '^[0-9]') processes, \$(docker ps -q | wc -l) containers\""
 }
 
-copy() {
+create_alpine() {
+    orb create alpine:3.22 "$machine"
+    orb run -m "$machine" -u root sh -c "apk add -q bash"
+
+    # Workers started at boot by OpenRC's local service, as a server's own daemons would be.
+    in_machine "
+        apk add -q doas coreutils
+        # OrbStack's Alpine comes with sudo, which most Alpine servers don't have.
+        apk del -q sudo
+        adduser -D -s /bin/sh deploy
+        cat > /etc/local.d/scout-test-workers.start <<'WORKERS'
+#!/bin/sh
+for i in \$(seq 250); do su -s /bin/sh nobody -c 'exec sleep 2147483647' & done
+WORKERS
+        chmod 755 /etc/local.d/scout-test-workers.start
+        rc-update add local default > /dev/null
+        rc-service local restart > /dev/null
+    "
+    sleep 5
+    in_machine "echo \"\$(ls /proc | grep -c '^[0-9]') processes\""
+}
+
+linux_build() {
     local arch
-    arch=$(orb run -m "$machine" uname -m)
+    # Not reading standard input, which holds the code for install.
+    arch=$(orb run -m "$machine" uname -m < /dev/null)
     local binary="build/scout/$arch/hive-scout"
     if [[ ! -f $binary ]]; then
         echo "error: $binary is missing; run Scripts/build-scout.sh first" >&2
         exit 1
     fi
+    echo "$binary"
+}
+
+copy() {
+    local binary
+    binary=$(linux_build)
     # OrbStack shares the Mac's files with its machines under /mnt/mac.
     in_machine "install -o root -g root -m 0755 '/mnt/mac$PWD/$binary' /usr/local/bin/hive-scout"
 }
 
-measure() {
-    local seconds="${1:?usage: measure <seconds> [--tls <host>:<port> --pin <hex>]}"
-    shift
-    local arguments="watch $*"
-
-    # A transient service as Scout's own user, with the same caps the installed service will have,
-    # so the figures are what a server would see. The samples it prints are thrown away, since the
-    # installed service won't write them to the journal.
+# What the pasted command does, but copying the binary from the Mac, since a development build has no
+# GitHub release to download: into a private folder, checked against its SHA-256, then installed with
+# the code read from this script's standard input.
+install_scout() {
+    local options=""
+    if [[ $# -gt 0 ]]; then
+        [[ $# -eq 2 && $1 == --ssh-user ]] || { echo "usage: install [--ssh-user <name>] < code" >&2; exit 64; }
+        options="--ssh-user $(printf '%q' "$2")"
+    fi
+    local binary hash
+    binary=$(linux_build)
+    hash=$(shasum -a 256 "$binary" | cut -d ' ' -f 1)
     in_machine "
-        systemctl stop hive-scout-measure 2> /dev/null || true
-        systemd-run --unit=hive-scout-measure --uid=hive-scout --property=CPUQuota=5% \
-            --property=MemoryMax=64M --property=Nice=10 --property=IOSchedulingClass=idle \
-            --property=StandardOutput=null \
-            /usr/local/bin/hive-scout $arguments > /dev/null
+        folder=\$(mktemp -d)
+        trap 'rm -rf \"\$folder\"' EXIT
+        cp '/mnt/mac$PWD/$binary' \"\$folder/hive-scout\"
+        echo '$hash  '\"\$folder/hive-scout\" | sha256sum -c > /dev/null
+        chmod 700 \"\$folder/hive-scout\"
+        \"\$folder/hive-scout\" install $options
     "
 
-    # Readings start after the first sample and the connection, so neither start-up nor the 10-second
-    # mark Scout waits for counts toward the average.
-    sleep 15
+    # OrbStack's machines are containers, and OrbStack turns off systemd's lockdown for every service
+    # in them with a drop-in. One named to sort after it turns Scout's back on, from Scout's own unit,
+    # so the machine runs Scout as a server would. Rewritten only when the unit changed, so enrolling
+    # again still reloads Scout rather than restarting it.
     in_machine "
-        pid=\$(systemctl show -p MainPID --value hive-scout-measure)
-        [[ \$pid != 0 ]] || { journalctl -u hive-scout-measure --no-pager | tail -n 20; exit 1; }
+        lxc=/run/systemd/system/service.d/zzz-lxc-service.conf
+        unit=/etc/systemd/system/hive-scout.service
+        dropIn=\$unit.d/zzzz-scout-test.conf
+        if [[ -f \$lxc && -f \$unit ]]; then
+            keys=\$(grep -oE '^[A-Za-z]+' \$lxc | paste -sd '|')
+            mkdir -p \$unit.d
+            { echo '[Service]'; grep -E \"^(\$keys)=\" \$unit; } > \$dropIn.new
+            if cmp -s \$dropIn.new \$dropIn; then
+                rm \$dropIn.new
+            else
+                mv \$dropIn.new \$dropIn
+                systemctl daemon-reload
+                systemctl restart hive-scout
+            fi
+        fi
+    "
+}
+
+uninstall_scout() {
+    in_machine "
+        /usr/local/bin/hive-scout uninstall
+        rm -rf /etc/systemd/system/hive-scout.service.d
+        if command -v systemctl > /dev/null; then systemctl daemon-reload; fi
+    "
+}
+
+# Prints the CPU and memory used by the process the given shell command prints the PID of, over
+# the given number of seconds, run inside the machine.
+report_usage() {
+    local find_pid="$1" seconds="$2"
+    in_machine "
+        pid=\$($find_pid)
+        [[ -n \$pid && \$pid != 0 ]] || { echo 'error: Scout isn'\''t running' >&2; exit 1; }
         ticks_per_second=\$(getconf CLK_TCK)
         user_ticks() { awk '{ print \$14 }' /proc/\$pid/stat; }
         system_ticks() { awk '{ print \$15 }' /proc/\$pid/stat; }
@@ -114,7 +211,8 @@ measure() {
         end_user=\$(user_ticks)
         end_system=\$(system_ticks)
         end=\$(date +%s.%N)
-        echo \"processes: \$(ls /proc | grep -c '^[0-9]'), containers: \$(docker ps -q | wc -l)\"
+        containers=\$(command -v docker > /dev/null && docker ps -q | wc -l || echo 0)
+        echo \"processes: \$(ls /proc | grep -c '^[0-9]'), containers: \$containers\"
         awk -v user=\$((end_user - start_user)) -v kernel=\$((end_system - start_system)) -v hz=\$ticks_per_second \
             -v start=\$start -v end=\$end 'BEGIN {
                 seconds = end - start
@@ -122,6 +220,31 @@ measure() {
                     (user + kernel) / hz / seconds * 100, seconds, user / hz / seconds * 100, kernel / hz / seconds * 100
             }'
         grep -E '^(VmRSS|VmHWM|RssAnon|RssFile|Threads)' /proc/\$pid/status
+    "
+}
+
+measure() {
+    local seconds="${1:?usage: measure <seconds> [--tls <host>:<port> --pin <hex>]}"
+    shift
+    local arguments="watch $*"
+
+    # A transient service as Scout's own user, with the same caps the installed service has, so the
+    # figures are what a server would see. The samples it prints are thrown away, since the
+    # installed service doesn't write them to the journal.
+    in_machine "
+        id hive-scout > /dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin hive-scout
+        systemctl stop hive-scout-measure 2> /dev/null || true
+        systemd-run --unit=hive-scout-measure --uid=hive-scout --property=CPUQuota=5% \
+            --property=MemoryMax=64M --property=Nice=10 --property=IOSchedulingClass=idle \
+            --property=StandardOutput=null \
+            /usr/local/bin/hive-scout $arguments > /dev/null
+    "
+
+    # Readings start after the first sample and the connection, so neither start-up nor the 10-second
+    # mark Scout waits for counts toward the average.
+    sleep 15
+    report_usage "systemctl show -p MainPID --value hive-scout-measure" "$seconds"
+    in_machine "
         echo 'journal, this run:'
         invocation=\$(systemctl show -p InvocationID --value hive-scout-measure)
         journalctl --no-pager -o cat _SYSTEMD_INVOCATION_ID=\$invocation | tail -n 5 | sed 's/^/    /'
@@ -129,10 +252,18 @@ measure() {
     "
 }
 
+measure_installed() {
+    local seconds="${1:?usage: measure-installed <seconds>}"
+    report_usage "pgrep -u hive-scout hive-scout" "$seconds"
+}
+
 case "${1:-}" in
-    create) create ;;
+    create) if $alpine; then create_alpine; else create_debian; fi ;;
+    install) shift; install_scout "$@" ;;
+    uninstall) uninstall_scout ;;
+    measure-installed) shift; measure_installed "$@" ;;
     copy) copy ;;
     measure) shift; measure "$@" ;;
     delete) orb delete -f "$machine" ;;
-    *) sed -n '3,15p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64 ;;
+    *) sed -n '3,26p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64 ;;
 esac
