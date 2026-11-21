@@ -49,4 +49,31 @@ case .enroll(let stateDirectory):
         Console.log(EnrollmentMessage.text(for: error))
         exit(1)
     }
+case let .run(stateDirectory, runtimeDirectory):
+    let enrollment: SavedEnrollment
+    do {
+        guard let saved = try EnrollmentStore(directory: stateDirectory).load() else {
+            Console.log("This server's Scout hasn't enrolled. Run hive-scout enroll with a code from Beekeeper first.")
+            exit(78)
+        }
+        enrollment = saved
+    } catch {
+        Console.log("Couldn't read the enrollment in the state folder: \(error)")
+        exit(78)
+    }
+    do {
+        let loop = RunLoop(enrollment: enrollment, statusFile: SendingStatusFile(directory: runtimeDirectory))
+        try await ScoutEventLoop.shared.run { try await loop.run() }
+    } catch {
+        Console.log("Stopped: \(error)")
+        exit(1)
+    }
+case .status(let runtimeDirectory):
+    do {
+        let status = try SendingStatusFile(directory: runtimeDirectory).load()
+        Console.log(StatusReport.text(for: status, now: SampleSchedule.now() / 1_000_000_000))
+    } catch {
+        Console.log("Couldn't read the running Scout's status: \(error)")
+        exit(1)
+    }
 }

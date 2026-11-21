@@ -43,3 +43,19 @@ A natural split: Scout's sending in the first session, Hive's storage in the sec
 - A Hive that never answers times out, and samples keep being taken on time meanwhile
 
 **Done when:** a Scout in the test VM sends to the development Hive for an hour; stopping Hive for ten minutes leaves no gap once it's back; the buffer's size after a day without Hive matches §5's estimate, or §5 is corrected; the database filled with a year of made-up data for one server matches §6's estimate, or §6 is corrected; and the tests pass.
+
+## Session 1: Scout's sending
+
+Done: everything under Scout above, and the buffer, catching-up, refusal and timeout tests. `Scripts/build-and-test.sh` passes. Left for session 2: Hive's side, the rest of the tests, and the "done when", which needs Hive's route.
+
+What was decided along the way:
+
+- **`hive-scout run`** samples on each mark into a `MetricsQueue` and signals `SendingCoordinator`, which sends on its own task, so sampling never waits on a request. Both run on `ScoutEventLoop`.
+- **Requests are a `MetricsReport`** to `POST /scout/metrics`: the protocol version, Scout's clock as it's sent, and up to 60 samples or 120 minutes (`MetricsMinute`, with the average, highest and `MinuteLows`). Hive's answers are written down in `ScoutEndpoint.metrics` for session 2 to follow: 2xx kept; 422 with a `ScoutRefusal` (`clock-ahead`, `too-old`, `too-many-samples`, `too-many-figures`, `too-many-new-names`, `value-out-of-range`), which Scout logs once a reason and drops; 429, which counts as unreachable; 409 with `ScoutProtocolMismatch`. Session 2 adds the route to `RequestGate.scoutRoutes`.
+- **The seam for other kinds of data** is `ReportQueue`. The coordinator goes back to its first queue, metrics, after every request. `MetricsQueue` is the only one.
+- **The buffer** (`MetricsBuffer`) folds samples older than an hour into minutes. A minute is closed once it's all over an hour old, and a sample on its way to Hive isn't folded until it's settled. Counts are capped as well as ages, so a clock set back can't make it grow. The newest sample goes alone first, then minutes, then samples oldest first.
+- **Waiting between tries:** 10, 20, 40, then 60 seconds while unreachable; an hour when refused for good (removed, Hive's key changed at every address, or the protocol no longer accepted); 15 minutes when locked out. Another key at one address beside one that can't be reached counts as unreachable. A connection that was working and drops is opened again at once, without waiting.
+- **Timeouts:** 10 seconds to connect, as before, and 30 for each request, TLS handshake included, after which the connection is closed and counts as unreachable.
+- **`hive-scout status`** reads `status.json`, which the running Scout writes after every sample to its runtime folder, `/run/hive-scout` unless `--runtime-directory` gives another. `/run` is in memory, so this isn't a disk write (§3). A4's unit sets `RuntimeDirectory=hive-scout`. The status says when it's more than 30 seconds old.
+- **`watch` keeps its health check.** It's for development only and doesn't send samples.
+- **Left for A4,** as before: reloading the enrollment on SIGHUP.

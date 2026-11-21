@@ -40,8 +40,17 @@ public final class ScoutEventLoop: TaskExecutor {
     /// makes the wait longer, but the next mark is worked out afresh after it. Cancelling the task ends
     /// the wait with an error.
     public func sleep(untilWallClock nanoseconds: Int64) async throws {
-        let delay = max(0, nanoseconds - SampleSchedule.now())
-        let wake = loop.scheduleTask(in: .nanoseconds(delay)) { () }
+        try await sleep(in: .nanoseconds(max(0, nanoseconds - SampleSchedule.now())))
+    }
+
+    /// Waits for `duration` by the system's steady clock. Cancelling the task ends the wait with an error.
+    public func sleep(for duration: Duration) async throws {
+        let (seconds, attoseconds) = duration.components
+        try await sleep(in: .nanoseconds(seconds * 1_000_000_000 + attoseconds / 1_000_000_000))
+    }
+
+    private func sleep(in delay: TimeAmount) async throws {
+        let wake = loop.scheduleTask(in: delay) { () }
         try await withTaskCancellationHandler {
             try await wake.futureResult.get()
         } onCancel: {

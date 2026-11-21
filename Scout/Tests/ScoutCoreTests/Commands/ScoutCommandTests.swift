@@ -36,10 +36,26 @@ struct ScoutCommandTests {
         #expect(ScoutCommand(arguments: ["enroll", "--state-directory", "/tmp/scout", "scout1:AQIDBAUG"]) == nil)
     }
 
+    @Test("Run and status take their folders as absolute paths, each at most once")
+    func runAndStatus() {
+        #expect(ScoutCommand(arguments: ["run"]) == .run(stateDirectory: "/var/lib/hive-scout", runtimeDirectory: "/run/hive-scout"))
+        #expect(
+            ScoutCommand(arguments: ["run", "--runtime-directory", "/tmp/run", "--state-directory", "/tmp/state"])
+                == .run(stateDirectory: "/tmp/state", runtimeDirectory: "/tmp/run")
+        )
+        #expect(ScoutCommand(arguments: ["status"]) == .status(runtimeDirectory: "/run/hive-scout"))
+        #expect(ScoutCommand(arguments: ["status", "--runtime-directory", "/tmp/run"]) == .status(runtimeDirectory: "/tmp/run"))
+
+        #expect(ScoutCommand(arguments: ["run", "--state-directory", "relative"]) == nil)
+        #expect(ScoutCommand(arguments: ["run", "--state-directory", "/a", "--state-directory", "/b"]) == nil)
+        #expect(ScoutCommand(arguments: ["status", "--state-directory", "/tmp/state"]) == nil)
+        #expect(ScoutCommand(arguments: ["run", "--state-directory"]) == nil)
+    }
+
     @Test("Unknown commands and extra arguments are refused")
     func unknown() {
         #expect(ScoutCommand(arguments: []) == nil)
         #expect(ScoutCommand(arguments: ["sample", "extra"]) == nil)
-        #expect(ScoutCommand(arguments: ["run"]) == nil)
+        #expect(ScoutCommand(arguments: ["status", "extra"]) == nil)
     }
 }

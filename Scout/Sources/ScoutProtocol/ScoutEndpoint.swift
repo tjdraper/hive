@@ -14,6 +14,10 @@ public enum ScoutEndpoint {
     public static let signIn = "/sign-in"
     /// `GET` reads the `ScoutSessionCheck` of the session it's sent with.
     public static let session = "/scout/session"
+    /// `POST` a `MetricsReport` for the session's server. Answers 2xx once it's kept, 422 with a
+    /// `ScoutRefusal` for what it won't keep, 429 when it's sent too often, and 409 with a
+    /// `ScoutProtocolMismatch` when Scout has to be updated.
+    public static let metrics = "/scout/metrics"
 }
 
 /// Which version of what Scout sends to Hive. It goes up only when that changes, apart from Scout's

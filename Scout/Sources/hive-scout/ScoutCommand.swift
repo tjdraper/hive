@@ -13,11 +13,17 @@ enum ScoutCommand: Equatable {
     case watch(HiveTarget?)
     /// Enrolls with a Hive through a code read from standard input, saving the key in the folder.
     case enroll(stateDirectory: String)
+    /// Samples every 10 seconds and sends to the Hive it enrolled with, as the service does.
+    case run(stateDirectory: String, runtimeDirectory: String)
+    /// Prints whether the running Scout is sending, from its runtime folder.
+    case status(runtimeDirectory: String)
 
     static let usage = """
         usage: hive-scout sample
                hive-scout watch [--tls <host>:<port> --pin <SHA-256 of Hive's key, in hex>]
                hive-scout enroll [--state-directory <path>] < code
+               hive-scout run [--state-directory <path>] [--runtime-directory <path>]
+               hive-scout status [--runtime-directory <path>]
         """
 
     init?(arguments: [String]) {
@@ -29,15 +35,34 @@ enum ScoutCommand: Equatable {
             self = .watch(target)
         case "enroll":
             // Never the code itself, which an argument would show in `ps`, `sudo`'s log and the journal.
-            switch arguments.count {
-            case 1: self = .enroll(stateDirectory: EnrollmentStore.defaultDirectory)
-            case 3 where arguments[1] == "--state-directory" && arguments[2].hasPrefix("/"):
-                self = .enroll(stateDirectory: arguments[2])
-            default: return nil
+            guard let folders = Self.folders(from: arguments.dropFirst(), allowed: ["--state-directory"]) else { return nil }
+            self = .enroll(stateDirectory: folders["--state-directory"] ?? EnrollmentStore.defaultDirectory)
+        case "run":
+            guard let folders = Self.folders(from: arguments.dropFirst(), allowed: ["--state-directory", "--runtime-directory"]) else {
+                return nil
             }
+            self = .run(
+                stateDirectory: folders["--state-directory"] ?? EnrollmentStore.defaultDirectory,
+                runtimeDirectory: folders["--runtime-directory"] ?? SendingStatusFile.defaultDirectory
+            )
+        case "status":
+            guard let folders = Self.folders(from: arguments.dropFirst(), allowed: ["--runtime-directory"]) else { return nil }
+            self = .status(runtimeDirectory: folders["--runtime-directory"] ?? SendingStatusFile.defaultDirectory)
         default:
             return nil
         }
+    }
+
+    /// Options naming folders, each at most once and as an absolute path. Nil for anything else.
+    private static func folders(from options: ArraySlice<String>, allowed: Set<String>) -> [String: String]? {
+        guard options.count.isMultiple(of: 2) else { return nil }
+        var folders: [String: String] = [:]
+        for index in stride(from: options.startIndex, to: options.endIndex, by: 2) {
+            let (name, path) = (options[index], options[index + 1])
+            guard allowed.contains(name), folders[name] == nil, path.hasPrefix("/") else { return nil }
+            folders[name] = path
+        }
+        return folders
     }
 
     /// The target is optional, but `--tls` is never accepted without a `--pin` to check Hive against.
