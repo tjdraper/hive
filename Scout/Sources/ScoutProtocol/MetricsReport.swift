@@ -30,6 +30,8 @@ public struct ScoutRefusal: Codable, Sendable {
         public static let clockAhead = Reason(rawValue: "clock-ahead")
         public static let tooOld = Reason(rawValue: "too-old")
         public static let tooManySamples = Reason(rawValue: "too-many-samples")
+        /// The request was larger than Hive reads.
+        public static let tooLarge = Reason(rawValue: "too-large")
         /// More filesystems, disks, interfaces or processes in a sample than Hive keeps.
         public static let tooManyFigures = Reason(rawValue: "too-many-figures")
         /// More new filesystem, disk or interface names in a day than Hive takes from one server.

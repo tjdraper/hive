@@ -12,7 +12,7 @@ Check off a slice here when its "done when" is true.
 
 - [x] [A1. Scout and what it reads](01-A1-ScoutAndWhatItReads.md) — Engine, 2 sessions
 - [x] [A2. Enrolling a Scout](02-A2-EnrollingAScout.md) — Engine, 1–2 sessions
-- [ ] [A3. Sending and storing samples](03-A3-SendingAndStoringSamples.md) — Engine, 2 sessions
+- [x] [A3. Sending and storing samples](03-A3-SendingAndStoringSamples.md) — Engine, 2 sessions
 - [ ] [A4. Installing on Linux](04-A4-InstallingOnLinux.md) — Engine, 1–2 sessions, needs you
 - [ ] [A5. Signed Scout releases](05-A5-SignedScoutReleases.md) — Engine, 1–2 sessions, needs you
 
@@ -118,7 +118,7 @@ Left for later:
   - 5 seconds would double the cost and the storage for a dashboard you look at, not a profiler.
   - 1 minute would be cheaper still, but a live page that changes once a minute feels broken, and short spikes vanish.
 - **Fixed, not a setting,** so every server's data has the same shape. Revisit only if a reason shows up.
-- **While Hive is unreachable,** Scout keeps the last hour of samples whole, and for the 23 hours before that each minute's average and highest, and the lowest where §6 keeps it, without processes, all in memory: about 2 MB, which A3 measures. Once Hive answers, the newest sample goes first, so the dashboard and alerts are current at once, then the rest oldest first. Hive files the per-minute figures straight into its 1-minute and 1-hour resolutions. Anything older than a day is dropped, and Scout restarting loses what it kept.
+- **While Hive is unreachable,** Scout keeps the last hour of samples whole, and for the 23 hours before that each minute's average and highest, and the lowest where §6 keeps it, without processes, all in memory: about 3 MB, as A3 measured with the test VM's samples, and 4 MB with a few more filesystems, interfaces and process groups. It counts against §3's memory goal. Once Hive answers, the newest sample goes first, so the dashboard and alerts are current at once, then the rest oldest first. Hive files the per-minute figures straight into its 1-minute and 1-hour resolutions. Anything older than a day is dropped, and Scout restarting loses what it kept.
 - **Sending twice is harmless.** A request that timed out may have landed, so Hive keeps one sample per server and time, and a repeat changes nothing.
 - **Times are the server's clock.** Each request also carries Scout's clock at the moment it's sent, so Hive knows each server's offset even while a backlog arrives. Beekeeper warns when it's more than a minute. A server whose clock runs so far ahead that Hive refuses its samples shows as "clock ahead", not as stopped reporting.
 
@@ -135,7 +135,7 @@ Left for later:
   | 1 hour | 1 year | a month and longer |
 
 - **Processes and containers** are kept with every 10-second sample for 24 hours, and as each hour's top 10 for 14 days. Each container service's and systemd service's hourly average and highest CPU and memory are kept for 90 days, to show which site grew.
-- **Roughly 30–40 MB for each server,** once it's been reporting for a year, so about 350 MB for ten servers. It stays there, since older data is pruned. A3 measures it with a year of made-up data, since an hour of real data says little about the long resolutions.
+- **Roughly 30–40 MB for each server,** once it's been reporting for a year, so about 350 MB for ten servers. It stays there, since older data is pruned. A3 measured 32 MB with a year of made-up data (three filesystems, two disks, two interfaces and 20 process groups a sample), a quarter of it the last day's processes.
 - **Rollups and pruning** run as samples arrive and once an hour, and a late batch from a Scout that was cut off updates the periods it falls in.
 
 ## §7. Beekeeper

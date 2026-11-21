@@ -11,6 +11,9 @@ public struct HiveAPI: Sendable {
     let settings: HiveSettingsWorkflow
     let servers: ServerWorkflow
     let jobs: BackupJobWorkflow
+    let metrics: MetricsStore
+    /// Kept for as long as Hive runs, so it counts across requests.
+    let metricsLimiter = MetricsRateLimiter()
     /// The Hive Mac's addresses, read fresh each time.
     let addresses: @Sendable () -> [NetworkInterfaceAddress]
     /// The port and address options, each time either changes.
@@ -150,7 +153,7 @@ public struct HiveAPI: Sendable {
     }
 
     /// `identityKeys` is where the identity key is saved, for regenerating it. The recovery file is
-    /// written in `dataDirectory`. Hive restarts when an update replaces `executable`.
+    /// written in `dataDirectory`, and the metrics database kept there. Hive restarts when an update replaces `executable`.
     public init(
         hiveID: UUID,
         pin: PublicKeyPin,
@@ -163,12 +166,13 @@ public struct HiveAPI: Sendable {
         rsync: URL,
         version: ReleaseVersion?,
         executable: URL
-    ) {
+    ) throws {
         let devices = DeviceStore(database: database)
         self.init(
             hiveID: hiveID,
             pin: pin,
             database: database,
+            metrics: try MetricsDatabase.open(in: dataDirectory),
             dataDirectory: dataDirectory,
             signIn: SignInWorkflow(hiveID: hiveID, devices: devices, sessions: SessionStore()),
             settingsStore: settings,
@@ -202,6 +206,7 @@ public struct HiveAPI: Sendable {
         hiveID: UUID,
         pin: PublicKeyPin,
         database: HiveDatabase,
+        metrics: MetricsDatabase,
         dataDirectory: URL,
         signIn: SignInWorkflow,
         settingsStore: HiveSettingsStore,
@@ -240,7 +245,8 @@ public struct HiveAPI: Sendable {
             suggestions: SuggestedHostResolver(naming: hostNaming), addressChanges: addressChanges, now: now
         )
         let servers = ServerStore(database: database)
-        self.servers = ServerWorkflow(store: servers, sealer: sealer, sessions: signIn.sessions, now: now)
+        self.metrics = MetricsStore(database: metrics)
+        self.servers = ServerWorkflow(store: servers, sealer: sealer, sessions: signIn.sessions, metrics: self.metrics, now: now)
         let schedule = ScheduleCalendar(calendar: calendar)
         jobs = BackupJobWorkflow(store: BackupJobStore(database: database), sealer: sealer, schedule: schedule, now: now)
         self.addresses = addresses

@@ -30,6 +30,7 @@ struct RequestGate<Next: HTTPResponder>: HTTPResponder where Next.Context == Hiv
     static var scoutRoutes: Set<OpenRoute> {
         [
             OpenRoute(method: .get, path: ScoutEndpoint.session),
+            OpenRoute(method: .post, path: ScoutEndpoint.metrics),
         ]
     }
 

@@ -142,7 +142,11 @@ A clean build is not evidence that anything works. Launching the app and looking
 
 ## Using the Mac
 
-The user is usually working at the Mac while you work. Don't drive it without asking first: no scripted keystrokes or clicks, no bringing apps to the front or quitting them, and no installing a test build over a running copy. Never register, unregister or replace an installed Hive daemon without asking; it may be running real backups. Do everything else first, then ask (a question notifies the user). If no answer comes, the user has probably stepped away, so wait for it. When the user has said they've left the computer to you, go ahead without asking.
+Ivy (`scutil --get LocalHostName` prints `Ivy`) is a Mac that runs agents unattended, so nobody is working at it. There, launch, quit and drive the apps, install development builds with `Scripts/install-test-build.sh --mac`, stop and start the development daemon, and use the test VM without asking. Ivy has no monitor and its display sleeps, so wake it with `caffeinate -u -t 2` just before a screenshot.
+
+On any other Mac, the user is usually working at it while you work. Don't drive it without asking first: no scripted keystrokes or clicks, no bringing apps to the front or quitting them, and no installing a test build over a running copy. Do everything else first, then ask (a question notifies the user). If no answer comes, the user has probably stepped away, so wait for it. When the user has said they've left the computer to you, go ahead without asking.
+
+On every Mac, Ivy included, never register, unregister or replace an installed Hive daemon without asking, which includes `Scripts/install-test-build.sh --mac-installed`. It may be running real backups, and Ivy's does.
 
 ## Tests
 

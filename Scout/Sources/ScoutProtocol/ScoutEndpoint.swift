@@ -15,8 +15,8 @@ public enum ScoutEndpoint {
     /// `GET` reads the `ScoutSessionCheck` of the session it's sent with.
     public static let session = "/scout/session"
     /// `POST` a `MetricsReport` for the session's server. Answers 2xx once it's kept, 422 with a
-    /// `ScoutRefusal` for what it won't keep, 429 when it's sent too often, and 409 with a
-    /// `ScoutProtocolMismatch` when Scout has to be updated.
+    /// `ScoutRefusal` for what it won't keep, 429 when it's sent too often, 409 with a
+    /// `ScoutProtocolMismatch` when Scout has to be updated, and 503 when Hive couldn't keep it.
     public static let metrics = "/scout/metrics"
 }
 

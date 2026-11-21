@@ -250,6 +250,7 @@ struct APIFixture {
             hiveID: signIn.hiveID,
             pin: pin,
             database: signIn.database,
+            metrics: try MetricsDatabase.inMemory(),
             dataDirectory: keyFolder.url,
             signIn: signIn.workflow,
             settingsStore: settings,
@@ -280,6 +281,10 @@ struct APIFixture {
             now: { clock.now },
             version: ReleaseVersion("2026.3")
         )
+    }
+
+    var metricsDatabase: MetricsDatabase {
+        api.metrics.database
     }
 
     var application: some ApplicationProtocol {

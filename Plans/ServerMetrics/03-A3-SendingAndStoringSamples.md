@@ -59,3 +59,22 @@ What was decided along the way:
 - **`hive-scout status`** reads `status.json`, which the running Scout writes after every sample to its runtime folder, `/run/hive-scout` unless `--runtime-directory` gives another. `/run` is in memory, so this isn't a disk write (§3). A4's unit sets `RuntimeDirectory=hive-scout`. The status says when it's more than 30 seconds old.
 - **`watch` keeps its health check.** It's for development only and doesn't send samples.
 - **Left for A4,** as before: reloading the enrollment on SIGHUP.
+
+## Session 2: Hive's storage
+
+Done: everything under Hive above, and the rollup, pruning, limit, other-server, duplicate, protocol and clock-ahead tests. `Scripts/build-and-test.sh` passes.
+
+Checked end to end (2026-11-21): `hive-scout run` as `hive-scout` in the test VM, with §3's caps, sent to the development Hive at `host.orb.internal:4484` for an hour, 19:45:20 to 20:45:30 UTC: 362 samples, none missing or refused, clock offset 0. Hive was stopped from 20:06:26 to 20:16:26. Scout logged once that it couldn't reach Hive, held its samples, reconnected 14 seconds after Hive started, and sent them, so each of those minutes has all six samples and the hours add up to 362. Scout's memory was 21.7 MB, 24.6 MB at its highest. The `Metrics/` folder and its write-ahead log show as excluded in `tmutil isexcluded`.
+
+The buffer after a day without Hive, filled with the VM's own samples and measured on the Mac: 2.7 MB, and 4.0 MB with three filesystems, two interfaces and 20 process groups. §5 said about 2 MB and is corrected. The database with a year of made-up data for one server: 32 MB, as §6 says.
+
+What was decided along the way:
+
+- **`Metrics/`** (`MetricsDatabase`, `MetricsStore`, `MetricsRoutes`, `MetricsUpkeep`): its own GRDB pool in `Metrics/metrics.sqlite`, the folder made `0700` and excluded from backup. One that can't be opened is moved aside and a new one started, since history matters less than Hive starting. `HiveAPI`'s public init opens it.
+- **Tables:** `metricsServer` (each server's clock offset, last report, newest sample's facts and last refusal), `metricsName` (each filesystem, disk and interface, with when it was first seen), and `server`, `filesystem`, `disk` and `networkInterface` at `TenSeconds`, `Minute` and `Hour`, without row IDs. `MetricsTables` lists every column once; the migration lists its own, and a test checks they agree. Totals such as memory and disk size keep only their average; available memory, space and inodes keep their lowest too.
+- **Processes:** each sample's groups as LZFSE-compressed JSON in `processTenSeconds`, about 1 KB each. Each hour's top 10 by average CPU and by average memory in `processHour`, made by the hourly pass once the hour is past and again when it gained samples.
+- **Rollups** run in the same transaction as the samples, for each minute and hour a request touched. The row made from more samples wins, so a repeat changes nothing, a late sample makes its period again, and a backlog minute never replaces one made from more 10-second rows. Hours weight each minute by its samples.
+- **Limits** (`MetricsReportCheck`): 60 samples and 120 minutes, 4 MB a request (`too-large`, added to `ScoutRefusal`), 32 filesystems, disks and interfaces and 20 process groups a sample, 50 new names a server a day, 60 requests a server a minute (429), names up to 255 bytes without control characters, shares within 0–1 and rates within 0–10¹⁵. A sample more than 5 minutes ahead of Hive's clock or of Scout's `sentAt` is `clock-ahead`; samples over a day old are left out, and a request holding only those is `too-old`. Hive answers 503 when it couldn't keep them, which Scout counts as unreachable and sends again.
+- **Last seen** stays on the `scout` row in Hive's store, written at sign-in, every 15 minutes; everything per request is in `metricsServer`.
+- **Removing a server** deletes its metrics, and the hourly pass removes any a failure left behind. Removing only its Scout keeps them.
+- **Measured** with a year of made-up data for one server: 32 MB, matching §6. Keeping one sample takes under 1 ms, a 60-sample batch about 12 ms, and the hourly pass about 10 ms.

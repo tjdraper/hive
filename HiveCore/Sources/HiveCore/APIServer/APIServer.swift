@@ -38,6 +38,7 @@ public struct APIServer: Sendable {
             .init(service: SchedulingService(scheduler: api.scheduler, runs: api.runs)),
             .init(service: AlertService(monitor: api.alerts)),
             .init(service: RecoveryFileService(writer: api.recoveryFiles)),
+            .init(service: MetricsUpkeepService(upkeep: api.metricsUpkeep)),
             .init(service: RestartService(restart: api.restart), successTerminationBehavior: .gracefullyShutdownGroup),
         ]
         if let watcher = api.replacementWatcher {
@@ -77,6 +78,7 @@ public struct APIServer: Sendable {
         AuditLogRoutes.add(to: router, auditLog: api.auditLog)
         ServerRoutes.add(to: router, workflow: api.servers, confirmations: api.confirmations)
         ScoutRoutes.add(to: router, windows: api.enrollmentWindow, removal: api.scoutRemoval, confirmations: api.confirmations)
+        MetricsRoutes.add(to: router, workflow: api.metricsReports)
         ServerSpaceRoutes.add(to: router, reader: api.serverSpace)
         RemovalEstimateRoutes.add(to: router, estimator: api.removalEstimator)
         BackupJobRoutes.add(to: router, workflow: api.jobs, confirmations: api.confirmations)
@@ -145,6 +147,16 @@ private struct RecoveryFileService: Service {
     func run() async throws {
         await cancelWhenGracefulShutdown {
             await writer.run()
+        }
+    }
+}
+
+private struct MetricsUpkeepService: Service {
+    let upkeep: MetricsUpkeep
+
+    func run() async throws {
+        await cancelWhenGracefulShutdown {
+            await upkeep.run()
         }
     }
 }

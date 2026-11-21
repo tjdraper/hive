@@ -10,6 +10,8 @@ struct ServerWorkflow: Sendable {
     let sealer: SecretSealer
     /// Removing a server removes its Scout with it, whose sessions end at once.
     let sessions: SessionStore
+    /// Removing a server removes its metrics history too (§2).
+    let metrics: MetricsStore
     let now: @Sendable () -> Date
 
     func add(_ draft: ServerDraft, by deviceID: UUID) throws -> Server {
@@ -34,6 +36,12 @@ struct ServerWorkflow: Sendable {
     func remove(id: UUID, by deviceID: UUID) throws -> Bool {
         guard try store.remove(id: id, by: deviceID, at: now()) != nil else { return false }
         sessions.endScoutSessions(forServer: id)
+        do {
+            try metrics.remove(forServer: id)
+        } catch {
+            // The hourly upkeep removes them instead.
+            Self.logger.error("Couldn't remove a removed server's metrics: \(String(describing: error), privacy: .public)")
+        }
         Self.logger.notice("Removed a server and its jobs from the configuration")
         return true
     }

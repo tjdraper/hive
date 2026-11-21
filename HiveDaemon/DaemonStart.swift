@@ -24,7 +24,7 @@ enum DaemonStart {
             let listeners = ListenerCoordinator(target: try settings.settings().listenTarget(hiveID: hiveID))
             let pin = PublicKeyPin(publicKey: keys.identity.publicKey)
 
-            let api = HiveAPI(
+            let api = try HiveAPI(
                 hiveID: hiveID,
                 pin: pin,
                 database: database,
