@@ -27,7 +27,7 @@ struct WatchLoop {
         while true {
             let mark = SampleSchedule.nextMark(after: SampleSchedule.now())
             try await ScoutEventLoop.shared.sleep(untilWallClock: mark)
-            let sample = sampler.sample(takenAt: mark / 1_000_000_000)
+            let sample = await sampler.sample(takenAt: mark / 1_000_000_000)
             Console.print(try encoder.encode(sample))
             marks.yield()
         }

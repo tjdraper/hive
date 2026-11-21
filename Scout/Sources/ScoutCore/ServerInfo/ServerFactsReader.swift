@@ -4,18 +4,19 @@ import ScoutProtocol
 struct ServerFactsReader {
     let files: SystemFiles
 
-    func read() -> ServerFacts {
+    func read(processesHidden: Bool) -> ServerFacts {
         ServerFacts(
             uptimeSeconds: files.text(at: "/proc/uptime").flatMap(Self.uptime(parsing:)),
             distribution: osRelease()?.distribution,
-            kernel: files.text(at: "/proc/sys/kernel/osrelease")?.split(whereSeparator: \.isNewline).first.map(String.init),
-            scoutVersion: ScoutRelease.version
+            kernel: files.text(at: "/proc/sys/kernel/osrelease")?.lines.first.map(String.init),
+            scoutVersion: ScoutRelease.version,
+            processesHidden: processesHidden
         )
     }
 
     /// The first of `/proc/uptime`'s two figures, seconds since the server started.
     static func uptime(parsing text: String) -> Double? {
-        text.split(separator: " ").first.flatMap { Double($0) }
+        text.split(byte: " ").first.flatMap { Double($0) }
     }
 
     /// `/etc/os-release` is the standard place, and `/usr/lib/os-release` where a distribution has no copy in `/etc`.

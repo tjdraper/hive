@@ -105,15 +105,22 @@ measure() {
         pid=\$(systemctl show -p MainPID --value hive-scout-measure)
         [[ \$pid != 0 ]] || { journalctl -u hive-scout-measure --no-pager | tail -n 20; exit 1; }
         ticks_per_second=\$(getconf CLK_TCK)
-        cpu_ticks() { awk '{ print \$14 + \$15 }' /proc/\$pid/stat; }
-        start_ticks=\$(cpu_ticks)
+        user_ticks() { awk '{ print \$14 }' /proc/\$pid/stat; }
+        system_ticks() { awk '{ print \$15 }' /proc/\$pid/stat; }
+        start_user=\$(user_ticks)
+        start_system=\$(system_ticks)
         start=\$(date +%s.%N)
         sleep $seconds
-        end_ticks=\$(cpu_ticks)
+        end_user=\$(user_ticks)
+        end_system=\$(system_ticks)
         end=\$(date +%s.%N)
         echo \"processes: \$(ls /proc | grep -c '^[0-9]'), containers: \$(docker ps -q | wc -l)\"
-        awk -v ticks=\$((end_ticks - start_ticks)) -v hz=\$ticks_per_second -v start=\$start -v end=\$end \
-            'BEGIN { printf \"cpu: %.3f%% of one core over %.0f seconds\n\", ticks / hz / (end - start) * 100, end - start }'
+        awk -v user=\$((end_user - start_user)) -v kernel=\$((end_system - start_system)) -v hz=\$ticks_per_second \
+            -v start=\$start -v end=\$end 'BEGIN {
+                seconds = end - start
+                printf \"cpu: %.3f%% of one core over %.0f seconds (user %.3f%%, system %.3f%%)\n\",
+                    (user + kernel) / hz / seconds * 100, seconds, user / hz / seconds * 100, kernel / hz / seconds * 100
+            }'
         grep -E '^(VmRSS|VmHWM|RssAnon|RssFile|Threads)' /proc/\$pid/status
         echo 'journal, this run:'
         invocation=\$(systemctl show -p InvocationID --value hive-scout-measure)

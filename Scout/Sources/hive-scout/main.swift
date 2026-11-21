@@ -17,10 +17,12 @@ guard let command = ScoutCommand(arguments: Array(CommandLine.arguments.dropFirs
 
 switch command {
 case .sample:
-    var sampler = Sampler()
+    let sample = try await ScoutEventLoop.shared.run {
+        var sampler = Sampler()
+        return await sampler.sample(takenAt: SampleSchedule.now() / 1_000_000_000)
+    }
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-    let sample = sampler.sample(takenAt: SampleSchedule.now() / 1_000_000_000)
     Console.print(try encoder.encode(sample))
 case .watch(let target):
     do {

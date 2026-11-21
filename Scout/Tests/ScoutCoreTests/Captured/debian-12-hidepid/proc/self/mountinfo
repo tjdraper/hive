@@ -1,0 +1,11 @@
+3877 3692 0:368 / / rw,relatime - overlay overlay rw,lowerdir=/var/lib/docker/overlay2/l/KHGRUUUHFY3TRQHT2SNFZ3DO4B:/var/lib/docker/overlay2/l/TDFXORMHUG4EY4HU6IO7F2AXUT,upperdir=/var/lib/docker/overlay2/a7c3d5305d98964cde6a94c4320127d5ddec769f80d857cbda72682302f3751a/diff,workdir=/var/lib/docker/overlay2/a7c3d5305d98964cde6a94c4320127d5ddec769f80d857cbda72682302f3751a/work
+3879 3877 0:542 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw,hidepid=invisible
+3880 3877 0:543 / /dev rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755
+3881 3880 0:544 / /dev/pts rw,nosuid,noexec,relatime - devpts devpts rw,gid=5,mode=620,ptmxmode=666
+3882 3877 0:545 / /sys rw,nosuid,nodev,noexec,relatime - sysfs sysfs rw
+3883 3882 0:32 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw,nsdelegate
+3884 3880 0:540 / /dev/mqueue rw,nosuid,nodev,noexec,relatime - mqueue mqueue rw
+3885 3880 0:546 / /dev/shm rw,nosuid,nodev,noexec,relatime - tmpfs shm rw,size=4097024k
+3886 3877 0:38 /docker/containers/ce27b5155656df5efc912acce73a34b41fc702a8b35bb99271f850769989be9c/hostname /etc/hostname rw,noatime - btrfs /dev/vdb1 rw,nodatasum,nodatacow,ssd,discard,space_cache=v2,subvolid=256,subvol=/docker
+3887 3877 0:38 /docker/containers/ce27b5155656df5efc912acce73a34b41fc702a8b35bb99271f850769989be9c/hosts /etc/hosts rw,noatime - btrfs /dev/vdb1 rw,nodatasum,nodatacow,ssd,discard,space_cache=v2,subvolid=256,subvol=/docker
+3888 3877 0:38 /docker/containers/ce27b5155656df5efc912acce73a34b41fc702a8b35bb99271f850769989be9c/resolv.conf /etc/resolv.conf rw,noatime - btrfs /dev/vdb1 rw,nodatasum,nodatacow,ssd,discard,space_cache=v2,subvolid=256,subvol=/docker

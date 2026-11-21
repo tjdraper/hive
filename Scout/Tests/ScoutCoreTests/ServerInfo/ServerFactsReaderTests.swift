@@ -17,7 +17,7 @@ struct ServerFactsReaderTests {
         let reader = ServerFactsReader(files: server.files)
 
         // Act
-        let facts = reader.read()
+        let facts = reader.read(processesHidden: false)
 
         // Assert
         #expect(facts.distribution == expected)
@@ -32,7 +32,7 @@ struct ServerFactsReaderTests {
         let reader = ServerFactsReader(files: SystemFiles(root: "/nonexistent-scout-test-root"))
 
         // Act
-        let facts = reader.read()
+        let facts = reader.read(processesHidden: false)
 
         // Assert
         #expect(facts.uptimeSeconds == nil)

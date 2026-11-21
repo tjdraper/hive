@@ -5,11 +5,14 @@ public struct ServerFacts: Codable, Hashable, Sendable {
     public var distribution: String?
     public var kernel: String?
     public var scoutVersion: String
+    /// `/proc` is mounted with `hidepid`, so Scout can't see other users' processes and sends none.
+    public var processesHidden: Bool
 
-    public init(uptimeSeconds: Double?, distribution: String?, kernel: String?, scoutVersion: String) {
+    public init(uptimeSeconds: Double?, distribution: String?, kernel: String?, scoutVersion: String, processesHidden: Bool) {
         self.uptimeSeconds = uptimeSeconds
         self.distribution = distribution
         self.kernel = kernel
         self.scoutVersion = scoutVersion
+        self.processesHidden = processesHidden
     }
 }
