@@ -31,3 +31,22 @@ References like §2 point to [00-Info.md](00-Info.md). Read §12 on pairing, sig
 - Scout refuses a Hive showing another key, and an expired or used code
 
 **Done when:** with a code opened from Beekeeper's Developer window, `hive-scout enroll` in the test VM reaches the development Hive at the Mac's address, enrolls, and signs in; the window and the enrollment show in the audit log; and the tests pass.
+
+## Session 1
+
+Done: everything above. `Scripts/build-and-test.sh` passes.
+
+Checked end to end (2026-11-21): with a code opened from Beekeeper's Developer window, `hive-scout enroll` as `hive-scout` in the test VM reached the development Hive at `host.orb.internal:4484`, enrolled and signed in. Its key file is `0600` and owned by `hive-scout`. Hive recorded the Scout with its version and platform (`0.1.0`, `linux-aarch64`), and the audit log has the window opening and the Scout enrolling. The same code used again was refused, and Hive logged it as no window open.
+
+What was decided along the way:
+
+- **Scout's wire types are in `ScoutProtocol`,** which HiveCore now depends on by path: `EnrollmentCode`, the enrollment and sign-in messages, `ScoutEndpoint` and `ScoutProtocolVersion` (1; Hive accepts it and the one before). Beekeeper's side, the window and the audit events, is in HiveKit.
+- **Devices and Scouts share the open routes,** and Hive tells them apart by what the body holds: a Scout's enrollment sends `scoutPublicKey` and its sign-in `scoutID`. A token opens only its own kind of window, so a device's token sent as a Scout's is a wrong token, and the other way round. Scouts share the pairing lockout, and the sign-in challenges and lockouts. A Scout signs a statement with a label of its own, so a device's signature never signs a Scout in.
+- **The gate matches a Scout's routes exactly,** like the open routes (`RequestGate.scoutRoutes`, only `GET /scout/session` for now), since several device routes, such as `GET /servers`, don't check the device themselves. A device's session is refused on any path whose first part is `scout`. Both refusals answer 403.
+- **Audit events are `AuditEvent.scout`** with a `ScoutChange`: window opened, closed, a Scout enrolled (and whether it replaced one), and removed. Enrolling is recorded as made by the device that opened the window, which has to still be paired.
+- **`DELETE /servers/:id/scout`** removes a server's Scout and ends its sessions, for B2's Remove Metrics. Removing the server removes its Scout with it.
+- **Scouts stay in the store after Regenerate Identity,** so B2 can say which servers need to enroll again. Their Scouts refuse the new key by its pin.
+- **Scout keeps its enrollment in `enrollment.json`** in its state folder, `/var/lib/hive-scout` unless `--state-directory` gives another, `0600`, written beside it and renamed into place, never through a symbolic link. Enrolling checks the folder can be written before it uses up the code.
+- **`ScoutSessionKeeper`** signs in again a minute before a session runs out. A3's `run` uses it.
+- **Beekeeper's Developer window** sends through the confirmation workflow, asking for Touch ID when Hive answers 428, so it can open enrollment windows.
+- **Left for A4:** a running Scout reloading its enrollment on SIGHUP, since `run` doesn't exist until A3.

@@ -1,6 +1,7 @@
 import Foundation
 import HiveKit
 import Hummingbird
+import ScoutProtocol
 
 enum PairingRoutes {
     /// Far more than a pairing needs, so a stranger can't make Hive read a large body.
@@ -10,6 +11,7 @@ enum PairingRoutes {
         to router: Router<HiveRequestContext>,
         windows: PairingWindowWorkflow,
         pairing: CodePairingWorkflow,
+        enrollment: ScoutEnrollmentWorkflow,
         confirmations: ConfirmationVerifier
     ) {
         router.post(RouterPath(HiveEndpoint.pairingWindow)) { request, context in
@@ -32,12 +34,18 @@ enum PairingRoutes {
             return JSONResponse(status: .noContent)
         }
 
-        // Open to devices that aren't signed in: the gate lets it through.
+        // Open to devices and Scouts that aren't signed in: the gate lets it through. A Scout's request
+        // goes only to Scouts' windows, and a device's only to the pairing window, so neither's token
+        // opens the other's.
         router.post(RouterPath(HiveEndpoint.pairing)) { request, context in
-            let body = try await request.body.collect(upTo: largestBody)
-            let pairingRequest = try? JSONDecoder().decode(PairingRequest.self, from: Data(body.readableBytesView))
+            let body = Data(try await request.body.collect(upTo: largestBody).readableBytesView)
+            let address = ClientAddress(context.remoteAddress)
+            if let scoutRequest = try? JSONDecoder().decode(ScoutEnrollmentRequest.self, from: body) {
+                return try answer(enrollment.enroll(scoutRequest, from: address))
+            }
+            let pairingRequest = try? JSONDecoder().decode(PairingRequest.self, from: body)
 
-            switch pairing.pair(pairingRequest, from: ClientAddress(context.remoteAddress)) {
+            switch pairing.pair(pairingRequest, from: address) {
             case .paired(let result):
                 return try JSONResponse(result)
             case .refused:
@@ -51,6 +59,23 @@ enum PairingRoutes {
             case .incompatible(let outdated):
                 return try JSONResponse(APIVersionMismatch(update: outdated, hiveAPIVersions: pairing.apiVersions), status: .conflict)
             }
+        }
+    }
+
+    private static func answer(_ outcome: ScoutEnrollmentOutcome) throws -> JSONResponse {
+        switch outcome {
+        case .enrolled(let enrollment):
+            try JSONResponse(enrollment)
+        case .refused:
+            JSONResponse(status: .notFound)
+        case .invalid(.storeUnavailable):
+            JSONResponse(status: .internalServerError)
+        case .invalid:
+            JSONResponse(status: .unprocessableContent)
+        case .lockedOut:
+            JSONResponse(status: .tooManyRequests)
+        case .incompatible:
+            try JSONResponse(ScoutProtocolMismatch(hiveProtocolVersion: ScoutProtocolVersion.current), status: .conflict)
         }
     }
 }

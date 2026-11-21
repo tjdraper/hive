@@ -65,6 +65,7 @@ enum HiveDatabaseMigrator {
         migrator.registerMigration("Add address options", migrate: addAddressOptions)
         migrator.registerMigration("Add advertising on the local network", migrate: addLocalNetworkAdvertising)
         migrator.registerMigration("Add the builds devices report", migrate: addDeviceBuilds)
+        migrator.registerMigration("Add Scouts", migrate: addScouts)
 
         return migrator
     }
@@ -348,6 +349,20 @@ extension HiveDatabaseMigrator {
         }
         try database.alter(table: "hive") { table in
             table.add(column: "sendsBuildExpiryWarnings", .boolean).notNull().defaults(to: true)
+        }
+    }
+
+    static func addScouts(_ database: Database) throws {
+        try database.create(table: "scout") { table in
+            table.primaryKey("id", .blob)
+            // One for each server. Removing the server removes its Scout.
+            table.column("serverID", .blob).notNull().unique().references("server", onDelete: .cascade)
+            // The X9.63 form of its P-256 key.
+            table.column("publicKey", .blob).notNull().unique()
+            table.column("enrolledAt", .datetime).notNull()
+            table.column("lastSeenAt", .datetime)
+            table.column("version", .text)
+            table.column("platform", .text)
         }
     }
 }

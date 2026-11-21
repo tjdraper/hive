@@ -108,7 +108,9 @@ Hive treats every network, the tailnet included, as the open internet. These rul
 - No plain HTTP listener, option or fallback. TLS always ends at Hive.
 - Never skip or loosen Beekeeper's public key pin, and never accept a changed Hive key without the user pairing again.
 - Never use `StrictHostKeyChecking=no` or otherwise accept an unknown or changed SSH host key without the user's confirmation.
-- Nothing new may be reachable without authentication. Only the challenge endpoint, the pairing endpoint (while a pairing window is open) and the health check answer unauthenticated requests.
+- Nothing new may be reachable without authentication. Only the challenge endpoint, the pairing endpoint (while a pairing or enrollment window is open) and the health check answer unauthenticated requests.
+- Scout never listens on a port, and never runs, reads or changes anything because Hive asked over its connection. Hive's answers to it carry only acknowledgements and refusals.
+- A Scout's session reaches only Scout's routes, for its own server, and a device's session never reaches them.
 - Secrets are write-only. No API response, log, error message or plaintext file may contain one.
 - Anything that deletes backups, sends a secret somewhere new, or gives a new device access (the list is in the plan's §6) requires the `.userPresence` key, and every change made through the API is recorded in the audit log.
 - Changing where a secret is sent, such as a server's host or the SMTP host, clears that secret so it has to be entered again.

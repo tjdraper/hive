@@ -9,6 +9,7 @@ import Glibc
 import Musl
 #endif
 import ScoutCore
+import ScoutProtocol
 
 guard let command = ScoutCommand(arguments: Array(CommandLine.arguments.dropFirst())) else {
     Console.log(ScoutCommand.usage)
@@ -31,6 +32,21 @@ case .watch(let target):
         exit(1)
     } catch {
         Console.log("Stopped: \(error)")
+        exit(1)
+    }
+case .enroll(let stateDirectory):
+    guard let code = CodeInput.read() else {
+        Console.log("That isn't a whole enrollment code. Copy it again from Beekeeper.")
+        exit(65)
+    }
+    do {
+        let store = EnrollmentStore(directory: stateDirectory)
+        let enrollment = try await ScoutEventLoop.shared.run {
+            try await EnrollmentWorkflow(connector: PinnedHiveConnector(), store: store).enroll(with: code)
+        }
+        Console.log("Enrolled with the Hive for server \(enrollment.serverID), and signed in")
+    } catch {
+        Console.log(EnrollmentMessage.text(for: error))
         exit(1)
     }
 }

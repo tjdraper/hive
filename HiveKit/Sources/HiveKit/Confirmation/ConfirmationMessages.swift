@@ -73,6 +73,8 @@ public enum ConfirmationReason: String, Codable, CaseIterable, Hashable, Sendabl
     case sshKeysRotated
     /// Whoever pairs through it gets full access.
     case pairingWindowOpened
+    /// Whoever enrolls through it can send figures for the server.
+    case enrollmentWindowOpened
 }
 
 /// Sent with 428 when a change needs confirming and the request carried none.

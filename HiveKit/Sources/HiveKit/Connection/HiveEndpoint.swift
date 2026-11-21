@@ -120,6 +120,17 @@ public enum HiveEndpoint {
         "\(snapshots)/\(id.uuidString)"
     }
 
+    /// `POST` opens a window for the server's Scout to enroll through, answering with its
+    /// `EnrollmentWindow`. Confirmed. `DELETE` closes it.
+    public static func enrollmentWindow(forServer id: UUID) -> String {
+        "\(server(id))/enrollment-window"
+    }
+
+    /// `DELETE` removes the server's Scout, so it can't sign in again, and ends its sessions.
+    public static func scout(ofServer id: UUID) -> String {
+        "\(server(id))/scout"
+    }
+
     /// `POST` a `QuotaEstimateRequest` for the `RemovalEstimate` of changing the server's quota.
     public static func quotaEstimate(ofServer id: UUID) -> String {
         "\(server(id))/quota-estimate"

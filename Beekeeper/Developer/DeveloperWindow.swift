@@ -3,7 +3,7 @@ import HiveKit
 import SwiftUI
 
 /// Sends any request to a Hive as this device and shows what comes back, for checking routes before
-/// Beekeeper has screens for them.
+/// Beekeeper has screens for them. A request Hive says needs confirming is confirmed and sent again.
 struct DeveloperWindow: View {
     static let id = "developer"
 
@@ -15,7 +15,8 @@ struct DeveloperWindow: View {
     @State private var method = "GET"
     @State private var path = HiveEndpoint.settings
     @State private var requestBody = ""
-    @State private var response: (status: Int, body: String)?
+    /// The status is nil for a success, whose exact code the confirmation workflow doesn't keep.
+    @State private var response: (status: Int?, body: String)?
     @State private var failure: String?
     @State private var isSending = false
 
@@ -51,9 +52,9 @@ struct DeveloperWindow: View {
                 Text("Response")
                     .font(.headline)
                 if let response {
-                    Text("\(response.status)")
+                    Text(response.status.map(String.init) ?? "OK")
                         .font(.body.monospaced())
-                        .foregroundStyle((200 ..< 300).contains(response.status) ? .green : .orange)
+                        .foregroundStyle(response.status == nil ? .green : .orange)
                 }
                 if isSending { ProgressView().controlSize(.small) }
             }
@@ -81,8 +82,11 @@ struct DeveloperWindow: View {
         let body = sendsBody ? Data(requestBody.utf8) : nil
         let path = path
         do {
-            let answer = try await link.perform { try await $0.send(method: method, path: path, body: body) }
-            response = (answer.status, Self.pretty(answer.body))
+            let answer = try await link.confirmed(method, path, encodedBody: body, reason: nil)
+            response = (nil, Self.pretty(answer))
+            failure = nil
+        } catch let refused as HiveRequestError {
+            response = (refused.status, Self.pretty(refused.body))
             failure = nil
         } catch {
             response = nil

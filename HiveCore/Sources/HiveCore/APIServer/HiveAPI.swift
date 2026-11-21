@@ -16,7 +16,9 @@ public struct HiveAPI: Sendable {
     /// The port and address options, each time either changes.
     let addressChanges = Broadcaster<HiveAddresses>()
     let pairingWindows = PairingWindowStore()
-    /// Kept for as long as Hive runs, so failures count across requests.
+    let enrollmentWindows = EnrollmentWindowStore()
+    /// Kept for as long as Hive runs, so failures count across requests. Devices pairing and Scouts
+    /// enrolling share it, as they share the route.
     let pairingLimiter = FailedAttemptLimiter<ClientAddress>(policy: .pairing)
     let hostKeys: HostKeyWorkflow
     let connectionTest: ConnectionTestWorkflow
@@ -238,7 +240,7 @@ public struct HiveAPI: Sendable {
             suggestions: SuggestedHostResolver(naming: hostNaming), addressChanges: addressChanges, now: now
         )
         let servers = ServerStore(database: database)
-        self.servers = ServerWorkflow(store: servers, sealer: sealer, now: now)
+        self.servers = ServerWorkflow(store: servers, sealer: sealer, sessions: signIn.sessions, now: now)
         let schedule = ScheduleCalendar(calendar: calendar)
         jobs = BackupJobWorkflow(store: BackupJobStore(database: database), sealer: sealer, schedule: schedule, now: now)
         self.addresses = addresses

@@ -58,10 +58,16 @@ public struct APIServer: Sendable {
         router.get(RouterPath(HiveEndpoint.health)) { _, _ in
             HTTPResponse.Status.noContent
         }
-        SignInRoutes.add(to: router, workflow: api.signIn)
+        SignInRoutes.add(to: router, workflow: api.signIn, scouts: api.scoutSignIn)
         OverviewRoutes.add(to: router, api: api)
         DeviceRoutes.add(to: router, devices: api.devices, revocation: api.revocation)
-        PairingRoutes.add(to: router, windows: api.pairingWindow, pairing: api.codePairing, confirmations: api.confirmations)
+        PairingRoutes.add(
+            to: router,
+            windows: api.pairingWindow,
+            pairing: api.codePairing,
+            enrollment: api.scoutEnrollment,
+            confirmations: api.confirmations
+        )
         ConfirmationRoutes.add(to: router, verifier: api.confirmations)
         IdentityRoutes.add(to: router, workflow: api.identity, confirmations: api.confirmations)
         SettingsRoutes.add(to: router, workflow: api.settings)
@@ -70,6 +76,7 @@ public struct APIServer: Sendable {
         RestoreRoutes.add(to: router, api: api)
         AuditLogRoutes.add(to: router, auditLog: api.auditLog)
         ServerRoutes.add(to: router, workflow: api.servers, confirmations: api.confirmations)
+        ScoutRoutes.add(to: router, windows: api.enrollmentWindow, removal: api.scoutRemoval, confirmations: api.confirmations)
         ServerSpaceRoutes.add(to: router, reader: api.serverSpace)
         RemovalEstimateRoutes.add(to: router, estimator: api.removalEstimator)
         BackupJobRoutes.add(to: router, workflow: api.jobs, confirmations: api.confirmations)

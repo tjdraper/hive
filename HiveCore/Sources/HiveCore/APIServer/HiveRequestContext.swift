@@ -5,9 +5,12 @@ import NIOCore
 struct HiveRequestContext: RequestContext {
     var coreContext: CoreRequestContextStorage
     let remoteAddress: SocketAddress?
-    /// Set by `RequestGate` for every request that isn't to an open route.
+    /// Set by `RequestGate` for every request with a device's session.
     var signedInDeviceID: UUID?
-    /// Set with `signedInDeviceID`, for a response that outlasts the request to check it's still good.
+    /// Set by `RequestGate` instead of `signedInDeviceID` for a Scout's session, which reaches only Scout's routes.
+    var signedInScout: SignedInScout?
+    /// Set with `signedInDeviceID` or `signedInScout`, for a response that outlasts the request to
+    /// check it's still good.
     var sessionToken: String?
 
     init(source: ApplicationRequestContextSource) {

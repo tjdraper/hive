@@ -19,6 +19,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../HiveKit"),
+        .package(path: "../Scout"),
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.12.0"),
         .package(url: "https://github.com/hummingbird-project/hummingbird", from: "2.28.1"),
         .package(url: "https://github.com/apple/swift-asn1", from: "1.7.4"),
@@ -34,6 +35,7 @@ let package = Package(
             name: "HiveCore",
             dependencies: [
                 "HiveKit",
+                .product(name: "ScoutProtocol", package: "Scout"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "HummingbirdTLS", package: "hummingbird"),
@@ -54,6 +56,7 @@ let package = Package(
             dependencies: [
                 "HiveCore",
                 "HiveKit",
+                .product(name: "ScoutProtocol", package: "Scout"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "HummingbirdTesting", package: "hummingbird"),
                 .product(name: "NIOCore", package: "swift-nio"),

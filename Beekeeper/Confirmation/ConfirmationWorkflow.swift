@@ -155,6 +155,7 @@ extension ConfirmationReason {
         case .retentionStarted: "start retention and quotas again, which removes snapshots"
         case .sshKeysRotated: "give every server a new SSH key, removing the old ones"
         case .pairingWindowOpened: "let a new device pair with the Hive, giving it full access"
+        case .enrollmentWindowOpened: "let a Scout enroll to send a server's figures"
         }
     }
 }

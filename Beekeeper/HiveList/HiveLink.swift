@@ -128,9 +128,14 @@ final class HiveLink {
     /// For a request whose answer has no body.
     @discardableResult
     func confirmed(_ method: String, _ path: String, body: (some Encodable)? = String?.none, reason: String?) async throws -> Data {
-        let encoded = try body.map { try JSONEncoder().encode($0) }
+        try await confirmed(method, path, encodedBody: body.map { try JSONEncoder().encode($0) }, reason: reason)
+    }
+
+    /// For a body that's already encoded, such as one typed into the Developer window.
+    @discardableResult
+    func confirmed(_ method: String, _ path: String, encodedBody: Data?, reason: String?) async throws -> Data {
         let workflow = ConfirmationWorkflow(hiveID: hiveID, keychain: keychain)
-        return try await perform { try await workflow.send(method: method, path: path, body: encoded, reason: reason, on: $0) }
+        return try await perform { try await workflow.send(method: method, path: path, body: encodedBody, reason: reason, on: $0) }
     }
 
     /// The Hive's live updates, until it ends them, such as when the session runs out.

@@ -36,6 +36,8 @@ public enum AuditEvent: Codable, Hashable, Sendable {
     case buildExpiryWarningsChanged(isOn: Bool)
     /// The server's name as it was after the change.
     case server(serverID: UUID, serverName: String, change: ServerChange)
+    /// The server's name when it happened.
+    case scout(serverID: UUID, serverName: String, change: ScoutChange)
     /// The names as they were after the change.
     case backupJob(jobID: UUID, serverName: String, jobName: String, change: BackupJobChange)
     case backupDriveChosen(old: BackupDriveIdentity?, new: BackupDriveIdentity)
@@ -90,6 +92,19 @@ public enum ServerChange: Codable, Hashable, Sendable {
     /// Fingerprints. Hive added the new key to the server's `authorized_keys` and checked it works.
     case sshKeyRotated(old: String, new: String)
     /// Its configuration only. Its snapshots stay on the backup drive.
+    case removed
+}
+
+/// A change to the Scout that reports a server's figures.
+public enum ScoutChange: Codable, Hashable, Sendable {
+    /// A window opened for the server's Scout to enroll through, which lasts a few minutes.
+    case enrollmentWindowOpened
+    /// The window was closed before a Scout used it.
+    case enrollmentWindowClosed
+    /// A Scout enrolled through the window the device opened, replacing the server's last one when
+    /// `replacedAnother`.
+    case enrolled(replacedAnother: Bool)
+    /// The server's Scout can no longer sign in, and its sessions ended.
     case removed
 }
 

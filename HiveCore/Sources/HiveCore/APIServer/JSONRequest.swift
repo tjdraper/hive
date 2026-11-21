@@ -22,6 +22,12 @@ extension HiveRequestContext {
         return signedInDeviceID
     }
 
+    /// The Scout that sent the request. `RequestGate` sets it for Scout's routes only.
+    func requireScout() throws -> SignedInScout {
+        guard let signedInScout else { throw HTTPError(.unauthorized) }
+        return signedInScout
+    }
+
     /// The UUID in the route's `:id`, or nil when it isn't one.
     var idParameter: UUID? {
         parameters.get("id").flatMap(UUID.init(uuidString:))

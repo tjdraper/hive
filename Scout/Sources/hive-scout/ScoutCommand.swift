@@ -11,10 +11,13 @@ enum ScoutCommand: Equatable {
     case sample
     /// Prints a sample every 10 seconds, holding a connection to Hive open when given one.
     case watch(HiveTarget?)
+    /// Enrolls with a Hive through a code read from standard input, saving the key in the folder.
+    case enroll(stateDirectory: String)
 
     static let usage = """
         usage: hive-scout sample
                hive-scout watch [--tls <host>:<port> --pin <SHA-256 of Hive's key, in hex>]
+               hive-scout enroll [--state-directory <path>] < code
         """
 
     init?(arguments: [String]) {
@@ -24,6 +27,14 @@ enum ScoutCommand: Equatable {
         case "watch":
             guard let target = Self.hiveTarget(from: arguments.dropFirst()) else { return nil }
             self = .watch(target)
+        case "enroll":
+            // Never the code itself, which an argument would show in `ps`, `sudo`'s log and the journal.
+            switch arguments.count {
+            case 1: self = .enroll(stateDirectory: EnrollmentStore.defaultDirectory)
+            case 3 where arguments[1] == "--state-directory" && arguments[2].hasPrefix("/"):
+                self = .enroll(stateDirectory: arguments[2])
+            default: return nil
+            }
         default:
             return nil
         }

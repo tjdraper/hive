@@ -8,6 +8,8 @@ struct ServerWorkflow: Sendable {
 
     let store: ServerStore
     let sealer: SecretSealer
+    /// Removing a server removes its Scout with it, whose sessions end at once.
+    let sessions: SessionStore
     let now: @Sendable () -> Date
 
     func add(_ draft: ServerDraft, by deviceID: UUID) throws -> Server {
@@ -31,6 +33,7 @@ struct ServerWorkflow: Sendable {
 
     func remove(id: UUID, by deviceID: UUID) throws -> Bool {
         guard try store.remove(id: id, by: deviceID, at: now()) != nil else { return false }
+        sessions.endScoutSessions(forServer: id)
         Self.logger.notice("Removed a server and its jobs from the configuration")
         return true
     }

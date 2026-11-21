@@ -22,6 +22,20 @@ struct ScoutCommandTests {
         #expect(ScoutCommand(arguments: ["watch", "--tls", "100.64.0.1:4484", "--pin", "not-a-pin"]) == nil)
     }
 
+    @Test("Enroll reads its code from standard input, and takes only a state folder as an argument")
+    func enroll() {
+        #expect(ScoutCommand(arguments: ["enroll"]) == .enroll(stateDirectory: "/var/lib/hive-scout"))
+        #expect(ScoutCommand(arguments: ["enroll", "--state-directory", "/tmp/scout"]) == .enroll(stateDirectory: "/tmp/scout"))
+    }
+
+    @Test("A code given as an argument is refused, so it never shows in `ps` or the journal")
+    func enrollRefusesCodeArgument() {
+        #expect(ScoutCommand(arguments: ["enroll", "scout1:AQIDBAUG"]) == nil)
+        #expect(ScoutCommand(arguments: ["enroll", "--code", "scout1:AQIDBAUG"]) == nil)
+        #expect(ScoutCommand(arguments: ["enroll", "--state-directory", "relative/folder"]) == nil)
+        #expect(ScoutCommand(arguments: ["enroll", "--state-directory", "/tmp/scout", "scout1:AQIDBAUG"]) == nil)
+    }
+
     @Test("Unknown commands and extra arguments are refused")
     func unknown() {
         #expect(ScoutCommand(arguments: []) == nil)

@@ -30,6 +30,8 @@ extension AuditEvent {
             isOn ? "Turned on build expiry warnings" : "Turned off build expiry warnings"
         case .server(_, let serverName, let change):
             change.summary(serverName: serverName)
+        case .scout(_, let serverName, let change):
+            change.summary(serverName: serverName)
         case .backupJob(_, let serverName, let jobName, let change):
             change.summary(job: "“\(jobName)” on “\(serverName)”")
         case .backupDriveChosen(nil, let new):
@@ -93,6 +95,23 @@ extension SnapshotDeletion {
             "Deleted \(SnapshotCount(count)) of “\(jobName)” on “\(serverName)”"
         case .server(_, let serverName, let count):
             "Deleted \(SnapshotCount(count)) of “\(serverName)”"
+        }
+    }
+}
+
+extension ScoutChange {
+    func summary(serverName: String) -> String {
+        switch self {
+        case .enrollmentWindowOpened:
+            "Opened a window for a Scout on “\(serverName)” to enroll"
+        case .enrollmentWindowClosed:
+            "Closed the enrollment window for “\(serverName)” before a Scout used it"
+        case .enrolled(replacedAnother: false):
+            "A Scout on “\(serverName)” enrolled"
+        case .enrolled(replacedAnother: true):
+            "A Scout on “\(serverName)” enrolled, replacing its last one"
+        case .removed:
+            "Removed the Scout on “\(serverName)”, which can no longer send"
         }
     }
 }
