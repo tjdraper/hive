@@ -74,7 +74,7 @@ public struct ScoutSessionKeeper {
             challenge: challenge.challenge,
             signature: try enrollment.signingKey().signature(for: statement).rawRepresentation,
             protocolVersion: ScoutProtocolVersion.current,
-            scoutVersion: ScoutRelease.version,
+            scoutVersion: ScoutRelease.version.description,
             platform: ScoutRelease.platform
         )
         let answer = try await connection.send("POST", ScoutEndpoint.signIn, body: Array(JSONEncoder().encode(request)), token: nil)

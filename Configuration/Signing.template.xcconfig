@@ -14,3 +14,8 @@ UPDATES_SITE =
 
 // The public half of the Sparkle signing key, as printed by Scripts/sparkle-tools.sh generate_keys -p.
 UPDATES_PUBLIC_KEY =
+
+// The public half of Scout's development key, as printed by Scripts/sparkle-tools.sh generate_keys
+// --account hive-scout-development -p. A Scout built by Scripts/release.sh takes updates signed with
+// the Sparkle key above only, and any other build with this key only.
+SCOUT_DEVELOPMENT_PUBLIC_KEY =

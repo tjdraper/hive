@@ -64,6 +64,16 @@ struct ScoutCommandTests {
         #expect(ScoutCommand(arguments: ["uninstall", "--ssh-user", "deploy"]) == nil)
     }
 
+    @Test("Manage takes no arguments at all, so Scout's sudo and doas rules need to allow none")
+    func manage() {
+        #expect(ScoutCommand(arguments: ["manage"]) == .manage)
+
+        #expect(ScoutCommand(arguments: ["manage", "update"]) == nil)
+        #expect(ScoutCommand(arguments: ["manage", ""]) == nil)
+        #expect(ScoutCommand(arguments: ["manage", "--state-directory", "/tmp/scout"]) == nil)
+        #expect(ScoutCommand(arguments: ["manage", "--ssh-user", "deploy"]) == nil)
+    }
+
     @Test("Unknown commands and extra arguments are refused")
     func unknown() {
         #expect(ScoutCommand(arguments: []) == nil)

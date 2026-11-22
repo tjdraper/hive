@@ -2,8 +2,9 @@
 #
 # Builds a release of Hive and Beekeeper for the Mac under one version: Developer ID exports of both,
 # notarized and stapled, an installer package that puts Hive.app in /Applications owned by root, and the
-# Sparkle zips and appcast entries for both apps. Publishing is left to you: the script prints the
-# commands at the end.
+# Sparkle zips and appcast entries for both apps. Hive.app carries Scout's Linux binaries, built and
+# signed with the Sparkle key, which are also attached to the GitHub release with their SHA-256s.
+# Publishing is left to you: the script prints the commands at the end.
 #
 # With --rehearsal, builds the same things for trying an update on this Mac only. It skips the git
 # checks, leaves the project and docs/ alone, doesn't notarize, and writes its appcasts under
@@ -327,6 +328,18 @@ mkdir -p "$OUTPUT_DIR"
 step "Building the bundled rsync"
 "$REPO_ROOT/Scripts/build-rsync.sh"
 
+step "Building Scout for Linux, signed with the Sparkle key"
+"$REPO_ROOT/Scripts/build-scout.sh" --release
+readonly SCOUT_DIR="$REPO_ROOT/build/scout/linux"
+readonly SCOUT_FILES=(hive-scout-linux-x86_64 hive-scout-linux-aarch64)
+
+# Where the command Beekeeper builds downloads Scout from. A rehearsal has nowhere a server could reach.
+if [[ -n "$REHEARSAL" ]]; then
+    scout_download_url=""
+else
+    scout_download_url="https://github.com/$GITHUB_REPO/releases/download/v$VERSION/"
+fi
+
 if [[ -z "$REHEARSAL" ]]; then
     step "Setting version $VERSION"
     # CFBundleVersion is what Sparkle compares. Keeping it equal to the marketing version leaves one
@@ -346,7 +359,8 @@ for app in "${APPS[@]}"; do
         -archivePath "$WORK_DIR/$app.xcarchive" \
         -allowProvisioningUpdates \
         MARKETING_VERSION="$VERSION" \
-        CURRENT_PROJECT_VERSION="$VERSION"
+        CURRENT_PROJECT_VERSION="$VERSION" \
+        SCOUT_DOWNLOAD_URL="$scout_download_url"
 
     step "Exporting a Developer ID build of $app"
     xcodebuild -exportArchive \
@@ -383,6 +397,35 @@ for embedded in "Contents/MacOS/HiveDaemon" "Contents/MacOS/rsync"; do
     signature="$(codesign --display --verbose=2 "$hive_app/$embedded" 2>&1)"
     grep -q "flags=.*runtime" <<<"$signature" || fail "$embedded in Hive.app isn't signed with the hardened runtime"
 done
+# Each binary is the one its statement and both apps name, and its statement is signed with the Sparkle
+# key, which is the one key a released Scout takes updates from.
+step "Checking Scout's binaries"
+scout_resources="$hive_app/Contents/Resources/Scout"
+for file in "${SCOUT_FILES[@]}"; do
+    binary="$scout_resources/$file"
+    [[ -f "$binary" && -f "$binary.statement" ]] || fail "Hive.app doesn't carry $file and its statement"
+    hash="$(shasum -a 256 "$binary" | cut -d ' ' -f 1)"
+    [[ "$(sed -n 's/^sha256 //p' "$binary.statement")" == "$hash" ]] || fail "$file's statement names another binary"
+    plist_key="ScoutSHA256Linux$(echo "${file##*-linux-}" | sed 's/^x86_64$/X86_64/; s/^aarch64$/Aarch64/')"
+    for app in "${APPS[@]}"; do
+        [[ "$(info_value "$WORK_DIR/export-$app/$app.app" "$plist_key")" == "$hash" ]] || fail "$app's $plist_key isn't $file's hash"
+    done
+    swift - "$SPARKLE_PUBLIC_KEY" "$binary.statement" <<'SWIFT' || fail "$file's statement isn't signed with the Sparkle key"
+import CryptoKit
+import Foundation
+let arguments = CommandLine.arguments
+let key = try Curve25519.Signing.PublicKey(rawRepresentation: Data(base64Encoded: arguments[1])!)
+let lines = try String(contentsOfFile: arguments[2], encoding: .utf8).split(separator: "\n")
+let signed = lines.dropLast().joined(separator: "\n") + "\n"
+let signature = Data(base64Encoded: String(lines.last!.dropFirst("signature ".count)))!
+exit(lines.count == 5 && key.isValidSignature(signature, for: Data(signed.utf8)) ? 0 : 1)
+SWIFT
+done
+for app in "${APPS[@]}"; do
+    [[ "$(info_value "$WORK_DIR/export-$app/$app.app" ScoutDownloadURL)" == "$scout_download_url" ]] \
+        || fail "$app's ScoutDownloadURL isn't '$scout_download_url'"
+done
+
 # The daemon refuses to start from a bundle that anyone but root can change. The installer and Sparkle
 # make root the owner, but keep each file's permissions.
 writable="$(find "$hive_app" -perm -g+w -o -perm -o+w)"
@@ -480,6 +523,18 @@ for app in "${APPS[@]}"; do
     cp "$zip" "$OUTPUT_DIR/"
 done
 
+# --- Scout ------------------------------------------------------------------
+
+step "Adding Scout's binaries to the release"
+# The binaries are attached to the release under the names the command Beekeeper builds downloads.
+(
+    cd "$scout_resources"
+    for file in "${SCOUT_FILES[@]}"; do
+        cp "$file" "$file.statement" "$OUTPUT_DIR/"
+    done
+    shasum -a 256 "${SCOUT_FILES[@]}" > "$OUTPUT_DIR/hive-scout-SHA256SUMS"
+)
+
 # --- Next steps ------------------------------------------------------------
 
 beekeeper_id="$(info_value "$WORK_DIR/export-Beekeeper/Beekeeper.app" CFBundleIdentifier)"
@@ -511,11 +566,12 @@ fi
 
 cat <<EOF
 
-Built and notarized Hive and Beekeeper $VERSION.
+Built and notarized Hive and Beekeeper $VERSION, with Scout $(sed -n 's/^SCOUT_VERSION = //p' "$SCOUT_DIR/Scout.xcconfig").
 
   $PACKAGE
   $OUTPUT_DIR/Hive-$VERSION.zip
   $OUTPUT_DIR/Beekeeper-$VERSION.zip
+  $OUTPUT_DIR/hive-scout-linux-x86_64, -aarch64, their statements, and hive-scout-SHA256SUMS
 
 Publish in this order. The tag lands on the release commit, and the downloads go live before the
 appcasts point at them:
@@ -523,7 +579,7 @@ appcasts point at them:
   git add "$PBXPROJ" docs && git commit -m "Release $VERSION"
   git tag v$VERSION
   git push origin v$VERSION
-  gh release create v$VERSION "$PACKAGE" "$OUTPUT_DIR/Hive-$VERSION.zip" "$OUTPUT_DIR/Beekeeper-$VERSION.zip" --repo $GITHUB_REPO --title "$VERSION" --verify-tag --notes-file $RELEASE_NOTES_PATH
+  gh release create v$VERSION "$PACKAGE" "$OUTPUT_DIR/Hive-$VERSION.zip" "$OUTPUT_DIR/Beekeeper-$VERSION.zip" "$OUTPUT_DIR"/hive-scout-* --repo $GITHUB_REPO --title "$VERSION" --verify-tag --notes-file $RELEASE_NOTES_PATH
   git push
 
 Then send Beekeeper $VERSION for iPhone and iPad to TestFlight from the release commit:

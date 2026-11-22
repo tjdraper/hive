@@ -1,3 +1,6 @@
 // The team ID and bundle ID prefix stay out of the repository. Copy Signing.template.xcconfig to
 // Signing.local.xcconfig, which git ignores, and fill it in.
 #include "Signing.local.xcconfig"
+
+// Scout's version and the SHA-256 of each Linux binary Hive.app carries, from Scripts/build-scout.sh.
+#include? "../build/scout/linux/Scout.xcconfig"

@@ -175,6 +175,34 @@ Hive runs rsync as a separate program, unmodified, under the GNU General Public 
 
 --"
 
+# Hive.app carries Scout's Linux binaries, which link the Static Linux SDK's runtime as well as packages.
+readonly SCOUT_PACKAGES="build/scout/linux/packages"
+[[ -f "$SCOUT_PACKAGES" ]] || fail "no list of Scout's packages at $SCOUT_PACKAGES; run Scripts/build-scout.sh first"
+scout_notice="hive-scout for Linux, in Hive.app at Contents/Resources/Scout, is built with Swift's Static Linux SDK and includes:
+
+Swift's runtime, standard library and Foundation, and LLVM's libunwind and libc++abi
+https://swift.org
+
+Licensed under the Apache License, Version 2.0, at the end of these notices, with the Runtime Library Exception.
+
+--
+
+musl
+https://musl.libc.org
+
+$(cat ThirdParty/scout/musl-COPYRIGHT)
+
+--
+
+mimalloc
+https://github.com/microsoft/mimalloc
+
+$(cat ThirdParty/scout/mimalloc-LICENSE)
+
+--
+
+The Swift packages hive-scout links are listed below with Hive's own."
+
 ios_packages=$(linked_packages "$INTERMEDIATES/Hive.build/Debug-iphonesimulator/Beekeeper.build/Objects-normal/arm64/Beekeeper.LinkFileList"
     embedded_framework_packages "$PRODUCTS/Debug-iphonesimulator/Beekeeper (Debug).app/Frameworks")
 [[ -z "$ios_packages" ]] || fail "Beekeeper for iPhone and iPad links $(echo "$ios_packages" | sorted_unique | tr '\n' ' ')and has nowhere to show their notices"
@@ -187,7 +215,10 @@ trap 'rm -rf "$work_dir"' EXIT
         "$INTERMEDIATES/Hive.build/Debug/Hive.build/Objects-normal/arm64/Hive (Debug).LinkFileList" \
         "$INTERMEDIATES/Hive.build/Debug/HiveDaemon.build/Objects-normal/arm64/HiveDaemon.LinkFileList"
     embedded_framework_packages "$PRODUCTS/Debug/Hive (Debug).app/Contents/Frameworks"
-} | sorted_unique | write_notices "Hive includes the following third-party software." "$rsync_notice" > "$work_dir/Hive.txt"
+    cat "$SCOUT_PACKAGES"
+} | sorted_unique | write_notices "Hive includes the following third-party software." "$rsync_notice
+
+$scout_notice" > "$work_dir/Hive.txt"
 
 {
     linked_packages "$INTERMEDIATES/Hive.build/Debug/Beekeeper.build/Objects-normal/arm64/Beekeeper (Debug).LinkFileList"

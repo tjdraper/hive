@@ -14,6 +14,12 @@
 #                                                    Install Scout as the pasted command does, from
 #                                                    the Linux build of Scripts/build-scout.sh
 #   Scripts/scout-test-vm.sh [--alpine] uninstall    Uninstall Scout
+#   Scripts/scout-test-vm.sh [--alpine] manage status|uninstall
+#   Scripts/scout-test-vm.sh [--alpine] manage update [<folder>]
+#                                                    Send hive-scout manage a request as Hive would, as
+#                                                    deploy through Scout's sudo or doas rule. An update
+#                                                    sends the binary for the machine's CPU and its
+#                                                    statement, from the folder or the Linux build
 #   Scripts/scout-test-vm.sh [--alpine] measure-installed <seconds>
 #                                                    Report the installed service's CPU and memory
 #   Scripts/scout-test-vm.sh [--alpine] delete       Remove the machine
@@ -127,7 +133,7 @@ linux_build() {
     local arch
     # Not reading standard input, which holds the code for install.
     arch=$(orb run -m "$machine" uname -m < /dev/null)
-    local binary="build/scout/$arch/hive-scout"
+    local binary="build/scout/linux/hive-scout-linux-$arch"
     if [[ ! -f $binary ]]; then
         echo "error: $binary is missing; run Scripts/build-scout.sh first" >&2
         exit 1
@@ -192,6 +198,29 @@ uninstall_scout() {
         rm -rf /etc/systemd/system/hive-scout.service.d
         if command -v systemctl > /dev/null; then systemctl daemon-reload; fi
     "
+}
+
+# What Hive does over SSH: one request line on hive-scout manage's standard input, an update's binary
+# after it, run as deploy through Scout's rule, which allows that command and no arguments.
+manage() {
+    local request="${1:-}" folder="${2:-build/scout/linux}" line arch binary
+    local elevate=(sudo -n)
+    if $alpine; then elevate=(doas -n); fi
+    case "$request" in
+        status | uninstall)
+            line=$(jq -cn --arg request "$request" '{request: $request}')
+            echo "$line" | orb run -m "$machine" -u deploy "${elevate[@]}" /usr/local/bin/hive-scout manage
+            ;;
+        update)
+            arch=$(orb run -m "$machine" uname -m < /dev/null)
+            binary="$folder/hive-scout-linux-$arch"
+            [[ -f $binary && -f $binary.statement ]] || { echo "error: no $binary and statement" >&2; exit 1; }
+            line=$(jq -cn --rawfile statement "$binary.statement" --argjson length "$(wc -c < "$binary")" \
+                '{request: "update", statement: $statement, binaryLength: $length}')
+            { echo "$line"; cat "$binary"; } | orb run -m "$machine" -u deploy "${elevate[@]}" /usr/local/bin/hive-scout manage
+            ;;
+        *) echo "usage: manage status|uninstall|update [<folder>]" >&2; exit 64 ;;
+    esac
 }
 
 # Prints the CPU and memory used by the process the given shell command prints the PID of, over
@@ -261,9 +290,10 @@ case "${1:-}" in
     create) if $alpine; then create_alpine; else create_debian; fi ;;
     install) shift; install_scout "$@" ;;
     uninstall) uninstall_scout ;;
+    manage) shift; manage "$@" ;;
     measure-installed) shift; measure_installed "$@" ;;
     copy) copy ;;
     measure) shift; measure "$@" ;;
     delete) orb delete -f "$machine" ;;
-    *) sed -n '3,26p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64 ;;
+    *) sed -n '3,31p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64 ;;
 esac

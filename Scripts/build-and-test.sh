@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Builds the bundled rsync if it isn't yet, Hive for macOS and Beekeeper for macOS and iOS, builds
-# HiveKit for iOS, and runs the HiveKit, HiveCore and Scout tests. Builds Scout for Linux in Docker
-# when Scout changed since that last passed. Fails if any step fails or logs a single warning,
+# Builds the bundled rsync if it isn't yet, Scout for Linux in Docker when Scout changed since that
+# last passed, Hive for macOS and Beekeeper for macOS and iOS, builds HiveKit for iOS, and runs the
+# HiveKit, HiveCore and Scout tests. Fails if any step fails or logs a single warning,
 # SwiftLint's included, or if the apps' third-party notices don't match what they link.
 #
 # Usage: Scripts/build-and-test.sh
@@ -80,6 +80,24 @@ run_step() {
     report "$name" $?
 }
 
+# Hive.app carries Scout's Linux binaries, so they're built first. That needs Docker and takes minutes,
+# so it runs only when Scout changed since it last passed, or the binaries there are a release's.
+printf '%-16s' "scout-linux"
+scout_fingerprint=$(git ls-files -z -co --exclude-standard -- Scout Scripts/build-scout.sh \
+    | xargs -0 shasum -a 256 2> /dev/null | shasum -a 256 | cut -d' ' -f1)
+scout_passed="$build_dir/scout-linux.passed"
+if [[ -f $scout_passed && $(cat "$scout_passed") == "$scout_fingerprint" ]] \
+    && grep -qx 'SCOUT_UPDATE_KEY = development' build/scout/linux/Scout.xcconfig 2> /dev/null; then
+    echo "unchanged"
+elif Scripts/build-scout.sh > "$build_dir/scout-linux.log" 2>&1; then
+    echo "$scout_fingerprint" > "$scout_passed"
+    echo "ok"
+else
+    failed=1
+    echo "FAILED (log: $build_dir/scout-linux.log)"
+    tail -n 20 "$build_dir/scout-linux.log" | sed 's/^/    /'
+fi
+
 run_step hive-macos -scheme Hive -destination "platform=macOS" -configuration Debug build
 run_step beekeeper-macos -scheme Beekeeper -destination "platform=macOS" -configuration Debug build
 run_step beekeeper-ios -scheme Beekeeper -destination "generic/platform=iOS Simulator" -configuration Debug build
@@ -102,22 +120,6 @@ if [[ -x $swiftlint ]]; then
 else
     failed=1
     echo "FAILED: SwiftLint wasn't fetched by the Scout build"
-fi
-
-# The Linux build needs Docker and takes minutes, so it runs only when Scout changed since it last passed.
-printf '%-16s' "scout-linux"
-scout_fingerprint=$(git ls-files -z -co --exclude-standard -- Scout Scripts/build-scout.sh \
-    | xargs -0 shasum -a 256 2> /dev/null | shasum -a 256 | cut -d' ' -f1)
-scout_passed="$build_dir/scout-linux.passed"
-if [[ -f $scout_passed && $(cat "$scout_passed") == "$scout_fingerprint" ]]; then
-    echo "unchanged"
-elif Scripts/build-scout.sh > "$build_dir/scout-linux.log" 2>&1; then
-    echo "$scout_fingerprint" > "$scout_passed"
-    echo "ok"
-else
-    failed=1
-    echo "FAILED (log: $build_dir/scout-linux.log)"
-    tail -n 20 "$build_dir/scout-linux.log" | sed 's/^/    /'
 fi
 
 # Reads what the builds above linked, so only a run whose builds all passed can check it.

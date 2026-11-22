@@ -21,6 +21,9 @@ enum ScoutCommand: Equatable {
     /// input, and lets Hive's SSH user run Scout's management command as root when named.
     case install(sshUser: String?)
     case uninstall
+    /// Carries out one `ManagementRequest` from standard input, run as root by Hive over SSH. It
+    /// takes no arguments, so the `sudo` and `doas` rules allow none.
+    case manage
 
     static let usage = """
         usage: hive-scout sample
@@ -30,6 +33,7 @@ enum ScoutCommand: Equatable {
                hive-scout status [--runtime-directory <path>]
                sudo hive-scout install [--ssh-user <name>] < code
                sudo hive-scout uninstall
+               sudo hive-scout manage < request
         """
 
     init?(arguments: [String]) {
@@ -45,6 +49,8 @@ enum ScoutCommand: Equatable {
             self = .install(sshUser: sshUser)
         case "uninstall" where options.isEmpty:
             self = .uninstall
+        case "manage" where options.isEmpty:
+            self = .manage
         case let name?:
             guard let command = Self.withFolders(name, options: options) else { return nil }
             self = command

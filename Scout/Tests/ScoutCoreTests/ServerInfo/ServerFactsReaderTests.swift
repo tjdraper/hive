@@ -23,7 +23,7 @@ struct ServerFactsReaderTests {
         #expect(facts.distribution == expected)
         #expect(facts.kernel == "7.2.12-orbstack-00394-gbecdd6130068")
         #expect(facts.uptimeSeconds ?? 0 > 100_000)
-        #expect(facts.scoutVersion == ScoutRelease.version)
+        #expect(facts.scoutVersion == ScoutRelease.version.description)
     }
 
     @Test("A server without its files still gives a sample, with those figures left out")

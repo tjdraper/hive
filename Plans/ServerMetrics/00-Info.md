@@ -14,7 +14,7 @@ Check off a slice here when its "done when" is true.
 - [x] [A2. Enrolling a Scout](02-A2-EnrollingAScout.md) — Engine, 1–2 sessions
 - [x] [A3. Sending and storing samples](03-A3-SendingAndStoringSamples.md) — Engine, 2 sessions
 - [x] [A4. Installing on Linux](04-A4-InstallingOnLinux.md) — Engine, 1–2 sessions, needs you
-- [ ] [A5. Signed Scout releases](05-A5-SignedScoutReleases.md) — Engine, 1–2 sessions, needs you
+- [x] [A5. Signed Scout releases](05-A5-SignedScoutReleases.md) — Engine, 1–2 sessions, needs you
 
 ### Phase B — Metrics in Beekeeper
 
@@ -77,7 +77,7 @@ Check off a slice here when its "done when" is true.
   - **A command you paste once as root,** when Hive's user has no root access. It installs Scout and a `sudo` rule (or `doas`, on Alpine without `sudo`) letting that user run only Scout's own management command as root, so Beekeeper handles updates from then on. Servers without SSH details always use a pasted command.
   - **Beekeeper builds the pasted command itself,** from the download address and hashes built into Beekeeper, the enrollment code and the SSH user's name. It checks the code and the name against strict patterns first, so a Hive taken over by someone else can't slip a command of its own into what you paste as root. Scout checks the name again before writing it into a `sudo` rule.
   - **Beekeeper checks which way applies,** and shows the command with the reason when Install can't work.
-  - **The installed Scout checks every update itself** (A5): a signed statement of version, CPU type and hash, from Scout's release key, for a binary held in memory, never older than the one installed. It stages the new binary where only root can write and renames it into place. Through the narrow `sudo` rule, a Hive taken over by someone else can install only genuine, current Scout releases.
+  - **The installed Scout checks every update itself** (A5): a signed statement of version, CPU type and hash, signed with Sparkle's key for a release, for a binary held in memory, never older than the one installed. It stages the new binary where only root can write and renames it into place. Through the narrow `sudo` rule, a Hive taken over by someone else can install only genuine, current Scout releases.
   - **No updating itself.** Scout runs unprivileged, and a root updater on every server would trust whatever the release publishes without you deciding.
 
 ## §3. What Scout may cost a server
@@ -184,7 +184,7 @@ Logs will also need things metrics don't: reading the journal or `/var/log` mean
 - [x] How Scouts update: from Beekeeper over SSH where Hive has root or A4's `sudo` rule, otherwise a pasted command, which keeps the key. Never by updating themselves (§2, A5, B3).
 - [ ] What can an unprivileged process read of other users' processes on macOS? Hive's own Mac depends on it (C2), and whether Scout on other Macs runs as root (C3).
 - [x] Container names without Docker's socket: Hive names them over SSH with `docker ps`, and Scout sends only IDs (§4, B7)
-- [ ] Does notarization accept Linux binaries in `Hive.app`'s resources? (A5)
+- [x] Does notarization accept Linux binaries in `Hive.app`'s resources? Yes, with no issues; they add about 15 MB to the downloads (A5)
 
 ## §12. What this builds on
 
@@ -228,7 +228,7 @@ Hive and Beekeeper as they stand. The code named here is the reference; `Plans/H
 - **A test Linux VM,** made by a script from A1 on: systemd, Docker in Swarm mode running a few services, and a few hundred processes. A4 adds one with Alpine and OpenRC.
 - **Tests use neither.** They run against temporary folders, captured `/proc` and `/sys` files, and fakes. They never run `ssh`, start the daemon or open a listening port.
 - **Scout's package builds and tests on the Mac** with the rest. Linux builds run in Docker, with the Static Linux SDK, so the Xcode toolchain on the Mac doesn't matter. They're a script of their own, `Scripts/build-scout.sh`, which also runs Scout's tests on Linux. `Scripts/build-and-test.sh` runs it only when `Scout/` changed since its last success, so Docker isn't needed for everything else.
-- **A development signing key** for Scout (A5), kept in this Mac's Keychain, so development builds of Hive carry signed Scout binaries. A development Scout trusts only the development key, and a release Scout only the release key.
+- **A development signing key** for Scout (A5), kept in this Mac's Keychain, so development builds of Hive carry signed Scout binaries. A development Scout trusts only the development key, and a release Scout only Sparkle's signing key, which also signs the Mac apps' updates.
 
 ## Every slice ends with
 

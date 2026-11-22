@@ -14,6 +14,18 @@ if Context.environment["SCOUT_WARNINGS_AS_ERRORS"] != nil {
     swiftSettings.append(.treatAllWarnings(as: .error))
 }
 
+// The public half of the key this build trusts for updates, in base64, from `Scripts/build-scout.sh`.
+// Swift's own conditions can't carry a value, so a C function hands it over. Without one, the build
+// refuses every update.
+var updateKeySettings: [CSetting] = []
+if let key = Context.environment["SCOUT_UPDATE_PUBLIC_KEY"] {
+    let base64 = Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
+    guard key.count == 44, key.allSatisfy(base64.contains) else {
+        fatalError("SCOUT_UPDATE_PUBLIC_KEY isn't the base64 of a 32-byte key")
+    }
+    updateKeySettings.append(.define("SCOUT_UPDATE_PUBLIC_KEY", to: "\"\(key)\""))
+}
+
 // SwiftLint's plugin ships a macOS binary only. Its warnings show only when SwiftPM reruns it, so
 // `Scripts/build-and-test.sh` also runs SwiftLint on Scout itself.
 var dependencies: [Package.Dependency] = [
@@ -37,10 +49,12 @@ let package = Package(
     dependencies: dependencies,
     targets: [
         .target(name: "ScoutProtocol", swiftSettings: swiftSettings, plugins: plugins),
+        .target(name: "ScoutUpdateKey", cSettings: updateKeySettings),
         .target(
             name: "ScoutCore",
             dependencies: [
                 "ScoutProtocol",
+                "ScoutUpdateKey",
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),

@@ -24,7 +24,7 @@ case .enroll, .run, .status:
         Console.log(ScoutUser.message(for: error))
         exit(77)
     }
-case .sample, .watch, .install, .uninstall:
+case .sample, .watch, .install, .uninstall, .manage:
     break
 }
 
@@ -114,4 +114,8 @@ case .uninstall:
         Console.log(InstallMessage.text(for: error))
         exit(1)
     }
+case .manage:
+    let response = ManageCommand.respond(to: ManagementInput.read())
+    Console.print(try JSONEncoder().encode(response))
+    exit(response.outcome == .done ? 0 : 1)
 }

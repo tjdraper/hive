@@ -12,6 +12,8 @@ A release has three downloads:
 - **`Hive-<version>.zip`** is what Sparkle downloads to update Hive.
 - **`Beekeeper-<version>.zip`** installs and updates Beekeeper, which stays owned by you like any other app.
 
+Scout's Linux binaries go with it, `hive-scout-linux-x86_64` and `hive-scout-linux-aarch64`, each with its signed `.statement`, and `hive-scout-SHA256SUMS`. The command Beekeeper builds to install Scout downloads them from the release, and `Hive.app` carries the same files in `Contents/Resources/Scout`, for installing and updating over SSH.
+
 Versions are `YYYY.N`, or `YYYY.N.P` for a fix between releases. `CFBundleVersion` equals the version, so a version that shipped can't be rebuilt under the same name, and the script refuses a version that's already tagged. There's no beta channel.
 
 The script refuses to run unless the working tree is clean and the branch is in step with its upstream, so the tag lands on the commit the build came from. If a release stops partway, undo the version and the appcast entries with `git checkout -- Hive.xcodeproj/project.pbxproj docs/appcasts`.
@@ -98,13 +100,26 @@ Beekeeper only uses the encryption built into iOS, so `ITSAppUsesNonExemptEncryp
 
 Sparkle signs each update with the EdDSA key in your login keychain, the one `Scripts/sparkle-tools.sh generate_keys -p` prints the public half of. Put that public half in `UPDATES_PUBLIC_KEY`. The release script checks that both apps carry it.
 
-**Back the private key up somewhere safe.** Losing it means no installed copy can ever update again, short of everyone downloading the next release by hand.
+**Back the private key up somewhere safe.** Losing it means no installed copy can ever update again, short of everyone downloading the next release by hand, and no released Scout can be updated from Beekeeper, only reinstalled with its pasted command.
 
 ```
 Scripts/sparkle-tools.sh generate_keys -x sparkle-private-key.txt
 ```
 
 Keep that file out of the repository. `sparkle-tools.sh` downloads Sparkle's command line tools into `build/tools/` the first time, checked against a pinned checksum.
+
+### Scout's update keys
+
+An installed Scout replaces itself only with a binary whose statement (its version, CPU type and SHA-256) is signed with the key it was built to trust, for a newer version. There are two:
+
+- **The Sparkle signing key** signs the Scouts in a release, which take updates signed with it and nothing else. It's the key above, so there's nothing more to set up or back up for releases.
+- **Scout's development key** signs every other build of Scout, from `Scripts/build-scout.sh`, which take updates signed with it and nothing else. It's kept by Sparkle's tools under the account `hive-scout-development`. Make it once, and put the public half it prints in `SCOUT_DEVELOPMENT_PUBLIC_KEY` in `Configuration/Signing.local.xcconfig`:
+
+  ```
+  Scripts/sparkle-tools.sh generate_keys --account hive-scout-development
+  ```
+
+`Scripts/build-scout.sh` refuses to build when the key in the Keychain isn't the one in the file. It signs by exporting the key into a private temporary folder for the moment it's needed, through the same tool that made it, so macOS doesn't ask for your password each time. The development key needs no backup: losing it only means making another and reinstalling development builds.
 
 ### GitHub Pages
 

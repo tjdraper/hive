@@ -171,6 +171,7 @@
 				A10100000000000000000006 /* Resources */,
 				A10100000000000000000007 /* Embed Daemon */,
 				A10100000000000000000016 /* Embed rsync License */,
+				A10100000000000000000019 /* Embed Scout */,
 				A10100000000000000000011 /* Write Launchd Plist */,
 			);
 			buildRules = (
@@ -304,6 +305,32 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		A10100000000000000000019 /* Embed Scout */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/build/scout/linux/hive-scout-linux-x86_64",
+				"$(SRCROOT)/build/scout/linux/hive-scout-linux-x86_64.statement",
+				"$(SRCROOT)/build/scout/linux/hive-scout-linux-aarch64",
+				"$(SRCROOT)/build/scout/linux/hive-scout-linux-aarch64.statement",
+			);
+			name = "Embed Scout";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Scout/hive-scout-linux-x86_64",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Scout/hive-scout-linux-x86_64.statement",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Scout/hive-scout-linux-aarch64",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Scout/hive-scout-linux-aarch64.statement",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Resources rather than MacOS, since codesign treats everything in Contents/MacOS as code.\nset -eu\ncopy() {\n    if [ ! -f \"$1\" ]; then\n        echo \"error: $1 is missing. Run Scripts/build-scout.sh, which builds Scout for Linux in Docker.\"\n        exit 1\n    fi\n    install -m \"$3\" \"$1\" \"$2\"\n}\nmkdir -p \"$(dirname \"$SCRIPT_OUTPUT_FILE_0\")\"\ncopy \"$SCRIPT_INPUT_FILE_0\" \"$SCRIPT_OUTPUT_FILE_0\" 755\ncopy \"$SCRIPT_INPUT_FILE_1\" \"$SCRIPT_OUTPUT_FILE_1\" 644\ncopy \"$SCRIPT_INPUT_FILE_2\" \"$SCRIPT_OUTPUT_FILE_2\" 755\ncopy \"$SCRIPT_INPUT_FILE_3\" \"$SCRIPT_OUTPUT_FILE_3\" 644\n";
+		};
 		A10100000000000000000011 /* Write Launchd Plist */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;

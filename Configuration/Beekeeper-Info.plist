@@ -41,5 +41,18 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<!--
+	Scout's version and the SHA-256 of each Linux binary, from Scripts/build-scout.sh, for building the
+	command that installs Scout and for knowing when a server's Scout is out of date. The download
+	address, the release's on GitHub, is set only by Scripts/release.sh, and is empty in every other build.
+	-->
+	<key>ScoutVersion</key>
+	<string>$(SCOUT_VERSION)</string>
+	<key>ScoutSHA256LinuxX86_64</key>
+	<string>$(SCOUT_SHA256_LINUX_X86_64)</string>
+	<key>ScoutSHA256LinuxAarch64</key>
+	<string>$(SCOUT_SHA256_LINUX_AARCH64)</string>
+	<key>ScoutDownloadURL</key>
+	<string>$(SCOUT_DOWNLOAD_URL)</string>
 </dict>
 </plist>

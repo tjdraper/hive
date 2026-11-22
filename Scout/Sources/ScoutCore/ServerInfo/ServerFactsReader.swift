@@ -9,7 +9,7 @@ struct ServerFactsReader {
             uptimeSeconds: files.text(at: "/proc/uptime").flatMap(Self.uptime(parsing:)),
             distribution: osRelease()?.distribution,
             kernel: files.text(at: "/proc/sys/kernel/osrelease")?.lines.first.map(String.init),
-            scoutVersion: ScoutRelease.version,
+            scoutVersion: ScoutRelease.version.description,
             processesHidden: processesHidden
         )
     }
