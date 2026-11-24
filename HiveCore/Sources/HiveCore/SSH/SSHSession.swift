@@ -23,11 +23,13 @@ struct SSHSession {
         return try await body(SSHSession(target: target, directory: directory, tools: tools))
     }
 
-    func ssh(_ remoteCommand: String) -> ChildProcess {
+    /// `input` goes to the remote command's standard input, which is then closed.
+    func ssh(_ remoteCommand: String, input: Data? = nil) -> ChildProcess {
         ChildProcess(
             executableURL: tools.ssh,
             arguments: SSHCommand.arguments(for: target, in: directory, remoteCommand: remoteCommand),
-            environment: SSHTools.environment()
+            environment: SSHTools.environment(),
+            input: input
         )
     }
 
@@ -51,15 +53,22 @@ enum SSHSessionError: Error, Equatable {
 
 /// Runs a command on a server over SSH. Tests stand in for it, since they never run `ssh`.
 protocol SSHRunning: Sendable {
-    func run(_ remoteCommand: String, on target: SSHTarget) async throws -> ChildProcess.Result
+    /// `input` goes to the remote command's standard input, which is then closed.
+    func run(_ remoteCommand: String, input: Data?, on target: SSHTarget) async throws -> ChildProcess.Result
+}
+
+extension SSHRunning {
+    func run(_ remoteCommand: String, on target: SSHTarget) async throws -> ChildProcess.Result {
+        try await run(remoteCommand, input: nil, on: target)
+    }
 }
 
 struct SSHRunner: SSHRunning {
     var tools = SSHTools()
 
-    func run(_ remoteCommand: String, on target: SSHTarget) async throws -> ChildProcess.Result {
+    func run(_ remoteCommand: String, input: Data?, on target: SSHTarget) async throws -> ChildProcess.Result {
         try await SSHSession.with(target, tools: tools) { session in
-            try await session.ssh(remoteCommand).run()
+            try await session.ssh(remoteCommand, input: input).run()
         }
     }
 }

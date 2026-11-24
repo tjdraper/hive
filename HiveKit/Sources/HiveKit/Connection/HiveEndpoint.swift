@@ -132,6 +132,18 @@ public enum HiveEndpoint {
         "\(server(id))/metrics"
     }
 
+    /// `POST` finds out over SSH, changing nothing, what Hive can do about Scout on the server, answering
+    /// with its `ScoutCheckResult`.
+    public static func scoutCheck(onServer id: UUID) -> String {
+        "\(server(id))/scout-check"
+    }
+
+    /// `POST` a `ScoutActionRequest` to act on the server's Scout over SSH, answering with its
+    /// `ScoutActionResult`. Installing and enrolling again are confirmed.
+    public static func scoutAction(onServer id: UUID) -> String {
+        "\(server(id))/scout-action"
+    }
+
     /// `POST` a `QuotaEstimateRequest` for the `RemovalEstimate` of changing the server's quota.
     public static func quotaEstimate(ofServer id: UUID) -> String {
         "\(server(id))/quota-estimate"

@@ -22,6 +22,11 @@
 #                                                    statement, from the folder or the Linux build
 #   Scripts/scout-test-vm.sh [--alpine] measure-installed <seconds>
 #                                                    Report the installed service's CPU and memory
+#   Scripts/scout-test-vm.sh [--alpine] ssh          Run an SSH server, so Hive can sign in as it would to
+#                                                    a real server, and print where it listens
+#   Scripts/scout-test-vm.sh [--alpine] authorize <user> < line
+#                                                    Add a line, such as Hive's key as Beekeeper shows it,
+#                                                    to the user's authorized_keys
 #   Scripts/scout-test-vm.sh [--alpine] delete       Remove the machine
 #   Scripts/scout-test-vm.sh copy                    Copy the Linux build into the Debian machine
 #   Scripts/scout-test-vm.sh measure <seconds> [--tls <host>:<port> --pin <hex>]
@@ -127,6 +132,40 @@ WORKERS
     "
     sleep 5
     in_machine "echo \"\$(ls /proc | grep -c '^[0-9]') processes\""
+}
+
+# OrbStack's machines have no SSH server of their own; `orb` reaches them another way.
+ssh_server() {
+    if $alpine; then
+        in_machine "
+            apk add -q openssh-server
+            # adduser -D locks the account, which Alpine's sshd, without PAM, takes as refusing every
+            # key too. A password that can never match unlocks it for keys only.
+            sed -i 's/^deploy:!:/deploy:*:/' /etc/shadow
+            rc-update add sshd default > /dev/null
+            rc-service sshd restart > /dev/null
+        "
+    else
+        in_machine "
+            DEBIAN_FRONTEND=noninteractive apt-get install -qq -y openssh-server > /dev/null
+            systemctl enable --now ssh > /dev/null 2>&1
+        "
+    fi
+    echo "Hive reaches it at $machine.orb.local, port 22."
+}
+
+authorize() {
+    local user="${1:-}"
+    [[ $user =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo "usage: authorize <user> < line" >&2; exit 64; }
+    in_machine "
+        home=\$(awk -F: -v user=$user '\$1 == user { print \$6 }' /etc/passwd)
+        [[ -n \$home ]] || { echo 'error: no user named $user' >&2; exit 1; }
+        group=\$(id -gn $user)
+        install -d -m 700 -o $user -g \$group \$home/.ssh
+        cat >> \$home/.ssh/authorized_keys
+        chown $user:\$group \$home/.ssh/authorized_keys
+        chmod 600 \$home/.ssh/authorized_keys
+    "
 }
 
 linux_build() {
@@ -294,6 +333,8 @@ case "${1:-}" in
     measure-installed) shift; measure_installed "$@" ;;
     copy) copy ;;
     measure) shift; measure "$@" ;;
+    ssh) ssh_server ;;
+    authorize) shift; authorize "$@" ;;
     delete) orb delete -f "$machine" ;;
-    *) sed -n '3,31p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64 ;;
+    *) sed -n '3,36p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64 ;;
 esac

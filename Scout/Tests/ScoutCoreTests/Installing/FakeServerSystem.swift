@@ -13,6 +13,9 @@ final class FakeServerSystem: ServerSystem {
     var answers: [String: CommandResult] = [:]
     var enrollSucceeds = true
     var enrolledCodes: [String] = []
+    var savesAddresses = true
+    /// The JSON each `addresses` was given.
+    var savedAddresses: [String] = []
 
     init(layout: InstallLayout) {
         self.layout = layout
@@ -59,6 +62,11 @@ final class FakeServerSystem: ServerSystem {
         guard enrollSucceeds else { return false }
         let file = layout.onDisk(stateDirectory) + "/enrollment.json"
         return FileManager.default.createFile(atPath: file, contents: Data("{}".utf8))
+    }
+
+    func replaceAddresses(json: [UInt8], binary _: String, stateDirectory _: String) -> Bool {
+        savedAddresses.append(String(bytes: json, encoding: .utf8) ?? "")
+        return savesAddresses
     }
 
     func changeOwner(of _: Int32, to _: SystemUser) -> Bool {

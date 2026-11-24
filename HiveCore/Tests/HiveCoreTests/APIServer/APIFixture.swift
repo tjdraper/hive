@@ -45,48 +45,6 @@ final class FakeFullDiskAccess: Sendable {
     }
 }
 
-/// Stands in for `ssh` and `ssh-keyscan`, answering what it's told and recording what it was asked.
-final class FakeSSH: SSHRunning, HostKeyScanning {
-    struct State {
-        var scan = HostKeyScanOutcome.failed(.unreachable)
-        var result = ChildProcess.Result(status: 0, standardOutput: Data(), standardError: Data())
-        var scanned: [ServerConnection] = []
-        var ran: [(command: String, target: SSHTarget)] = []
-    }
-
-    private let state = Mutex(State())
-
-    var scanned: [ServerConnection] {
-        state.withLock { $0.scanned }
-    }
-
-    var ran: [(command: String, target: SSHTarget)] {
-        state.withLock { $0.ran }
-    }
-
-    func setScan(_ outcome: HostKeyScanOutcome) {
-        state.withLock { $0.scan = outcome }
-    }
-
-    func setResult(status: Int32, standardError: String = "") {
-        state.withLock { $0.result = ChildProcess.Result(status: status, standardOutput: Data(), standardError: Data(standardError.utf8)) }
-    }
-
-    func scan(_ connection: ServerConnection) async throws -> HostKeyScanOutcome {
-        state.withLock { state in
-            state.scanned.append(connection)
-            return state.scan
-        }
-    }
-
-    func run(_ remoteCommand: String, on target: SSHTarget) async throws -> ChildProcess.Result {
-        state.withLock { state in
-            state.ran.append((remoteCommand, target))
-            return state.result
-        }
-    }
-}
-
 /// The Mac's addresses, as the fixture's Hive sees them.
 final class FakeMacAddresses: Sendable {
     private let addresses = Mutex([
@@ -228,7 +186,8 @@ struct APIFixture {
         dumpSearchPath: String = "/usr/bin:/bin",
         startupDriveGrace: TimeInterval = 0,
         liveUpdateHeartbeat: Duration = .seconds(15),
-        scoutVersion: String? = nil
+        scoutVersion: String? = nil,
+        scoutFolder: URL? = nil
     ) throws {
         self.signIn = try signIn ?? SignInFixture()
         let sealer = sealer ?? SecretSealer(key: P256.KeyAgreement.PrivateKey())
@@ -280,7 +239,7 @@ struct APIFixture {
             },
             liveUpdateHeartbeat: liveUpdateHeartbeat,
             now: { clock.now },
-            version: ReleaseVersion("2026.3"), scoutVersion: scoutVersion
+            version: ReleaseVersion("2026.3"), carriedScout: CarriedScout(folder: scoutFolder ?? keyFolder.url, version: scoutVersion)
         )
     }
 

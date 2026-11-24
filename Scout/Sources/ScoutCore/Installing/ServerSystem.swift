@@ -28,6 +28,9 @@ protocol ServerSystem {
     /// Runs `binary enroll` with the code on standard input. Run as root, `enroll` drops to Scout's
     /// user itself before reading anything, and its messages go straight to the terminal.
     func enroll(code: String, binary: String, stateDirectory: String) -> Bool
+    /// Runs `binary addresses` with the addresses as JSON on standard input, which drops to Scout's
+    /// user, as `enroll` does.
+    func replaceAddresses(json: [UInt8], binary: String, stateDirectory: String) -> Bool
     func changeOwner(of descriptor: Int32, to user: SystemUser) -> Bool
 }
 
@@ -89,21 +92,29 @@ struct PosixServerSystem: ServerSystem {
     }
 
     func enroll(code: String, binary: String, stateDirectory: String) -> Bool {
-        // The code is written before the program starts, so it waits in the pipe however soon the
-        // program exits, and writing can't fail with SIGPIPE.
+        Self.run(binary, ["enroll", "--state-directory", stateDirectory], input: Array((code + "\n").utf8))
+    }
+
+    func replaceAddresses(json: [UInt8], binary: String, stateDirectory: String) -> Bool {
+        Self.run(binary, ["addresses", "--state-directory", stateDirectory], input: json + [UInt8(ascii: "\n")])
+    }
+
+    /// Whether `binary` with `arguments` exited successfully, its messages going straight to the terminal.
+    private static func run(_ binary: String, _ arguments: [String], input line: [UInt8]) -> Bool {
+        // The input is written before the program starts, so it waits in the pipe however soon the
+        // program exits, and writing can't fail with SIGPIPE. It's far smaller than a pipe holds.
         var input: [Int32] = [-1, -1]
         guard pipe(&input) == 0 else { return false }
-        let line = Array((code + "\n").utf8)
-        let written = line.withUnsafeBytes { Self.writeDescriptor(input[1], $0.baseAddress, $0.count) }
-        Self.closeDescriptor(input[1])
-        defer { Self.closeDescriptor(input[0]) }
+        let written = line.withUnsafeBytes { writeDescriptor(input[1], $0.baseAddress, $0.count) }
+        closeDescriptor(input[1])
+        defer { closeDescriptor(input[0]) }
         guard written == line.count else { return false }
-        let pid = Self.spawn([binary, "enroll", "--state-directory", stateDirectory], program: binary) { actions in
+        let pid = spawn([binary] + arguments, program: binary) { actions in
             posix_spawn_file_actions_adddup2(&actions, input[0], STDIN_FILENO)
             posix_spawn_file_actions_addclose(&actions, input[0])
         }
         guard let pid else { return false }
-        return Self.wait(for: pid) == 0
+        return wait(for: pid) == 0
     }
 
     func changeOwner(of descriptor: Int32, to user: SystemUser) -> Bool {

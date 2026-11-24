@@ -17,7 +17,7 @@ guard let command = ScoutCommand(arguments: Array(CommandLine.arguments.dropFirs
 }
 
 switch command {
-case .enroll, .run, .status:
+case .enroll, .addresses, .run, .status:
     do {
         try ScoutUser.dropRoot()
     } catch {
@@ -59,6 +59,24 @@ case .enroll(let stateDirectory):
         Console.log("Enrolled with the Hive for server \(enrollment.serverID), and signed in")
     } catch {
         Console.log(EnrollmentMessage.text(for: error))
+        exit(1)
+    }
+case .addresses(let stateDirectory):
+    guard let bytes = ManagementInput.readAll(from: STDIN_FILENO, limit: ManagementRequest.longestLine),
+          let addresses = try? JSONDecoder().decode([EnrollmentCode.Address].self, from: Data(bytes)),
+          ManagementRequest.areAddresses(addresses)
+    else {
+        Console.log("Those aren't addresses Scout can use. Nothing was changed.")
+        exit(65)
+    }
+    do throws(AddressChangeError) {
+        try EnrollmentStore(directory: stateDirectory).replaceAddresses(with: addresses)
+        Console.log("Saved \(addresses.count) addresses for the Hive.")
+    } catch .notEnrolled {
+        Console.log("This server's Scout hasn't enrolled, so it has no addresses to replace.")
+        exit(78)
+    } catch {
+        Console.log("Couldn't save the addresses: \(error)")
         exit(1)
     }
 case let .run(stateDirectory, runtimeDirectory):

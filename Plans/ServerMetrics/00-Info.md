@@ -20,7 +20,7 @@ Check off a slice here when its "done when" is true.
 
 - [x] [B1. Servers without SSH details](06-B1-ServersWithoutSSHDetails.md) — Mixed, 1–2 sessions
 - [x] [B2. Adding metrics to a server](07-B2-AddingMetricsToAServer.md) — Mixed, 1 session, installed build
-- [ ] [B3. Installing Scout from Beekeeper](08-B3-InstallingScoutFromBeekeeper.md) — Mixed, 1–2 sessions, needs you
+- [x] [B3. Installing Scout from Beekeeper](08-B3-InstallingScoutFromBeekeeper.md) — Mixed, 1–2 sessions, needs you
 - [ ] [B4. Reading metrics from Hive](09-B4-ReadingMetricsFromHive.md) — Engine, 1 session
 - [ ] [B5. The dashboard](10-B5-TheDashboard.md) — UI, 1–2 sessions
 - [ ] [B6. A server's metrics](11-B6-AServersMetrics.md) — UI, 2 sessions

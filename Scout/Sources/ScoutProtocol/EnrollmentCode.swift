@@ -7,7 +7,7 @@ import Foundation
 /// What a Scout needs to enroll with a Hive for one server, as text pasted into `hive-scout enroll`.
 /// It carries the pin of Hive's key, so Scout trusts no network for it.
 public struct EnrollmentCode: Hashable, Sendable {
-    public struct Address: Hashable, Sendable {
+    public struct Address: Codable, Hashable, Sendable {
         public let host: String
         public let port: Int
 

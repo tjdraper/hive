@@ -116,6 +116,35 @@ struct EnrollmentWorkflowTests {
         #expect(try first.signingKey().rawRepresentation != second.signingKey().rawRepresentation)
     }
 
+    @Test("New addresses replace the saved ones, keeping the key, the pin, the Hive and the server")
+    func replacesAddresses() async throws {
+        // Arrange
+        let enrolled = try await workflow.enroll(with: hive.code(hosts: ["hive.old"]))
+
+        // Act
+        try store.replaceAddresses(with: [
+            EnrollmentCode.Address(host: "hive.new", port: 4484),
+            EnrollmentCode.Address(host: "100.64.0.9", port: 4483),
+        ])
+
+        // Assert
+        let saved = try #require(try store.load())
+        #expect(saved.hiveAddresses == [HiveAddress(host: "hive.new", port: 4484), HiveAddress(host: "100.64.0.9", port: 4483)])
+        #expect(try saved.signingKey().rawRepresentation == enrolled.signingKey().rawRepresentation)
+        #expect(saved.pin == enrolled.pin)
+        #expect(saved.hiveID == enrolled.hiveID)
+        #expect(saved.serverID == enrolled.serverID)
+        #expect(saved.scoutID == enrolled.scoutID)
+    }
+
+    @Test("New addresses for a Scout that hasn't enrolled save nothing")
+    func addressesNeedAnEnrollment() throws {
+        #expect(throws: AddressChangeError.notEnrolled) {
+            try store.replaceAddresses(with: [EnrollmentCode.Address(host: "hive", port: 4483)])
+        }
+        #expect(try store.load() == nil)
+    }
+
     @Test("A folder Scout can't write in is found before the code is used up")
     func unwritableFolder() async throws {
         // Arrange

@@ -108,6 +108,16 @@ public enum ScoutChange: Codable, Hashable, Sendable {
     case enrolled(replacedAnother: Bool)
     /// The server's metrics were removed: its Scout can no longer sign in, and its sessions ended.
     case removed
+    /// Hive installed Scout on the server over SSH.
+    case installed(version: String)
+    /// Hive updated the server's Scout over SSH.
+    case updated(version: String)
+    /// Hive gave the server's Scout its address options over SSH.
+    case addressesSent
+    /// Hive uninstalled Scout from the server over SSH.
+    case uninstalled
+    /// Hive's action on the server's Scout stopped part way, maybe having changed something.
+    case actionFailed(ScoutAction)
 }
 
 public enum BackupJobChange: Codable, Hashable, Sendable {

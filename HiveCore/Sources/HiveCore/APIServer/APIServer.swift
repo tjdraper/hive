@@ -78,6 +78,7 @@ public struct APIServer: Sendable {
         AuditLogRoutes.add(to: router, auditLog: api.auditLog)
         ServerRoutes.add(to: router, workflow: api.servers, confirmations: api.confirmations)
         ScoutRoutes.add(to: router, api: api)
+        ScoutManagementRoutes.add(to: router, workflow: api.scoutManagement, confirmations: api.confirmations)
         MetricsRoutes.add(to: router, workflow: api.metricsReports)
         ServerSpaceRoutes.add(to: router, reader: api.serverSpace)
         RemovalEstimateRoutes.add(to: router, estimator: api.removalEstimator)

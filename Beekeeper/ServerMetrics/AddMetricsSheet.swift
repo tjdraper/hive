@@ -1,9 +1,11 @@
 import HiveKit
 import SwiftUI
 
-/// Opens an enrollment window for the server and shows the command that installs Scout and enrolls it,
-/// with the time left on its code, until the Scout enrolls or the code expires. Closing the sheet closes
-/// the window. Also used to enroll a Scout again, such as after a restore or a new identity.
+/// Adds metrics to a server, or enrolls its Scout again, such as after a restore or a new identity. Where
+/// Hive signs in to the server, it checks it first and installs or enrolls Scout itself when it can act as
+/// root. Otherwise it opens an enrollment window and shows the command that installs Scout and enrolls
+/// it, with the time left on its code, until the Scout enrolls or the code expires. Closing the sheet
+/// closes the window.
 struct AddMetricsSheet: View {
     let link: HiveLink
     let server: Server
@@ -14,9 +16,14 @@ struct AddMetricsSheet: View {
     let onEnrolled: () -> Void
 
     private enum Phase: Equatable {
+        case checking
+        /// Hive can install or enroll Scout over SSH itself.
+        case overSSH(ScoutAction)
+        case working(ScoutAction)
+        case blocked(ScoutObstacle)
         case opening
         case open(EnrollmentWindow, expiresAt: Date)
-        case enrolled
+        case enrolled(String?)
         case expired
         case failed(String)
     }
@@ -26,13 +33,20 @@ struct AddMetricsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var phase = Phase.opening
     @State private var platform = ScoutRelease.Platform.x86
+    @State private var ssh: ScoutOverSSH?
+    /// Why the command is shown rather than Hive installing Scout itself.
+    @State private var why: String?
+    /// Named in the command when Scout's rule would let Hive manage it from then on.
+    @State private var sshUser: String?
+    /// Why Hive's last try over SSH didn't work.
+    @State private var actionFailure: String?
 
     var body: some View {
         SheetLayout(
             title: title,
-            cancel: isFinished ? nil : SheetButton(title: "Cancel") { close() },
-            confirm: isFinished ? SheetButton(title: "Done") { close() } : nil,
-            secondary: phase == .expired ? SheetButton(title: "New Code") { Task { await open() } } : nil
+            cancel: cancelButton,
+            confirm: confirmButton,
+            secondary: secondaryButton
         ) {
             VStack(alignment: .leading, spacing: 16) {
                 #if os(macOS)
@@ -46,26 +60,52 @@ struct AddMetricsSheet: View {
         }
         .macSheetSize(width: 640, height: 560)
         .interactiveDismissDisabled()
-        .task {
-            platform = ThisBuildsScout.platform(reportedAs: reportedPlatform) ?? .x86
-            await open()
-        }
+        .task { await start() }
         .task(id: openWindowID) { await watch() }
     }
 
     private var title: String {
-        "Add Metrics to “\(server.name)”"
+        previousEnrollment == nil ? "Add Metrics to “\(server.name)”" : "Enroll Scout on “\(server.name)” Again"
+    }
+
+    private var cancelButton: SheetButton? {
+        switch phase {
+        case .enrolled, .blocked: nil
+        case .working: SheetButton(title: "Cancel", isDisabled: true) {
+            // Hive is already working on the server, which it finishes either way.
+        }
+        default: SheetButton(title: "Cancel") { close() }
+        }
+    }
+
+    private var confirmButton: SheetButton? {
+        switch phase {
+        case .enrolled, .blocked: SheetButton(title: "Done") { close() }
+        case .overSSH(let action): SheetButton(title: action == .install ? "Install" : "Enroll") { Task { await perform(action) } }
+        default: nil
+        }
+    }
+
+    private var secondaryButton: SheetButton? {
+        switch phase {
+        case .expired: SheetButton(title: "New Code") { Task { await open() } }
+        case .overSSH: SheetButton(title: "Show Command Instead") { Task { await open() } }
+        default: nil
+        }
     }
 
     @ViewBuilder private var content: some View {
-        if case .open(let window, let expiresAt) = phase {
+        switch phase {
+        case .open(let window, let expiresAt):
             // Only the command can outgrow the sheet, such as on iPhone.
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     openWindow(window, expiresAt: expiresAt)
                 }
             }
-        } else {
+        case .overSSH(let action):
+            ScoutOverSSHOffer(action: action, server: server, found: ssh?.found, failure: actionFailure)
+        default:
             // Fills the sheet below the title, so it sits in the middle of it.
             outcome
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -74,14 +114,20 @@ struct AddMetricsSheet: View {
 
     @ViewBuilder private var outcome: some View {
         switch phase {
+        case .checking:
+            ProgressView("Checking what Hive can do on “\(server.name)”…")
+        case .working(let action):
+            ProgressView(action == .install ? "Installing Scout on “\(server.name)”…" : "Enrolling Scout on “\(server.name)”…")
         case .opening:
             ProgressView("Opening an enrollment window…")
-        case .enrolled:
+        case .enrolled(let message):
             ContentUnavailableView(
                 "Scout Enrolled",
                 systemImage: "checkmark.circle",
-                description: Text("Scout on “\(server.name)” is sending its figures to the Hive.")
+                description: Text(message ?? "Scout on “\(server.name)” is sending its figures to the Hive.")
             )
+        case .blocked(let obstacle):
+            ContentUnavailableView("Scout Can't Run Here", systemImage: "xmark.octagon", description: Text(obstacle.message))
         case .expired:
             ContentUnavailableView(
                 "The Code Expired",
@@ -94,21 +140,25 @@ struct AddMetricsSheet: View {
                 systemImage: "exclamationmark.triangle",
                 description: Text(message)
             )
-        case .open:
+        case .open, .overSSH:
             EmptyView()
         }
     }
 
     @ViewBuilder private func openWindow(_ window: EnrollmentWindow, expiresAt: Date) -> some View {
+        if let why {
+            Label(why, systemImage: "info.circle")
+                .fixedSize(horizontal: false, vertical: true)
+        }
         if let release = ThisBuildsScout.release {
             Text(
                 "Run this as root on “\(server.name)”. It downloads Scout \(release.version), checks it, installs it as a service "
                     + "and enrolls it with this Hive. Running it again later updates Scout and keeps its enrollment."
             )
             .fixedSize(horizontal: false, vertical: true)
-            PlatformCommand(platform: $platform) { ScoutCommand.install(release, for: $0, code: window.code) }
+            PlatformCommand(platform: $platform) { ScoutCommand.install(release, for: $0, code: window.code, sshUser: sshUser) }
         } else {
-            developmentCode(window)
+            DevelopmentEnrollmentCode(code: window.code, sshUser: sshUser)
         }
         HStack {
             ProgressView()
@@ -130,29 +180,43 @@ struct AddMetricsSheet: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// Only a release knows where Scout is downloaded from, so a development build shows the code for
-    /// `Scripts/scout-test-vm.sh install`, which copies the development binary in instead.
-    @ViewBuilder private func developmentCode(_ window: EnrollmentWindow) -> some View {
-        Text(
-            "This build of Beekeeper has no address to download Scout from, which only a release has. "
-                + "Pass this code to Scripts/scout-test-vm.sh install on its standard input."
-        )
-        .fixedSize(horizontal: false, vertical: true)
-        if ScoutCommand.isCode(window.code) {
-            CommandBox(text: window.code)
-        } else {
-            Label("The Hive sent something that isn't an enrollment code.", systemImage: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-        }
-    }
-
-    private var isFinished: Bool {
-        phase == .enrolled
-    }
-
     private var openWindowID: UUID? {
         if case .open(let window, _) = phase { return window.id }
         return nil
+    }
+
+    /// Checks the server first where Hive signs in to it.
+    private func start() async {
+        platform = ThisBuildsScout.platform(reportedAs: reportedPlatform) ?? .x86
+        let ssh = ScoutOverSSH(link: link, server: server)
+        self.ssh = ssh
+        guard ssh.canCheck else { return await open() }
+        phase = .checking
+        await ssh.refresh()
+        switch ScoutInstallChoice(ssh: ssh, server: server) {
+        case .overSSH(let action, let platform):
+            self.platform = platform
+            phase = .overSSH(action)
+        case .blocked(let obstacle):
+            phase = .blocked(obstacle)
+        case .command(let why, let sshUser, let platform):
+            if let platform { self.platform = platform }
+            (self.why, self.sshUser) = (why, sshUser)
+            await open()
+        }
+    }
+
+    private func perform(_ action: ScoutAction) async {
+        guard let ssh else { return }
+        phase = .working(action)
+        let done = await ssh.perform(action)
+        if done {
+            phase = .enrolled(ssh.outcome?.message)
+            onEnrolled()
+        } else {
+            actionFailure = ssh.outcome?.message
+            phase = .overSSH(action)
+        }
     }
 
     private func open() async {
@@ -177,7 +241,7 @@ struct AddMetricsSheet: View {
             guard !Task.isCancelled else { return }
             let state: ServerMetricsState? = try? await link.perform { try await $0.get(HiveEndpoint.metrics(ofServer: server.id)) }
             if let enrolledAt = state?.scout?.enrolledAt, enrolledAt != previousEnrollment {
-                phase = .enrolled
+                phase = .enrolled(nil)
                 onEnrolled()
                 return
             }

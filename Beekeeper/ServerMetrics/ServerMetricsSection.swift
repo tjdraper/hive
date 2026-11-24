@@ -2,7 +2,8 @@ import HiveKit
 import SwiftUI
 
 /// Whether a server's Scout reports, what it last said about the server, and adding, updating and
-/// removing it, each with the command to run on the server.
+/// removing it: over SSH where Hive can run Scout's management command as root, and otherwise with the
+/// command to run on the server.
 struct ServerMetricsSection: View {
     let link: HiveLink
     let server: Server
@@ -20,6 +21,8 @@ struct ServerMetricsSection: View {
     /// Shown once metrics are removed, until the page closes.
     @State private var showsUninstall = false
     @State private var platform = ScoutRelease.Platform.x86
+    @State private var ssh: ScoutOverSSH?
+    @State private var isConfirmingUninstall = false
 
     var body: some View {
         Section {
@@ -36,6 +39,9 @@ struct ServerMetricsSection: View {
             Text("Metrics")
         }
         .task(id: server.id) {
+            let ssh = ScoutOverSSH(link: link, server: server)
+            self.ssh = ssh
+            Task { await ssh.refresh() }
             while !Task.isCancelled {
                 await load()
                 try? await Task.sleep(for: Self.refreshInterval)
@@ -45,6 +51,14 @@ struct ServerMetricsSection: View {
             Button("Remove Metrics", role: .destructive) { Task { await removeMetrics() } }
         } message: {
             Text("Hive stops accepting its Scout's figures at once. Those already kept stay until they age out.")
+        }
+        .confirmationDialog("Uninstall Scout from “\(server.name)”?", isPresented: $isConfirmingUninstall) {
+            Button("Uninstall Scout", role: .destructive) { Task { await run(.uninstall) } }
+        } message: {
+            Text(
+                "Hive removes Scout, its service and its rule from the server, and stops accepting its figures. "
+                    + "Those already kept stay until they age out."
+            )
         }
         .alert("Couldn't Remove Metrics", isPresented: isFailingRemoval) {
             Button("OK") { removalFailure = nil }
@@ -64,14 +78,31 @@ struct ServerMetricsSection: View {
             )
             .foregroundStyle(.orange)
             Button("Enroll Scout Again…", systemImage: "arrow.clockwise") { addMetrics(previous: nil) }
-            Button("Remove Metrics…", systemImage: "trash", role: .destructive) { isConfirmingRemoval = true }
+            removal
         } else {
             Text("Scout isn't reporting this server's CPU, memory, disks and network to the Hive.")
                 .foregroundStyle(.secondary)
             Button("Add Metrics…", systemImage: "plus") { addMetrics(previous: nil) }
-            if showsUninstall {
+            if ssh?.canManage == true {
+                // Installed, such as after its metrics were removed, so Hive can take it off.
+                Button("Uninstall Scout…", systemImage: "trash", role: .destructive) { isConfirmingUninstall = true }
+                    .disabled(ssh?.working != nil)
+            } else if showsUninstall {
                 uninstall
             }
+        }
+        if let ssh {
+            ScoutActionStatus(ssh: ssh, server: server)
+        }
+    }
+
+    /// Uninstalling over SSH removes the metrics too, so it takes Remove Metrics' place where Hive can.
+    @ViewBuilder private var removal: some View {
+        if ssh?.canManage == true {
+            Button("Uninstall Scout…", systemImage: "trash", role: .destructive) { isConfirmingUninstall = true }
+                .disabled(ssh?.working != nil)
+        } else {
+            Button("Remove Metrics…", systemImage: "trash", role: .destructive) { isConfirmingRemoval = true }
         }
     }
 
@@ -113,7 +144,12 @@ struct ServerMetricsSection: View {
         }
         LabeledContent("Enrolled", value: scout.enrolledAt.formatted(date: .abbreviated, time: .shortened))
         Button("Enroll Scout Again…", systemImage: "arrow.clockwise") { addMetrics(previous: scout) }
-        Button("Remove Metrics…", systemImage: "trash", role: .destructive) { isConfirmingRemoval = true }
+        if ssh?.canManage == true {
+            Button("Give Scout the Hive's Addresses", systemImage: "network") { Task { await run(.sendAddresses) } }
+                .disabled(ssh?.working != nil)
+                .help("For when the Hive's addresses for other devices have changed, so Scout needn't enroll again")
+        }
+        removal
     }
 
     @ViewBuilder private func updateRows(_ update: ScoutUpdate, platform reported: String?) -> some View {
@@ -128,7 +164,10 @@ struct ServerMetricsSection: View {
             )
             .foregroundStyle(.orange)
         }
-        if let release = ThisBuildsScout.release {
+        if ssh?.canManage == true {
+            Button("Update Scout", systemImage: "arrow.down.circle") { Task { await run(.update) } }
+                .disabled(ssh?.working != nil)
+        } else if let release = ThisBuildsScout.release {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Run this as root on the server to update Scout to \(release.version), keeping its enrollment.")
                 PlatformCommand(platform: $platform) { ScoutCommand.update(release, for: $0) }
@@ -160,9 +199,19 @@ struct ServerMetricsSection: View {
                 reportedPlatform: previous?.platform
             ) {
                 showsUninstall = false
-                Task { await load() }
+                Task {
+                    await load()
+                    await ssh?.refresh()
+                }
             }
         }
+    }
+
+    private func run(_ action: ScoutAction) async {
+        guard let ssh else { return }
+        await ssh.perform(action)
+        if action == .uninstall, ssh.outcome?.succeeded == true { showsUninstall = false }
+        await load()
     }
 
     private func load() async {

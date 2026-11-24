@@ -112,6 +112,28 @@ extension ScoutChange {
             "A Scout on “\(serverName)” enrolled, replacing its last one"
         case .removed:
             "Removed metrics from “\(serverName)”, whose Scout can no longer send"
+        case .installed(let version):
+            "Installed Scout \(version) on “\(serverName)”"
+        case .updated(let version):
+            "Updated Scout on “\(serverName)” to \(version)"
+        case .addressesSent:
+            "Gave the Scout on “\(serverName)” the Hive's addresses"
+        case .uninstalled:
+            "Uninstalled Scout from “\(serverName)”"
+        case .actionFailed(let action):
+            "\(action.failureSummary) on “\(serverName)” failed part way"
+        }
+    }
+}
+
+private extension ScoutAction {
+    var failureSummary: String {
+        switch self {
+        case .install: "Installing Scout"
+        case .update: "Updating Scout"
+        case .enrollAgain: "Enrolling Scout again"
+        case .sendAddresses: "Giving Scout the Hive's addresses"
+        case .uninstall: "Uninstalling Scout"
         }
     }
 }

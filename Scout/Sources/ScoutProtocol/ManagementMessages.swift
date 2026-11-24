@@ -11,6 +11,9 @@ public struct ManagementRequest: Codable, Equatable, Sendable {
         case install
         /// Replaces the installed binary with a newer release, signed with Scout's update key.
         case update
+        /// Gives the enrolled Scout the Hive's new addresses, keeping its key and the pin it checks
+        /// Hive's key against, so it can't be pointed at another Hive.
+        case addresses
         case uninstall
     }
 
@@ -26,6 +29,8 @@ public struct ManagementRequest: Codable, Equatable, Sendable {
     public let statement: String?
     /// For `update`.
     public let binaryLength: Int?
+    /// For `addresses`, in the order to try them.
+    public let addresses: [EnrollmentCode.Address]?
 
     public static let status = Self(request: .status)
     public static let uninstall = Self(request: .uninstall)
@@ -38,11 +43,29 @@ public struct ManagementRequest: Codable, Equatable, Sendable {
         Self(request: .update, statement: statement, binaryLength: binaryLength)
     }
 
-    private init(request: Kind, code: String? = nil, statement: String? = nil, binaryLength: Int? = nil) {
+    public static func addresses(_ addresses: [EnrollmentCode.Address]) -> Self {
+        Self(request: .addresses, addresses: addresses)
+    }
+
+    private init(
+        request: Kind,
+        code: String? = nil,
+        statement: String? = nil,
+        binaryLength: Int? = nil,
+        addresses: [EnrollmentCode.Address]? = nil
+    ) {
         self.request = request
         self.code = code
         self.statement = statement
         self.binaryLength = binaryLength
+        self.addresses = addresses
+    }
+
+    /// As many as a code carries, each with a host and port a code could carry.
+    public static func areAddresses(_ addresses: [EnrollmentCode.Address]) -> Bool {
+        (1...EnrollmentCode.largestAddressCount).contains(addresses.count) && addresses.allSatisfy { address in
+            (1...EnrollmentCode.longestHost).contains(address.host.utf8.count) && (1...65535).contains(address.port)
+        }
     }
 }
 

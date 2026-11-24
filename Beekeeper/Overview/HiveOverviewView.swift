@@ -56,7 +56,7 @@ struct HiveOverviewView: View {
             if case .afterIdle(let minutes) = link.overview?.macSleep {
                 MacSleepWarning(minutes: minutes, isOnThisMac: hive.isOnThisMac)
             }
-            ServerOverviewList(servers: servers, onAddServer: onAddServer, onSelect: onSelectServer)
+            ServerOverviewList(link: link, servers: servers, onAddServer: onAddServer, onSelect: onSelectServer)
             if recovery.hiveState?.hasKey == true {
                 RecoveryFileSummary(copies: recovery)
             }
@@ -115,9 +115,12 @@ struct HiveOverviewView: View {
 }
 
 private struct ServerOverviewList: View {
+    let link: HiveLink
     let servers: ServerList
     let onAddServer: () -> Void
     let onSelect: (UUID) -> Void
+
+    @State private var outOfDate: [Server] = []
 
     var body: some View {
         Section("Servers") {
@@ -153,6 +156,11 @@ private struct ServerOverviewList: View {
                 }
                 .buttonStyle(.plain)
             }
+            UpdateAllScouts(link: link, outOfDate: $outOfDate)
+        }
+        .task(id: servers.servers.map(\.id)) {
+            let found = await UpdateAllScouts.outOfDate(servers.servers, link: link)
+            if !Task.isCancelled { outOfDate = found }
         }
     }
 

@@ -38,6 +38,8 @@ struct ManagementInputTests {
     func otherRequests() throws {
         #expect(try read(Self.line(.status)) == ManagementInput(request: .status, binary: []))
         #expect(try read(Self.line(.install(code: "scout1:AQID"))) == ManagementInput(request: .install(code: "scout1:AQID"), binary: []))
+        let addresses = ManagementRequest.addresses([EnrollmentCode.Address(host: "hive.example.com", port: 4483)])
+        #expect(try read(Self.line(addresses)) == ManagementInput(request: addresses, binary: []))
         #expect(try read(Self.line(.uninstall) + [UInt8(ascii: "x")]) == nil)
         #expect(try read(Array(#"{"request":"status"}"#.utf8)) == nil)
         #expect(try read(Array("status\n".utf8)) == nil)

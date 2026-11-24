@@ -15,6 +15,9 @@ enum ScoutCommand: Equatable {
     case enroll(stateDirectory: String)
     /// Samples every 10 seconds and sends to the Hive it enrolled with, as the service does.
     case run(stateDirectory: String, runtimeDirectory: String)
+    /// Replaces the enrollment's addresses with those read as JSON from standard input, keeping its key
+    /// and pin. `manage` runs it for Hive, as Scout's own user.
+    case addresses(stateDirectory: String)
     /// Prints whether the running Scout is sending, from its runtime folder.
     case status(runtimeDirectory: String)
     /// Installs this binary as a service, run as root, enrolling through a code read from standard
@@ -29,6 +32,7 @@ enum ScoutCommand: Equatable {
         usage: hive-scout sample
                hive-scout watch [--tls <host>:<port> --pin <SHA-256 of Hive's key, in hex>]
                hive-scout enroll [--state-directory <path>] < code
+               hive-scout addresses [--state-directory <path>] < addresses
                hive-scout run [--state-directory <path>] [--runtime-directory <path>]
                hive-scout status [--runtime-directory <path>]
                sudo hive-scout install [--ssh-user <name>] < code
@@ -66,6 +70,9 @@ enum ScoutCommand: Equatable {
             // Never the code itself, which an argument would show in `ps`, `sudo`'s log and the journal.
             guard let folders = folders(from: options, allowed: ["--state-directory"]) else { return nil }
             return .enroll(stateDirectory: folders["--state-directory"] ?? EnrollmentStore.defaultDirectory)
+        case "addresses":
+            guard let folders = folders(from: options, allowed: ["--state-directory"]) else { return nil }
+            return .addresses(stateDirectory: folders["--state-directory"] ?? EnrollmentStore.defaultDirectory)
         case "run":
             guard let folders = folders(from: options, allowed: ["--state-directory", "--runtime-directory"]) else { return nil }
             return .run(

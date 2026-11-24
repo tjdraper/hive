@@ -8,36 +8,59 @@ enum ManageCommand {
         guard let input else {
             return answer(.refused, "That isn't a request Scout understands. Nothing was changed.")
         }
-        var said: [String] = []
-        let say = { (line: String) in said.append(line) }
         switch input.request.request {
         case .status:
             return answer(.done, "Scout \(ScoutRelease.version) for \(ScoutRelease.platform).")
         case .install:
-            do {
-                try InstallWorkflow(say: say).install(sshUser: nil) { () throws(InstallError) in
-                    guard let text = input.request.code else { return nil }
-                    guard let code = EnrollmentCode(text: text) else { throw .notACode }
-                    return code
-                }
-                return answer(.done, said.joined(separator: " "))
-            } catch {
-                return answer(outcome(of: error), InstallMessage.text(for: error))
-            }
+            return install(code: input.request.code)
         case .update:
-            do {
-                let version = try UpdateWorkflow().update(statement: input.request.statement ?? "", binary: input.binary)
-                return answer(.done, "Updated Scout from \(ScoutRelease.version) to \(version) and restarted it.", version: version)
-            } catch {
-                return answer(outcome(of: error), UpdateMessage.text(for: error))
-            }
+            return update(statement: input.request.statement ?? "", binary: input.binary)
+        case .addresses:
+            return replaceAddresses(with: input.request.addresses ?? [])
         case .uninstall:
-            do {
-                try UninstallWorkflow(say: say).uninstall()
-                return answer(.done, said.joined(separator: " "))
-            } catch {
-                return answer(.failed, InstallMessage.text(for: error))
+            return uninstall()
+        }
+    }
+
+    private static func install(code text: String?) -> ManagementResponse {
+        var said: [String] = []
+        do {
+            try InstallWorkflow { said.append($0) }.install(sshUser: nil) { () throws(InstallError) in
+                guard let text else { return nil }
+                guard let code = EnrollmentCode(text: text) else { throw .notACode }
+                return code
             }
+            return answer(.done, said.joined(separator: " "))
+        } catch {
+            return answer(outcome(of: error), InstallMessage.text(for: error))
+        }
+    }
+
+    private static func update(statement: String, binary: [UInt8]) -> ManagementResponse {
+        do {
+            let version = try UpdateWorkflow().update(statement: statement, binary: binary)
+            return answer(.done, "Updated Scout from \(ScoutRelease.version) to \(version) and restarted it.", version: version)
+        } catch {
+            return answer(outcome(of: error), UpdateMessage.text(for: error))
+        }
+    }
+
+    private static func replaceAddresses(with addresses: [EnrollmentCode.Address]) -> ManagementResponse {
+        do throws(NewAddressesError) {
+            try NewAddressesWorkflow().replace(with: addresses)
+            return answer(.done, "Scout has the Hive's new addresses and is connecting through them.")
+        } catch {
+            return answer(outcome(of: error), AddressesMessage.text(for: error))
+        }
+    }
+
+    private static func uninstall() -> ManagementResponse {
+        var said: [String] = []
+        do {
+            try UninstallWorkflow { said.append($0) }.uninstall()
+            return answer(.done, said.joined(separator: " "))
+        } catch {
+            return answer(.failed, InstallMessage.text(for: error))
         }
     }
 
@@ -56,6 +79,13 @@ enum ManageCommand {
             .refused
         case .ruleRefused, .commandFailed, .file:
             .failed
+        }
+    }
+
+    private static func outcome(of error: NewAddressesError) -> ManagementResponse.Outcome {
+        switch error {
+        case .notRoot, .notInstalled, .notAddresses, .notSaved: .refused
+        case .reloadFailed: .failed
         }
     }
 
@@ -92,6 +122,24 @@ enum UpdateMessage {
             "Couldn't write the new binary: \(error)"
         case .restartFailed(let output):
             "The new binary is in place, but Scout's service didn't start again: \(output)"
+        }
+    }
+}
+
+/// What a change of addresses says when it stops.
+enum AddressesMessage {
+    static func text(for error: NewAddressesError) -> String {
+        switch error {
+        case .notRoot:
+            "Run this as root, such as with sudo."
+        case .notInstalled:
+            "Scout isn't installed, so there are no addresses to change. Nothing was changed."
+        case .notAddresses:
+            "Those aren't addresses Scout can use. Nothing was changed."
+        case .notSaved:
+            "Scout couldn't save the new addresses, as when it hasn't enrolled. Nothing was changed."
+        case let .reloadFailed(command, output):
+            "Scout saved the new addresses, but \(command) failed, so it uses them only once it starts again: \(output)"
         }
     }
 }

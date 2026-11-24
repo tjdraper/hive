@@ -114,6 +114,7 @@ Hive treats every network, the tailnet included, as the open internet. These rul
 - Secrets are write-only. No API response, log, error message or plaintext file may contain one.
 - Anything that deletes backups, sends a secret somewhere new, or gives a new device access (the list is in the plan's §6) requires the `.userPresence` key, and every change made through the API is recorded in the audit log.
 - Changing where a secret is sent, such as a server's host or the SMTP host, clears that secret so it has to be entered again.
+- Hive installs on a server only a Scout binary Hive.app carries, whose signed statement names it, and updates a Scout only to a newer version than the one installed, which the installed Scout checks is signed with the key its build trusts. Nothing a server or its Scout says goes into a command Hive runs.
 
 ## Real Servers and Backups
 

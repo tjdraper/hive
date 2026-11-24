@@ -28,6 +28,13 @@ struct ScoutCommandTests {
         #expect(ScoutCommand(arguments: ["enroll", "--state-directory", "/tmp/scout"]) == .enroll(stateDirectory: "/tmp/scout"))
     }
 
+    @Test("Addresses are read from standard input, and only a state folder is taken as an argument")
+    func addresses() {
+        #expect(ScoutCommand(arguments: ["addresses"]) == .addresses(stateDirectory: "/var/lib/hive-scout"))
+        #expect(ScoutCommand(arguments: ["addresses", "--state-directory", "/tmp/scout"]) == .addresses(stateDirectory: "/tmp/scout"))
+        #expect(ScoutCommand(arguments: ["addresses", "hive.example.com:4483"]) == nil)
+    }
+
     @Test("A code given as an argument is refused, so it never shows in `ps` or the journal")
     func enrollRefusesCodeArgument() {
         #expect(ScoutCommand(arguments: ["enroll", "scout1:AQIDBAUG"]) == nil)

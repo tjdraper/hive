@@ -11,7 +11,7 @@ extension HiveAPI {
     }
 
     var metricsState: ServerMetricsStateReader {
-        ServerMetricsStateReader(scouts: scouts, metrics: metrics, carriedScoutVersion: scoutVersion)
+        ServerMetricsStateReader(scouts: scouts, metrics: metrics, carriedScoutVersion: carriedScout?.version)
     }
 
     var enrollmentWindow: EnrollmentWindowWorkflow {
@@ -34,6 +34,19 @@ extension HiveAPI {
             sessions: signIn.sessions,
             limiter: pairingLimiter,
             isRestarting: { [restart] in restart.isRequested },
+            now: signIn.now
+        )
+    }
+
+    var scoutManagement: ScoutManagementWorkflow {
+        ScoutManagementWorkflow(
+            targets: connectionTest.targets,
+            ssh: connectionTest.ssh,
+            carried: carriedScout,
+            settings: settingsStore,
+            database: servers.store.database,
+            windows: enrollmentWindow,
+            metricsRemoval: metricsRemoval,
             now: signIn.now
         )
     }

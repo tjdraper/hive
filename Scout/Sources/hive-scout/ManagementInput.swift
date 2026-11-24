@@ -30,14 +30,14 @@ struct ManagementInput: Equatable {
             guard let length = request.binaryLength, (1...ManagementRequest.largestBinary).contains(length),
                   rest.count == length
             else { return nil }
-        case .status, .install, .uninstall:
+        case .status, .install, .addresses, .uninstall:
             guard rest.isEmpty else { return nil }
         }
         return Self(request: request, binary: rest)
     }
 
     /// Everything until the end of the input, or nil past `limit` bytes.
-    private static func readAll(from descriptor: Int32, limit: Int) -> [UInt8]? {
+    static func readAll(from descriptor: Int32, limit: Int) -> [UInt8]? {
         var bytes: [UInt8] = []
         var buffer = [UInt8](repeating: 0, count: 1 << 16)
         while bytes.count <= limit {

@@ -57,7 +57,7 @@ final class FakeKeyServer: SSHRunning {
         state.withLock { $0.failsRemoval = true }
     }
 
-    func run(_ remoteCommand: String, on target: SSHTarget) async throws -> ChildProcess.Result {
+    func run(_ remoteCommand: String, input _: Data?, on target: SSHTarget) async throws -> ChildProcess.Result {
         let key = target.key.publicKey
         let (only, also, failsRemoval) = state.withLock { state in
             state.commands.append((remoteCommand, key))

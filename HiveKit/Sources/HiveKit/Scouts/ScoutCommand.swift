@@ -4,7 +4,7 @@ import Foundation
 /// SHA-256s. Built into Beekeeper, so a Hive taken over by someone else can't point a server at a
 /// binary of its own.
 public struct ScoutRelease: Hashable, Sendable {
-    public enum Platform: String, CaseIterable, Hashable, Sendable {
+    public enum Platform: String, CaseIterable, Codable, Hashable, Sendable {
         case x86 = "x86_64"
         case arm = "aarch64"
 
