@@ -14,6 +14,9 @@ public enum LiveUpdate: Codable, Hashable, Sendable {
     /// change. A device connected when the port changes keeps this response on the old port, so it
     /// hears of the new one.
     case addresses(HiveAddresses)
+    /// A server's newest sample, each time it changes. A device that falls behind gets only each
+    /// server's newest, and samples from a Scout's backlog are never sent.
+    case serverMetrics(ServerMetricsLatest)
     /// Sent while nothing else is, so neither end takes a quiet connection for a dead one.
     case heartbeat
 }

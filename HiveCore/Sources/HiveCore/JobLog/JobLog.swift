@@ -74,6 +74,20 @@ struct JobLog: Sendable {
         }
     }
 
+    /// The server's runs that were going at any time from `start` up to `end`, oldest first, at most
+    /// `largestPage` of them.
+    func runs(ofServer serverID: UUID, from start: Date, to end: Date) throws -> [RunLogEntry] {
+        try database.writer.read { database in
+            try JobLogRecord
+                .filter(Column("serverID") == serverID && JobLogRecord.kindColumn != RemovalLogRecord.kind)
+                .filter(Column("startedAt") < end && (Column("finishedAt") == nil || Column("finishedAt") >= start))
+                .order(Column("startedAt"))
+                .limit(Self.largestPage)
+                .fetchAll(database)
+                .compactMap(\.entry)
+        }
+    }
+
     /// Removes finished entries that started before `date`. Returns how many.
     func removeEntries(startedBefore date: Date) throws -> Int {
         try database.writer.write { database in

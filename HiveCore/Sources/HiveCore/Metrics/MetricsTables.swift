@@ -25,22 +25,22 @@ struct MetricsColumn: Equatable, Sendable {
     }
 }
 
-struct MetricsFigure<Source>: Sendable {
+struct StoredFigure<Source>: Sendable {
     let column: MetricsColumn
     let value: @Sendable (Source) -> DatabaseValue
 
     static func real(_ name: String, kept: MetricsKept = .averageAndHighest, _ value: @escaping @Sendable (Source) -> Double?) -> Self {
-        MetricsFigure(column: MetricsColumn(name: name, isWhole: false, kept: kept)) { value($0)?.databaseValue ?? .null }
+        StoredFigure(column: MetricsColumn(name: name, isWhole: false, kept: kept)) { value($0)?.databaseValue ?? .null }
     }
 
     static func bytes(_ name: String, kept: MetricsKept = .averageAndHighest, _ value: @escaping @Sendable (Source) -> UInt64?) -> Self {
-        MetricsFigure(column: MetricsColumn(name: name, isWhole: true, kept: kept)) {
+        StoredFigure(column: MetricsColumn(name: name, isWhole: true, kept: kept)) {
             value($0).map { Int64(clamping: $0) }?.databaseValue ?? .null
         }
     }
 
     static func count(_ name: String, kept: MetricsKept = .averageAndHighest, _ value: @escaping @Sendable (Source) -> Int?) -> Self {
-        MetricsFigure(column: MetricsColumn(name: name, isWhole: true, kept: kept)) { value($0)?.databaseValue ?? .null }
+        StoredFigure(column: MetricsColumn(name: name, isWhole: true, kept: kept)) { value($0)?.databaseValue ?? .null }
     }
 }
 
@@ -72,7 +72,7 @@ extension MetricsTableShape {
 struct MetricsTable<Source>: MetricsTableShape {
     let kind: String
     let nameKind: String?
-    let figures: [MetricsFigure<Source>]
+    let figures: [StoredFigure<Source>]
 
     var columns: [MetricsColumn] {
         figures.map(\.column)

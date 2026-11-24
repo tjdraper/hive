@@ -186,7 +186,8 @@ struct SignInWorkflowTests {
     @Test("A Beekeeper newer than this Hive understands is told to update Hive")
     func oldHiveIsReported() throws {
         // Arrange
-        let request = try fixture.request(apiVersions: APIVersions(current: 5, oldestCompatible: 4))
+        let hive = APIVersions.thisBuild.current
+        let request = try fixture.request(apiVersions: APIVersions(current: hive + 2, oldestCompatible: hive + 1))
 
         // Act
         let outcome = fixture.workflow.signIn(request, from: address)

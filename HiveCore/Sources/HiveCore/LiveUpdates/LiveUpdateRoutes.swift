@@ -42,3 +42,17 @@ enum LiveUpdateRoutes {
         }
     }
 }
+
+extension HiveAPI {
+    var liveUpdateStream: LiveUpdateStream {
+        LiveUpdateStream(
+            events: runs.events,
+            statuses: jobStatus,
+            recovery: recoveryKey,
+            settings: settingsStore,
+            addressChanges: addressChanges,
+            metrics: metricsBoard,
+            heartbeat: liveUpdateHeartbeat
+        )
+    }
+}

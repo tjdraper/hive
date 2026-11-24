@@ -128,6 +128,11 @@ struct ScoutSessionTests {
             (HiveEndpoint.enrollmentWindow(forServer: server.id), .post),
             (HiveEndpoint.metrics(ofServer: server.id), .get),
             (HiveEndpoint.metrics(ofServer: server.id), .delete),
+            (HiveEndpoint.metricsSummary, .get),
+            (HiveEndpoint.metricsSeries(ofServer: server.id, from: 0, to: 3_600, figures: [.cpuUser]), .get),
+            (HiveEndpoint.processes(ofServer: server.id, at: 0), .get),
+            (HiveEndpoint.filesystemForecasts(ofServer: server.id), .get),
+            (HiveEndpoint.backupRunMarks(ofServer: server.id, from: 0, to: 3_600), .get),
         ]
 
         for (path, method) in paths {

@@ -14,6 +14,8 @@ public struct HiveAPI: Sendable {
     let metrics: MetricsStore
     /// Kept for as long as Hive runs, so it counts across requests.
     let metricsLimiter = MetricsRateLimiter()
+    /// Each server's newest figures, for live updates.
+    let metricsBoard = MetricsLiveBoard()
     /// The Hive Mac's addresses, read fresh each time.
     let addresses: @Sendable () -> [NetworkInterfaceAddress]
     /// The port and address options, each time either changes.

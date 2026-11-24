@@ -67,8 +67,8 @@ enum MetricsRollup {
         try database.cachedStatement(sql: sql).execute(arguments: StatementArguments(arguments))
     }
 
-    /// The average, highest and lowest of a column, as far as `resolution`'s rollup keeps them.
-    private static func aggregates(of column: MetricsColumn, from source: MetricsResolution) -> [String] {
+    /// The average, highest and lowest of a column over rows from `source`, as far as the column keeps them.
+    static func aggregates(of column: MetricsColumn, from source: MetricsResolution) -> [String] {
         let name = column.name
         let average: String
         let highest: String

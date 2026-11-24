@@ -65,11 +65,30 @@ struct DeveloperWindow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(.background.secondary)
+
+            Text("Live figures")
+                .font(.headline)
+            ScrollView {
+                Text(liveFigures)
+                    .font(.body.monospaced())
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(minHeight: 80, maxHeight: 200)
+            .background(.background.secondary)
         }
         .padding()
         .onAppear {
             if hiveID == nil { hiveID = store.hives.first?.id }
         }
+    }
+
+    /// Each server's newest figures from the chosen Hive's live updates.
+    private var liveFigures: String {
+        guard let hiveID, let metrics = store.liveMetrics(for: hiveID) else { return "" }
+        let latest = metrics.latest.values.sorted { $0.serverID.uuidString < $1.serverID.uuidString }
+        guard let data = try? JSONEncoder().encode(latest) else { return "" }
+        return Self.pretty(data)
     }
 
     private func send() async {

@@ -12,6 +12,7 @@ final class HiveListStore {
     private var links: [UUID: HiveLink] = [:]
     private var serverLists: [UUID: ServerList] = [:]
     private var recoveryFiles: [UUID: RecoveryFileCopies] = [:]
+    private var liveMetrics: [UUID: LiveServerMetrics] = [:]
     private var liveUpdates: [UUID: Task<Void, Never>] = [:]
     /// Hives first paired since Beekeeper opened, whose setup goes on to their recovery key.
     private var newlyPaired: Set<UUID> = []
@@ -63,6 +64,10 @@ final class HiveListStore {
         recoveryFiles[id]
     }
 
+    func liveMetrics(for id: UUID) -> LiveServerMetrics? {
+        liveMetrics[id]
+    }
+
     var hasOfflineHive: Bool {
         hives.contains { links[$0.id]?.status == .offline }
     }
@@ -91,7 +96,14 @@ final class HiveListStore {
         serverLists[hive.id] = servers
         let recovery = RecoveryFileCopies(hiveID: hive.id, hiveName: hive.name, link: link)
         recoveryFiles[hive.id] = recovery
-        let follower = LiveUpdateFollower(link: link, statuses: servers.statuses, recovery: recovery) { [weak self] addresses in
+        let metrics = LiveServerMetrics()
+        liveMetrics[hive.id] = metrics
+        let follower = LiveUpdateFollower(
+            link: link,
+            statuses: servers.statuses,
+            recovery: recovery,
+            metrics: metrics
+        ) { [weak self] addresses in
             self?.follow(hive.id, to: addresses)
         }
         liveUpdates[hive.id] = Task { await follower.follow() }
@@ -179,6 +191,7 @@ final class HiveListStore {
         links[id] = nil
         serverLists[id] = nil
         recoveryFiles[id] = nil
+        liveMetrics[id] = nil
         liveUpdates.removeValue(forKey: id)?.cancel()
     }
 

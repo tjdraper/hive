@@ -20,3 +20,27 @@ References like §6 point to [00-Info.md](00-Info.md).
 - A Scout's session is refused on every one of these routes
 
 **Done when:** with a Scout in the test VM reporting to the development Hive, Beekeeper's Developer window shows a range, a moment's processes and live figures; and the tests pass.
+
+## Session 1
+
+Done: every route, the live updates, HiveKit's types and the tests, and the "done when". `Scripts/build-and-test.sh` passes. B4 is done.
+
+Checked end to end (2026-11-24): Scout installed from Debug Beekeeper on the test VM's B3 Debian root, reporting to the development Hive. Through the Developer window: an hour's range in 10-second buckets, a day's in 3-minute ones and a week's in 20-minute ones; the processes nearest a moment as a sample, and `notKept` where nothing was; each server's live figures, moving on with every sample; the summary, with the VM reporting and two other servers stopped; forecasts, empty with too few hours; and a server's backup runs, one failed for a missing drive.
+
+That check found two things, both fixed: a week's range read hours, since it reached Hive a few seconds older than a week, so minutes now count as kept for as long as pruning leaves them, an hour more; and a stopped server's sparkline showed the hour before it stopped as if current, so it's now the last hour by Hive's clock, moved by the server's offset.
+
+What was decided along the way:
+
+- **Routes** (`MetricsReading/`), each reached only by a device's session: `GET /metrics` for the dashboard's summaries, and under `/servers/<id>/metrics`, `series`, `processes`, `filesystem-forecasts` and `backup-runs`. A server whose metrics were removed still answers with its history. API version 4.
+- **Figures are named** by `MetricsFigure`, such as `cpuUser` or `filesystem.available`, and a series comes back per subject (the server, then each filesystem, disk and interface), each with only the buckets something was kept in, so a missing one is a gap.
+- **Buckets** are the smallest size from a fixed list that gives at most 600, and never finer than the finest resolution still kept at the range's start. Each stretch of the range is read from whichever resolution holds the most samples, so minutes from a Scout's backlog, which have no 10-second rows, fill the buckets they cover instead of showing as a gap.
+- **A moment's processes** are the 10-second sample nearest it within 5 minutes, otherwise its hour's top groups, otherwise `notKept`.
+- **Forecasts** use the least-squares slope of each filesystem's hourly available space over its newest week, need at least 6 hours, and give no date when it's steady, shrinking or more than a year off.
+- **Backup runs** come from the job log, moved onto the server's clock by its last known offset.
+- **Reporting** on the dashboard: waiting (nothing since its Scout enrolled), reporting, stopped (nothing for 3 minutes), clock ahead, or refused.
+- **Live figures** go through `MetricsLiveBoard`, which keeps each server's newest and no queue. A device's stream gets a signal holding at most one change while unread, then writes every server's newest it hasn't seen, so figures never take room in `Broadcaster`'s queue from job events. Only a report whose newest sample is within a minute of when Scout sent it reaches the board, so a backlog never does.
+- **The Developer window** shows each server's live figures under the response.
+
+Follow-ups:
+
+- **Processes in containers show a host user's name for their user ID,** such as Redis in a container as `hive-scout`, since Scout looks the ID up on the host. B7, which says which container each process is in, should show the ID instead for those.

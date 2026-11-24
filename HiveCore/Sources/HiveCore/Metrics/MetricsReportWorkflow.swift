@@ -23,6 +23,8 @@ struct MetricsReportWorkflow: Sendable {
 
     let store: MetricsStore
     let limiter: MetricsRateLimiter
+    /// Given each report's newest sample while it's current, for live updates.
+    let board: MetricsLiveBoard
     let now: @Sendable () -> Date
 
     /// False when the server's Scout has sent more often than Hive takes, checked before its body is read.
@@ -57,6 +59,7 @@ struct MetricsReportWorkflow: Sendable {
                 Self.logger.info(
                     "Kept \(samples, privacy: .public) samples and \(minutes, privacy: .public) minutes in \(duration, privacy: .public)"
                 )
+                postIfCurrent(report, forServer: serverID)
                 return .kept
             case .refused(let reason):
                 Self.logger.error("Refused a Scout's figures: \(reason.rawValue, privacy: .public)")
@@ -67,6 +70,22 @@ struct MetricsReportWorkflow: Sendable {
             return .unavailable
         }
     }
+
+    /// A backlog's batches are older than the newest sample Scout sent first, so they never reach live
+    /// updates. The newest is read back as kept, so a repeat of an older sample can't replace it.
+    private func postIfCurrent(_ report: MetricsReport, forServer serverID: UUID) {
+        guard let newest = report.samples.map(\.takenAt).max(), newest >= report.sentAt - Self.currentSeconds else { return }
+        do {
+            if let latest = try ServerMetricsSummaryReader.latest(ofServer: serverID, in: store.database) {
+                board.post(latest)
+            }
+        } catch {
+            Self.logger.error("Couldn't read a server's newest figures: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// A sample taken this long before Scout sent it is from a backlog.
+    static let currentSeconds: Int64 = 60
 
     /// For a request refused before it reached the store, such as one too large to read.
     func refuse(_ reason: ScoutRefusal.Reason, forServer serverID: UUID) -> MetricsReportOutcome {

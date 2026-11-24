@@ -80,6 +80,7 @@ public struct APIServer: Sendable {
         ScoutRoutes.add(to: router, api: api)
         ScoutManagementRoutes.add(to: router, workflow: api.scoutManagement, confirmations: api.confirmations)
         MetricsRoutes.add(to: router, workflow: api.metricsReports)
+        MetricsReadingRoutes.add(to: router, api: api)
         ServerSpaceRoutes.add(to: router, reader: api.serverSpace)
         RemovalEstimateRoutes.add(to: router, estimator: api.removalEstimator)
         BackupJobRoutes.add(to: router, workflow: api.jobs, confirmations: api.confirmations)
@@ -92,18 +93,7 @@ public struct APIServer: Sendable {
         JobLogRoutes.add(to: router, jobLog: api.jobLog)
         SnapshotRoutes.add(to: router, reader: api.snapshots, removedJobs: api.removedJobs)
         SnapshotDeletionRoutes.add(to: router, store: api.snapshotDeletions, runs: api.runs, confirmations: api.confirmations)
-        LiveUpdateRoutes.add(
-            to: router,
-            stream: LiveUpdateStream(
-                events: api.runs.events,
-                statuses: api.jobStatus,
-                recovery: api.recoveryKey,
-                settings: api.settingsStore,
-                addressChanges: api.addressChanges,
-                heartbeat: api.liveUpdateHeartbeat
-            ),
-            signIn: api.signIn
-        )
+        LiveUpdateRoutes.add(to: router, stream: api.liveUpdateStream, signIn: api.signIn)
         return router
     }
 

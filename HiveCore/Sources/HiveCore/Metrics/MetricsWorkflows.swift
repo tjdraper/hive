@@ -4,7 +4,7 @@ import HiveKit
 /// The metrics workflows, built from the API's stores like the rest.
 extension HiveAPI {
     var metricsReports: MetricsReportWorkflow {
-        MetricsReportWorkflow(store: metrics, limiter: metricsLimiter, now: signIn.now)
+        MetricsReportWorkflow(store: metrics, limiter: metricsLimiter, board: metricsBoard, now: signIn.now)
     }
 
     var metricsUpkeep: MetricsUpkeep {

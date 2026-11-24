@@ -13,6 +13,7 @@ struct LiveUpdateFollower {
     let link: HiveLink
     let statuses: JobStatusStore
     let recovery: RecoveryFileCopies
+    let metrics: LiveServerMetrics
     let onAddresses: (HiveAddresses) -> Void
 
     /// Until cancelled. Opening live updates signs in again, so a Hive that comes back after a restart
@@ -56,6 +57,8 @@ struct LiveUpdateFollower {
             recovery.receive(state)
         case .addresses(let addresses):
             onAddresses(addresses)
+        case .serverMetrics(let figures):
+            metrics.receive(figures)
         case .jobStatuses, .jobStatus, .event, .heartbeat:
             statuses.apply(update)
         }

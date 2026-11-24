@@ -21,6 +21,36 @@ private struct LiveAnswer {
     }
 }
 
+/// Holds writers back while it's closed, as a slow device does.
+private actor Gate {
+    private var isClosed = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func close() {
+        isClosed = true
+    }
+
+    func open() {
+        isClosed = false
+        for writer in waiting {
+            writer.resume()
+        }
+        waiting = []
+    }
+
+    func wait() async {
+        guard isClosed else { return }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+}
+
+private extension RunEvent {
+    /// A distinct event for each `index`, which changes no job's state.
+    static func progressStep(jobID: UUID, _ index: Int) -> RunEvent {
+        .step(jobID: jobID, step: .pulling(folder: "folder \(index)"))
+    }
+}
+
 /// What a live updates stream wrote, as it writes it.
 private final class WrittenUpdates: Sendable {
     private let written = Mutex<[LiveUpdate]>([])
@@ -107,7 +137,7 @@ struct LiveUpdateTests {
         let api = fixture.api.api
         let stream = LiveUpdateStream(
             events: fixture.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey,
-            settings: api.settingsStore, addressChanges: api.addressChanges, heartbeat: .seconds(3600)
+            settings: api.settingsStore, addressChanges: api.addressChanges, metrics: api.metricsBoard, heartbeat: .seconds(3600)
         )
         let following = Task { try await stream.run(isSignedIn: { true }, writing: { written.append($0) }) }
         try await written.wait { $0.count == 3 }
@@ -177,7 +207,7 @@ struct LiveUpdateTests {
         let api = fixture.api
         let stream = LiveUpdateStream(
             events: api.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey,
-            settings: api.settingsStore, addressChanges: api.addressChanges, heartbeat: .milliseconds(10)
+            settings: api.settingsStore, addressChanges: api.addressChanges, metrics: api.metricsBoard, heartbeat: .milliseconds(10)
         )
 
         // Act
@@ -249,7 +279,7 @@ struct LiveUpdateTests {
         let written = WrittenUpdates()
         let stream = LiveUpdateStream(
             events: api.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey,
-            settings: api.settingsStore, addressChanges: api.addressChanges, heartbeat: .seconds(3600)
+            settings: api.settingsStore, addressChanges: api.addressChanges, metrics: api.metricsBoard, heartbeat: .seconds(3600)
         )
         let following = Task { try await stream.run(isSignedIn: { true }, writing: { written.append($0) }) }
         try await written.wait { $0.count == 3 }
@@ -274,6 +304,62 @@ struct LiveUpdateTests {
         #expect(states.dropFirst().allSatisfy { $0.fileDigest != nil })
         #expect(Set(states.map(\.fileDigest)).count == 4)
         #expect(states.last?.fileDigest == RecoveryFileHeader.digest(of: try Data(contentsOf: fixture.recoveryFile)))
+    }
+
+    @Test(
+        "A device that falls behind gets every job event and only each server's newest figures",
+        .timeLimit(.minutes(1))
+    )
+    func slowListenerGetsNewestFigures() async throws {
+        // Arrange
+        let fixture = try APIFixture()
+        let api = fixture.api
+        let written = WrittenUpdates()
+        let gate = Gate()
+        let stream = LiveUpdateStream(
+            events: api.runs.events, statuses: api.jobStatus, recovery: api.recoveryKey,
+            settings: api.settingsStore, addressChanges: api.addressChanges, metrics: api.metricsBoard, heartbeat: .seconds(3600)
+        )
+        let following = Task {
+            try await stream.run(isSignedIn: { true }, writing: { update in
+                await gate.wait()
+                written.append(update)
+            })
+        }
+        try await written.wait { $0.count == 3 }
+        await gate.close()
+        let jobID = UUID()
+        let (first, second) = (UUID(), UUID())
+
+        // Act: while the device is held up writing the first event.
+        let events = (0 ..< 150).map { RunEvent.progressStep(jobID: jobID, $0) }
+        for (index, event) in events.enumerated() {
+            api.runs.events.send(event)
+            api.metricsBoard.post(Self.figures(first, takenAt: Int64(index)))
+            api.metricsBoard.post(Self.figures(second, takenAt: Int64(index)))
+        }
+        await gate.open()
+        try await written.wait { updates in
+            updates.contains(.event(events[events.count - 1])) && updates.count { if case .serverMetrics = $0 { true } else { false } } == 2
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        following.cancel()
+
+        // Assert
+        let updates = written.updates.dropFirst(3)
+        #expect(updates.compactMap { update -> RunEvent? in
+            guard case .event(let event) = update else { return nil }
+            return event
+        } == events)
+        let figures = updates.compactMap { update -> ServerMetricsLatest? in
+            guard case .serverMetrics(let latest) = update else { return nil }
+            return latest
+        }
+        #expect(Set(figures) == [Self.figures(first, takenAt: 149), Self.figures(second, takenAt: 149)])
+    }
+
+    private static func figures(_ serverID: UUID, takenAt: Int64) -> ServerMetricsLatest {
+        ServerMetricsLatest(serverID: serverID, takenAt: takenAt, cores: 4, cpu: nil, load: nil, memory: nil, fullestFilesystem: nil)
     }
 
     private static func describe(_ event: RunEvent) -> String {

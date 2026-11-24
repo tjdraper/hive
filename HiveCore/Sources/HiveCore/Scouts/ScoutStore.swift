@@ -95,6 +95,15 @@ struct ScoutStore: Sendable {
         try database.writer.read { try Bool.fetchOne($0, sql: "SELECT hasMetrics FROM server WHERE id = ?", arguments: [serverID]) }
     }
 
+    /// Every server with metrics, by name, with its Scout while one is enrolled.
+    func serversWithMetrics() throws -> [(serverID: UUID, scout: ScoutRecord?)] {
+        try database.writer.read { database in
+            let serverIDs = try UUID.fetchAll(database, sql: "SELECT id FROM server WHERE hasMetrics = 1 ORDER BY name")
+            let scouts = try ScoutRecord.fetchAll(database)
+            return serverIDs.map { id in (id, scouts.first { $0.serverID == id }) }
+        }
+    }
+
     static func serverName(_ serverID: UUID, in database: Database) throws -> String? {
         try String.fetchOne(database, sql: "SELECT name FROM server WHERE id = ?", arguments: [serverID])
     }

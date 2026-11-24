@@ -57,6 +57,8 @@ public enum HiveEndpoint {
     public static let snapshots = "/snapshots"
     /// `GET` lists the `RemovedJob`s whose snapshots stayed on the chosen backup drive.
     public static let removedJobs = "/removed-jobs"
+    /// `GET` reads a `ServerMetricsSummary` for every server with metrics, for the dashboard.
+    public static let metricsSummary = "/metrics"
 
     public static func device(_ id: UUID) -> String {
         "\(devices)/\(id.uuidString)"
@@ -130,6 +132,30 @@ public enum HiveEndpoint {
     /// in again and its sessions end, while the figures already kept age out.
     public static func metrics(ofServer id: UUID) -> String {
         "\(server(id))/metrics"
+    }
+
+    /// `GET` reads the `MetricsSeries` of `figures` from `from` up to `to`, seconds since 1970 on the
+    /// server's clock, at most `longestMetricsRange` apart.
+    public static func metricsSeries(ofServer id: UUID, from start: Int64, to end: Int64, figures: [MetricsFigure]) -> String {
+        "\(metrics(ofServer: id))/series?from=\(start)&to=\(end)&figures=\(figures.map(\.rawValue).joined(separator: ","))"
+    }
+
+    public static let longestMetricsRange: Int64 = 400 * 86_400
+
+    /// `GET` reads the server's `ProcessMoment` at `at`, seconds since 1970 on the server's clock.
+    public static func processes(ofServer id: UUID, at moment: Int64) -> String {
+        "\(metrics(ofServer: id))/processes?at=\(moment)"
+    }
+
+    /// `GET` reads a `FilesystemForecast` for each of the server's filesystems.
+    public static func filesystemForecasts(ofServer id: UUID) -> String {
+        "\(metrics(ofServer: id))/filesystem-forecasts"
+    }
+
+    /// `GET` reads the `BackupRunMark`s of the server's runs from `from` up to `to`, seconds since 1970
+    /// on the server's clock.
+    public static func backupRunMarks(ofServer id: UUID, from start: Int64, to end: Int64) -> String {
+        "\(metrics(ofServer: id))/backup-runs?from=\(start)&to=\(end)"
     }
 
     /// `POST` finds out over SSH, changing nothing, what Hive can do about Scout on the server, answering
