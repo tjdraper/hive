@@ -15,19 +15,23 @@ enum ServerDraftCheck {
         let name = DisplayName.validated(draft.name)
         if name == nil { problems.append(ConfigurationProblem(field: .name, reason: .invalid)) }
 
-        let host = draft.connection.host.trimmingCharacters(in: .whitespaces).lowercased()
-        // IPv6 addresses need the colon. `ssh` takes them without brackets.
-        if !TextCheck.isPlainName(host, extra: "-._:", longest: longestHost) {
-            problems.append(ConfigurationProblem(field: .host, reason: .invalid))
-        }
+        var connection: ServerConnection?
+        if let requested = draft.connection {
+            let host = requested.host.trimmingCharacters(in: .whitespaces).lowercased()
+            // IPv6 addresses need the colon. `ssh` takes them without brackets.
+            if !TextCheck.isPlainName(host, extra: "-._:", longest: longestHost) {
+                problems.append(ConfigurationProblem(field: .host, reason: .invalid))
+            }
 
-        if !ports.contains(draft.connection.port) {
-            problems.append(ConfigurationProblem(field: .port, reason: .outOfRange))
-        }
+            if !ports.contains(requested.port) {
+                problems.append(ConfigurationProblem(field: .port, reason: .outOfRange))
+            }
 
-        let user = draft.connection.user.trimmingCharacters(in: .whitespaces)
-        if !TextCheck.isPlainName(user, extra: "-._", longest: longestUser) {
-            problems.append(ConfigurationProblem(field: .user, reason: .invalid))
+            let user = requested.user.trimmingCharacters(in: .whitespaces)
+            if !TextCheck.isPlainName(user, extra: "-._", longest: longestUser) {
+                problems.append(ConfigurationProblem(field: .user, reason: .invalid))
+            }
+            connection = ServerConnection(host: host, port: requested.port, user: user)
         }
 
         if let quota = draft.quotaBytes, quota <= 0 {
@@ -35,10 +39,6 @@ enum ServerDraftCheck {
         }
 
         guard let name, problems.isEmpty else { throw ConfigurationChangeError.refused(problems) }
-        return ServerDraft(
-            name: name,
-            connection: ServerConnection(host: host, port: draft.connection.port, user: user),
-            quotaBytes: draft.quotaBytes
-        )
+        return ServerDraft(name: name, connection: connection, quotaBytes: draft.quotaBytes)
     }
 }

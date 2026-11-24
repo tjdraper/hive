@@ -158,7 +158,10 @@ private struct ServerOverviewList: View {
 
     @ViewBuilder
     private func status(of server: Server) -> some View {
-        if server.isSetUp {
+        if server.connection == nil {
+            Text("No SSH details")
+                .foregroundStyle(.secondary)
+        } else if server.isSetUp {
             ServerHealthLabel(jobs: servers.jobs.jobs(onServer: server.id), statuses: servers.statuses)
         } else {
             HStack(spacing: 6) {

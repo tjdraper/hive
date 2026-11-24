@@ -30,7 +30,7 @@ struct ConnectionTestCheck: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Connecting to \(server.connection.host)…")
+                Text("Connecting to \(server.setupConnection.host)…")
                     .foregroundStyle(.secondary)
             }
         } else if let failure {
@@ -41,7 +41,7 @@ struct ConnectionTestCheck: View {
                 .foregroundStyle(.red)
         } else if let result {
             let seconds = result.seconds.formatted(.number.precision(.fractionLength(1)))
-            Label("Hive signed in as \(server.connection.user) in \(seconds) seconds.", systemImage: "checkmark.circle.fill")
+            Label("Hive signed in as \(server.setupConnection.user) in \(seconds) seconds.", systemImage: "checkmark.circle.fill")
             .foregroundStyle(.green)
         } else {
             Text("Checks that Hive can sign in with its key.")

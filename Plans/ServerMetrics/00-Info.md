@@ -18,7 +18,7 @@ Check off a slice here when its "done when" is true.
 
 ### Phase B — Metrics in Beekeeper
 
-- [ ] [B1. Servers without SSH details](06-B1-ServersWithoutSSHDetails.md) — Mixed, 1–2 sessions
+- [x] [B1. Servers without SSH details](06-B1-ServersWithoutSSHDetails.md) — Mixed, 1–2 sessions
 - [ ] [B2. Adding metrics to a server](07-B2-AddingMetricsToAServer.md) — Mixed, 1 session, installed build
 - [ ] [B3. Installing Scout from Beekeeper](08-B3-InstallingScoutFromBeekeeper.md) — Mixed, 1–2 sessions, needs you
 - [ ] [B4. Reading metrics from Hive](09-B4-ReadingMetricsFromHive.md) — Engine, 1 session

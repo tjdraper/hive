@@ -120,11 +120,13 @@ extension ServerChange {
     func summary(serverName: String) -> String {
         switch self {
         case .added(let connection):
-            "Added the server “\(serverName)” at \(connection.summary)"
+            connection.map { "Added the server “\(serverName)” at \($0.summary)" }
+                ?? "Added the server “\(serverName)” without SSH details"
         case .renamed(let old, let new):
             "Renamed the server “\(old)” to “\(new)”"
         case .connection(let old, let new):
-            "Changed “\(serverName)” from \(old.summary) to \(new.summary), clearing its database passwords and host key"
+            old.map { "Changed “\(serverName)” from \($0.summary) to \(new.summary), clearing its database passwords and host key" }
+                ?? "Added SSH details to “\(serverName)”: \(new.summary)"
         case .quota(let old, let new):
             "Changed the quota of “\(serverName)” from \(Self.quota(old)) to \(Self.quota(new))"
         case .hostKeyConfirmed(nil, let new):

@@ -146,7 +146,7 @@ private extension SSHKeyRotationFailure {
 private extension ConnectionFailure {
     var rotationSummary: String {
         switch self {
-        case .noSSHKey, .noConfirmedHostKey: "not set up yet"
+        case .noSSHDetails, .noSSHKey, .noConfirmedHostKey: "not set up yet"
         case .hostKeyChanged: "its host key changed"
         case .loginRefused: "the server turned the old key down"
         case .unreachable: "couldn't reach the server"

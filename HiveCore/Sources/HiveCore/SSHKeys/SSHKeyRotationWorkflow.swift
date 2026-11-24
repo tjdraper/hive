@@ -80,7 +80,8 @@ actor SSHKeyRotationWorkflow {
         let servers: [Server]
         let comment: String
         do {
-            servers = try ServerStore(database: database).all()
+            // A server without SSH details has no key to rotate.
+            servers = try ServerStore(database: database).all().filter { $0.connection != nil }
             comment = "Hive \(try settings.settings().name)"
         } catch {
             Self.logger.error("Couldn't read the servers to rotate: \(String(describing: type(of: error)), privacy: .public)")

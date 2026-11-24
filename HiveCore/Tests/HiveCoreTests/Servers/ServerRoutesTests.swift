@@ -27,7 +27,7 @@ struct ServerRoutesTests {
         // Arrange
         var draft = ConfigurationSamples.server
         draft.name = " Studio Web "
-        draft.connection.host = " Web.Example.COM"
+        draft.connection?.host = " Web.Example.COM"
 
         // Act
         let added = try await fixture.addServer(draft)
@@ -72,11 +72,8 @@ struct ServerRoutesTests {
     func changesServer() async throws {
         // Arrange
         let server = try await fixture.addServer()
-        let draft = ServerDraft(
-            name: "Studio Web 2",
-            connection: ServerConnection(host: "web2.example.com", port: 2222, user: "hive"),
-            quotaBytes: nil
-        )
+        let connection = ServerConnection(host: "web2.example.com", port: 2222, user: "hive")
+        let draft = ServerDraft(name: "Studio Web 2", connection: connection, quotaBytes: nil)
 
         // Act
         let answer = try await fixture.sendConfirmed(.put, HiveEndpoint.server(server.id), json: draft)
@@ -89,7 +86,7 @@ struct ServerRoutesTests {
         let entries = try fixture.auditLog.page(before: nil, limit: 3).entries
         #expect(entries.map(\.event) == [
             .server(serverID: server.id, serverName: "Studio Web 2", change: .quota(old: 500_000_000_000, new: nil)),
-            .server(serverID: server.id, serverName: "Studio Web 2", change: .connection(old: server.connection, new: draft.connection)),
+            .server(serverID: server.id, serverName: "Studio Web 2", change: .connection(old: server.connection, new: connection)),
             .server(serverID: server.id, serverName: "Studio Web 2", change: .renamed(old: "Studio Web", new: "Studio Web 2")),
         ])
         #expect(entries.allSatisfy { $0.deviceID == fixture.signIn.device.id })
@@ -265,7 +262,7 @@ struct ServerRoutesTests {
         // Act
         _ = try await fixture.sendConfirmed(.put, HiveEndpoint.server(server.id), json: draft)
         var otherDraft = otherServer.draft
-        otherDraft.connection.host = "mail.example.com"
+        otherDraft.connection?.host = "mail.example.com"
         _ = try await fixture.sendConfirmed(.put, HiveEndpoint.server(otherServer.id), json: otherDraft)
 
         // Assert
@@ -277,7 +274,7 @@ struct ServerRoutesTests {
     @Test("A body that isn't a server is refused")
     func malformedBody() async throws {
         // Act
-        let answer = try await fixture.send(.post, HiveEndpoint.servers, body: Data("{\"name\": \"Web\"}".utf8))
+        let answer = try await fixture.send(.post, HiveEndpoint.servers, body: Data("{\"connection\": {\"host\": \"web\"}}".utf8))
 
         // Assert
         #expect(answer.status == .badRequest)

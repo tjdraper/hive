@@ -80,7 +80,7 @@ struct HostKeyCheck: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Asking \(server.connection.host) for its host key…")
+                Text("Asking \(server.setupConnection.host) for its host key…")
                     .foregroundStyle(.secondary)
             }
         case .failed(let message):
@@ -103,7 +103,7 @@ struct HostKeyCheck: View {
 
     @ViewBuilder private func found(_ key: HostKeyFingerprint, replacing confirmed: HostKeyFingerprint?) -> some View {
         Text(
-            "\(server.connection.host) showed this \(confirmed == nil ? "" : "new ")\(key.typeName) key. Before confirming it, "
+            "\(server.setupConnection.host) showed this \(confirmed == nil ? "" : "new ")\(key.typeName) key. Before confirming it, "
                 + "check that it matches the server's own, so Hive never trusts a machine standing in for the server."
         )
         FingerprintText(fingerprint: key.fingerprint)

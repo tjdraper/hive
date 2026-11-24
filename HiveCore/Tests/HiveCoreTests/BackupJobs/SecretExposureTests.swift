@@ -36,7 +36,7 @@ struct SecretExposureTests {
         var unknownID = ConfigurationSamples.job(name: "Other", password: Self.secret)
         unknownID.databases[0].id = UUID()
         var moved = server.draft
-        moved.connection.host = "elsewhere.example.com"
+        moved.connection?.host = "elsewhere.example.com"
 
         // Act
         answers.append(try await fixture.sendConfirmed(.put, HiveEndpoint.job(job.id), json: replacing))

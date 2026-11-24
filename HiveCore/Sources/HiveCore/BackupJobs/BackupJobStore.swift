@@ -25,7 +25,8 @@ struct BackupJobStore: Sendable {
         try database.writer.read { try StoredBackupJob.fetch(id: id, in: $0)?.backupJob() }
     }
 
-    /// `sealed` has passed `BackupJobDraftCheck`. Returns nil when no server has that ID.
+    /// `sealed` has passed `BackupJobDraftCheck`. Refused for a server without SSH details, which it
+    /// would have no way to back up. Returns nil when no server has that ID.
     func add(
         _ sealed: SealedJobDraft,
         toServer serverID: UUID,
@@ -35,6 +36,9 @@ struct BackupJobStore: Sendable {
     ) throws -> BackupJob? {
         try database.writer.write { database in
             guard let server = try ServerRecord.fetchOne(database, key: serverID) else { return nil }
+            guard server.connection != nil else {
+                throw ConfigurationChangeError.refused([ConfigurationProblem(field: .connection, reason: .missing)])
+            }
             try Self.checkDatabaseIDs(in: sealed.draft, known: [])
             try Self.checkNameIsFree(sealed.draft.name, onServer: serverID, except: nil, in: database)
 

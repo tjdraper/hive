@@ -19,8 +19,8 @@ struct ServerStore: Sendable {
         try database.writer.read { try ServerRecord.fetchOne($0, key: id)?.server }
     }
 
-    /// `draft` has passed `ServerDraftCheck`.
-    func add(_ draft: ServerDraft, sshKey: SealedSSHKey, by deviceID: UUID, at date: Date) throws -> Server {
+    /// `draft` has passed `ServerDraftCheck`. `sshKey` is nil when it has no SSH details.
+    func add(_ draft: ServerDraft, sshKey: SealedSSHKey?, by deviceID: UUID, at date: Date) throws -> Server {
         try database.writer.write { database in
             try Self.checkNameIsFree(draft.name, except: nil, in: database)
             let record = ServerRecord(id: UUID(), draft: draft, sshKey: sshKey, createdAt: date)
@@ -33,11 +33,14 @@ struct ServerStore: Sendable {
 
     /// Changing where Hive connects clears the server's host key and its jobs' database passwords, so
     /// they have to be confirmed and entered again before anything is sent there. Hive's SSH key stays,
-    /// since only its public half is ever sent. Throws `ConfirmationError.required`, changing nothing,
-    /// when the change needs confirming and isn't confirmed. Returns nil when no server has that ID.
+    /// since only its public half is ever sent. A server given its first SSH details gets `newSSHKey`,
+    /// unless it already has a key or none is given. Its SSH details can't be taken away, so a server with jobs always
+    /// has them. Throws `ConfirmationError.required`, changing nothing, when the change
+    /// needs confirming and isn't confirmed. Returns nil when no server has that ID.
     func change(
         id: UUID,
         to draft: ServerDraft,
+        newSSHKey: SealedSSHKey? = nil,
         isConfirmed: Bool,
         by deviceID: UUID,
         at date: Date
@@ -46,8 +49,15 @@ struct ServerStore: Sendable {
             guard var record = try ServerRecord.fetchOne(database, key: id) else { return nil }
             let old = record.server
             try Self.checkNameIsFree(draft.name, except: id, in: database)
+            if old.connection != nil, draft.connection == nil {
+                throw ConfigurationChangeError.refused([ConfigurationProblem(field: .connection, reason: .missing)])
+            }
 
             record.apply(draft)
+            if old.connection == nil, record.connection != nil, record.sealedSSHKey == nil, let key = newSSHKey {
+                record.sealedSSHKey = key.sealedSeed.data
+                record.sshPublicKey = key.publicKey.line
+            }
             try ConfirmationRequirement.check(ConfirmationRequirement.reasons(from: old, to: record.server), isConfirmed: isConfirmed)
             if record.connection != old.connection {
                 record.hostKey = nil
@@ -87,7 +97,9 @@ struct ServerStore: Sendable {
     static func changes(from old: Server, to new: Server) -> [ServerChange] {
         var changes: [ServerChange] = []
         if old.name != new.name { changes.append(.renamed(old: old.name, new: new.name)) }
-        if old.connection != new.connection { changes.append(.connection(old: old.connection, new: new.connection)) }
+        if let connection = new.connection, old.connection != connection {
+            changes.append(.connection(old: old.connection, new: connection))
+        }
         if old.quotaBytes != new.quotaBytes { changes.append(.quota(old: old.quotaBytes, new: new.quotaBytes)) }
         return changes
     }

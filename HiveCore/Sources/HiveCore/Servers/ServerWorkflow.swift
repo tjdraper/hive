@@ -16,7 +16,8 @@ struct ServerWorkflow: Sendable {
 
     func add(_ draft: ServerDraft, by deviceID: UUID) throws -> Server {
         let draft = try ServerDraftCheck.validated(draft)
-        let server = try store.add(draft, sshKey: SealedSSHKey(SSHKeyPair(), sealer: sealer), by: deviceID, at: now())
+        let sshKey = try draft.connection.map { _ in try SealedSSHKey(SSHKeyPair(), sealer: sealer) }
+        let server = try store.add(draft, sshKey: sshKey, by: deviceID, at: now())
         Self.logger.notice("Added a server")
         return server
     }
@@ -24,7 +25,16 @@ struct ServerWorkflow: Sendable {
     /// Returns nil when no server has that ID.
     func change(id: UUID, to draft: ServerDraft, isConfirmed: Bool, by deviceID: UUID) throws -> Server? {
         let draft = try ServerDraftCheck.validated(draft)
-        guard let (old, new) = try store.change(id: id, to: draft, isConfirmed: isConfirmed, by: deviceID, at: now()) else { return nil }
+        let getsFirstSSHDetails = try draft.connection != nil && store.server(id: id)?.connection == nil
+        let newSSHKey = try getsFirstSSHDetails ? SealedSSHKey(SSHKeyPair(), sealer: sealer) : nil
+        guard let (old, new) = try store.change(
+            id: id,
+            to: draft,
+            newSSHKey: newSSHKey,
+            isConfirmed: isConfirmed,
+            by: deviceID,
+            at: now()
+        ) else { return nil }
         let changed = ServerStore.changes(from: old, to: new)
         if !changed.isEmpty {
             let reasons = ConfirmationRequirement.logged(ConfirmationRequirement.reasons(from: old, to: new))

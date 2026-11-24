@@ -1,8 +1,10 @@
 import HiveKit
 import SwiftUI
 
-/// Adding a server, from where Hive connects to a passing test connection. The server is saved after
-/// the first step, so closing the sheet later leaves it listed as not set up, to carry on from its page.
+/// Adding a server, from where Hive connects to a passing test connection, or by name only, without SSH
+/// details. Also gives a server added without them its SSH details, through the same steps. The server
+/// is saved after the first step, so closing the sheet later leaves it listed as not set up, to carry on
+/// from its page.
 struct AddServerSheet: View {
     let link: HiveLink
     let servers: ServerList
@@ -10,22 +12,40 @@ struct AddServerSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var step = AddServerStep.connection
-    @State private var draft = ServerDraft.empty
+    @State private var draft: ServerDraft
     @State private var problems = ServerFieldProblems()
     @State private var serverID: UUID?
     @State private var isSaving = false
     @State private var failure: String?
+    /// Set when giving an existing server its SSH details, rather than adding one.
+    private let existingName: String?
+
+    /// `existing` is a server without SSH details to give them to.
+    init(link: HiveLink, servers: ServerList, addingSSHDetailsTo existing: Server? = nil, onClose: @escaping (UUID) -> Void) {
+        self.link = link
+        self.servers = servers
+        self.onClose = onClose
+        existingName = existing?.name
+        _serverID = State(initialValue: existing?.id)
+        _draft = State(initialValue: existing.map { ServerDraft(name: $0.name, connection: .empty, quotaBytes: nil) } ?? .empty)
+    }
 
     private var server: Server? {
         serverID.flatMap(servers.server)
     }
 
+    private var title: String {
+        existingName.map { "Add SSH Details to “\($0)”" } ?? "Add a Server"
+    }
+
     var body: some View {
-        SheetLayout(title: "Add a Server", cancel: cancelButton, confirm: confirmButton, secondary: backButton) {
+        SheetLayout(title: title, cancel: cancelButton, confirm: confirmButton, secondary: backButton) {
             VStack(spacing: 0) {
-                AddServerStepIndicator(current: step)
-                    .padding()
-                Divider()
+                if draft.connection != nil {
+                    AddServerStepIndicator(current: step)
+                        .padding()
+                    Divider()
+                }
                 Form {
                     content
                 }
@@ -38,7 +58,11 @@ struct AddServerSheet: View {
     @ViewBuilder private var content: some View {
         switch (step, server) {
         case (.connection, _):
-            ServerFields(draft: $draft, problems: problems)
+            if existingName != nil {
+                Text("Hive needs these before it can back the server up.")
+                    .foregroundStyle(.secondary)
+            }
+            ServerFields(draft: $draft, problems: problems, showsName: existingName == nil, sshDetailsAreOptional: existingName == nil)
             if let failure {
                 Text(failure)
                     .foregroundStyle(.red)
@@ -55,9 +79,9 @@ struct AddServerSheet: View {
         }
     }
 
-    /// Once the server is saved, closing leaves it listed as not set up.
+    /// Once the server is saved with its SSH details, closing leaves it listed as not set up.
     private var cancelButton: SheetButton {
-        if let serverID {
+        if let serverID, server?.connection != nil {
             SheetButton(title: "Finish Later") { close(serverID) }
         } else {
             SheetButton(title: "Cancel") { dismiss() }
@@ -67,7 +91,9 @@ struct AddServerSheet: View {
     private var confirmButton: SheetButton {
         switch step {
         case .connection:
-            SheetButton(title: "Continue", isDisabled: !draft.isComplete || isSaving) { Task { await save() } }
+            SheetButton(title: draft.connection == nil ? "Add Server" : "Continue", isDisabled: !draft.isComplete || isSaving) {
+                Task { await save() }
+            }
         case .key, .hostKey:
             SheetButton(title: "Continue", isDisabled: step == .hostKey && server?.confirmedHostKey == nil) {
                 step = step.next ?? step
@@ -86,8 +112,17 @@ struct AddServerSheet: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            let added = try await servers.add(draft)
-            serverID = added.id
+            let saved: Server
+            if let serverID {
+                // As the server is now, in case it changed since the sheet opened.
+                guard var change = server?.draft else { return }
+                change.connection = draft.connection
+                saved = try await servers.change(serverID, to: change, confirming: nil)
+            } else {
+                saved = try await servers.add(draft)
+            }
+            guard saved.connection != nil else { return close(saved.id) }
+            serverID = saved.id
             problems = ServerFieldProblems()
             failure = nil
             step = .key

@@ -29,8 +29,8 @@ struct RecoveryFileTests {
 
         let recovered = try #require(contents.servers.only)
         #expect(recovered.id == server.id)
-        #expect(recovered.host == server.connection.host)
-        #expect(recovered.user == server.connection.user)
+        #expect(recovered.host == server.connection?.host)
+        #expect(recovered.user == server.connection?.user)
         #expect(recovered.quotaBytes == server.quotaBytes)
         #expect(recovered.hostKey == ConfigurationSamples.hostKey.line)
         let sshKey = try #require(recovered.sshKey)

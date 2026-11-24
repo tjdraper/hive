@@ -239,4 +239,47 @@ struct HiveDatabaseTests {
         #expect(try AlertStore(database: database).checkedThrough() == 7)
         #expect(try AlertStore(database: database).all().isEmpty)
     }
+
+    @Test("A store from before servers without SSH details keeps each server's details, keys, jobs and Scout")
+    func migratesToOptionalSSHDetails() throws {
+        // Arrange
+        let writer = try HiveDatabase.inMemory(migratedUpTo: "Add Scouts")
+        let (serverID, jobID) = (UUID(), UUID())
+        let key = SSHKeyPair().publicKey
+        try writer.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO server (id, name, host, port, user, quotaBytes, hostKey, createdAt, sshPublicKey, snapshotFolder)
+                VALUES (?, 'Web', 'web.example.com', 2222, 'backup', 1000, ?, ?, ?, 'Web')
+                """,
+                arguments: [serverID, ConfigurationSamples.hostKey.line, Date(), key.line]
+            )
+            try database.execute(
+                sql: """
+                INSERT INTO backupJob (id, serverID, name, dailySnapshots, monthlySnapshots, createdAt)
+                VALUES (?, ?, 'Site', 14, 12, ?)
+                """,
+                arguments: [jobID, serverID, Date()]
+            )
+            try database.execute(
+                sql: "INSERT INTO scout (id, serverID, publicKey, enrolledAt) VALUES (?, ?, ?, ?)",
+                arguments: [UUID(), serverID, P256.Signing.PrivateKey().publicKey.x963Representation, Date()]
+            )
+        }
+
+        // Act
+        let database = try HiveDatabase.migrate(writer, defaultHiveName: "Ignored")
+
+        // Assert
+        let server = try #require(try ServerStore(database: database).server(id: serverID))
+        #expect(server.connection == ServerConnection(host: "web.example.com", port: 2222, user: "backup"))
+        #expect(server.quotaBytes == 1000)
+        #expect(server.confirmedHostKey == ConfigurationSamples.hostKey.hostKeyFingerprint)
+        #expect(server.sshKeyFingerprint == key.fingerprint)
+        #expect(try BackupJobStore(database: database).job(id: jobID)?.serverID == serverID)
+        // Removing the server still removes what refers to it.
+        try database.writer.write { try $0.execute(sql: "DELETE FROM server") }
+        #expect(try BackupJobStore(database: database).all().isEmpty)
+        #expect(try database.writer.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM scout") } == 0)
+    }
 }

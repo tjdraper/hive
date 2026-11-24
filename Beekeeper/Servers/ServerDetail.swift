@@ -2,6 +2,7 @@ import HiveKit
 import SwiftUI
 
 /// One server: its backup jobs, where Hive connects, its keys, a connection test, and editing or removing it.
+/// A server without SSH details has none of those until they're added.
 struct ServerDetail: View {
     let hive: KnownHive
     let link: HiveLink
@@ -9,6 +10,7 @@ struct ServerDetail: View {
     let serverID: UUID
     /// Selects the server's Hive, such as from the path or once the server is removed.
     let onShowHive: () -> Void
+    /// Asks for SSH details instead when the server has none.
     let onAddJob: () -> Void
     let onSelectJob: (UUID) -> Void
 
@@ -38,25 +40,15 @@ struct ServerDetail: View {
 
     private func page(_ server: Server) -> some View {
         Form {
-            ServerJobsSection(
-                jobs: servers.jobs.jobs(onServer: server.id),
-                statuses: servers.statuses,
-                onAddJob: onAddJob,
-                onSelectJob: onSelectJob
-            )
-            Section("Connection") {
-                LabeledContent("Host", value: server.connection.host)
-                LabeledContent("Port", value: String(server.connection.port))
-                LabeledContent("SSH user", value: server.connection.user)
+            if let connection = server.connection {
+                backups(server, connection: connection)
+            } else {
+                Section("Backups") {
+                    Text("Hive has no SSH details for this server, so it can't back it up.")
+                        .foregroundStyle(.secondary)
+                    Button("Add SSH Details…", systemImage: "plus", action: onAddJob)
+                }
             }
-            ServerQuotaSection(link: link, servers: servers, server: server)
-            // A new identity, so a changed connection starts the checks over rather than showing an old result.
-            Group {
-                HostKeyCheck(link: link, servers: servers, server: server, change: hostKeyChange(of: server))
-                AuthorizedKeySetup(link: link, server: server)
-                ConnectionTestCheck(link: link, server: server)
-            }
-            .id(server.connection)
         }
         .formStyle(.grouped)
         .toolbar {
@@ -70,5 +62,27 @@ struct ServerDetail: View {
             }
         }
         .serverEditing($editRequest) { _ in onShowHive() }
+    }
+
+    @ViewBuilder private func backups(_ server: Server, connection: ServerConnection) -> some View {
+        ServerJobsSection(
+            jobs: servers.jobs.jobs(onServer: server.id),
+            statuses: servers.statuses,
+            onAddJob: onAddJob,
+            onSelectJob: onSelectJob
+        )
+        Section("Connection") {
+            LabeledContent("Host", value: connection.host)
+            LabeledContent("Port", value: String(connection.port))
+            LabeledContent("SSH user", value: connection.user)
+        }
+        ServerQuotaSection(link: link, servers: servers, server: server)
+        // A new identity, so a changed connection starts the checks over rather than showing an old result.
+        Group {
+            HostKeyCheck(link: link, servers: servers, server: server, change: hostKeyChange(of: server))
+            AuthorizedKeySetup(link: link, server: server)
+            ConnectionTestCheck(link: link, server: server)
+        }
+        .id(connection)
     }
 }

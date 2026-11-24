@@ -104,7 +104,7 @@ struct HostKeyRoutesTests {
         let server = try await fixture.addServer()
         _ = try await scan(server)
         var draft = server.draft
-        draft.connection.host = "elsewhere.example.com"
+        draft.connection?.host = "elsewhere.example.com"
         _ = try await fixture.sendConfirmed(.put, HiveEndpoint.server(server.id), json: draft)
 
         // Act

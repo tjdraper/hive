@@ -23,6 +23,8 @@ public struct ConfigurationProblem: Codable, Hashable, Sendable {
 
 public enum ConfigurationField: String, Codable, Hashable, Sendable {
     case name
+    /// A server's SSH details as a whole, such as when a server without them is given a backup job.
+    case connection
     case host
     case port
     case user
@@ -66,7 +68,8 @@ public enum ConfigurationProblemReason: String, Codable, Hashable, Sendable {
     case insideAnother
     /// A database ID the job doesn't have.
     case unknown
-    /// A job with no times to run, email with no recipients, or a username with no password.
+    /// A job with no times to run, email with no recipients, a username with no password, or a server
+    /// without SSH details given a backup job or sent without the ones it has.
     case missing
     /// A job with neither directories nor databases.
     case nothingToBackUp

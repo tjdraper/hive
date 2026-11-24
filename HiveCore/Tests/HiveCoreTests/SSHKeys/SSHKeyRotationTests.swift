@@ -68,6 +68,20 @@ struct SSHKeyRotationTests {
         #expect(keyServer.commands.last?.key == new)
     }
 
+    @Test("A server without SSH details is left out of a rotation")
+    func skipsServerWithoutSSHDetails() async throws {
+        // Arrange
+        let setUp = try await Self.rotationFixture()
+        let (fixture, server, keyServer) = (setUp.api, setUp.server, setUp.keyServer)
+        _ = try await fixture.addServer(ServerDraft(name: "Metrics Only", connection: nil, quotaBytes: nil))
+
+        // Act
+        let state = try await Self.rotate(fixture, on: keyServer)
+
+        // Assert
+        #expect(state.results.map(\.serverID) == [server.id])
+    }
+
     @Test("A server that turns the new key down keeps its old key, and Hive goes on using it")
     func newKeyRefused() async throws {
         // Arrange

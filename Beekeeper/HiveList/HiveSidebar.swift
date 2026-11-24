@@ -77,7 +77,7 @@ struct HiveSidebar: View {
             )
         }
         .contextMenu {
-            Button("Add Job…") { onAddJob(server.id, hiveID) }
+            Button(server.connection == nil ? "Add SSH Details…" : "Add Job…") { onAddJob(server.id, hiveID) }
             Divider()
             Button("Edit…") { editRequest = ServerEditRequest(action: .edit, server: server, servers: servers) }
             Button("Remove…", role: .destructive) {
@@ -187,13 +187,16 @@ private struct ServerSidebarRow: View {
             Label(server.name, systemImage: "server.rack")
                 .lineLimit(1)
             Spacer()
-            if !server.isSetUp {
-                Image(systemName: "exclamationmark.circle")
-                    .foregroundStyle(.orange)
-                    .help("Not set up yet")
-                    .accessibilityLabel("Not set up yet")
-            } else {
-                JobHealthBadge(health: health)
+            // Without SSH details it has no backups to report on.
+            if server.connection != nil {
+                if server.isSetUp {
+                    JobHealthBadge(health: health)
+                } else {
+                    Image(systemName: "exclamationmark.circle")
+                        .foregroundStyle(.orange)
+                        .help("Not set up yet")
+                        .accessibilityLabel("Not set up yet")
+                }
             }
             SidebarDisclosureButton(isExpanded: $isExpanded)
         }

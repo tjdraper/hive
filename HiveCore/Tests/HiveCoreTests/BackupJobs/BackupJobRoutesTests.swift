@@ -185,7 +185,7 @@ struct BackupJobRoutesTests {
         let job = try await fixture.addJob(to: server)
         var other = ConfigurationSamples.server
         other.name = "Elsewhere"
-        other.connection.host = "attacker.example.com"
+        other.connection?.host = "attacker.example.com"
         let otherServer = try await fixture.addServer(other)
         let otherJob = try await fixture.addJob(ConfigurationSamples.job(password: nil), to: otherServer)
         var stealing = otherJob.draft

@@ -28,7 +28,7 @@ struct ConfirmedRouteTests {
         ConfirmedRequestCase(testDescription: "changing a server's host", reason: .connectionChanged) { fixture in
             let server = try await fixture.addServer()
             var draft = server.draft
-            draft.connection.host = "elsewhere.example.com"
+            draft.connection?.host = "elsewhere.example.com"
             return try serverChange(server, draft)
         },
         ConfirmedRequestCase(testDescription: "lowering a server's quota", reason: .quotaLowered) { fixture in
@@ -268,7 +268,7 @@ struct ConfirmedRouteTests {
         }
         let server = try await fixture.addServer()
         var draft = server.draft
-        draft.connection.host = "elsewhere.example.com"
+        draft.connection?.host = "elsewhere.example.com"
         let body = try JSONEncoder().encode(draft)
         let path = HiveEndpoint.server(server.id)
 

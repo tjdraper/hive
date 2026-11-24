@@ -1,36 +1,84 @@
 import HiveKit
 import SwiftUI
 
-/// A server's name and where Hive connects, with Hive's reason beside any field it turned down.
+/// A server's name and, when it has them, its SSH details, with Hive's reason beside any field it turned down.
 struct ServerFields: View {
     @Binding var draft: ServerDraft
     let problems: ServerFieldProblems
+    var showsName = true
+    /// When adding a server, which can go without SSH details. Otherwise the fields follow what the draft has.
+    var sshDetailsAreOptional = false
+
+    @State private var setAside: ServerConnection?
 
     var body: some View {
         Section {
-            field("Name", problem: problems[.name]) {
-                TextField("Name", text: $draft.name, prompt: Text("Web 1"))
+            if showsName {
+                ServerFieldRow(title: "Name", problem: problems[.name]) {
+                    TextField("Name", text: $draft.name, prompt: Text("Web 1"))
+                }
             }
-            field("Host", problem: problems[.host]) {
-                TextField("Host", text: $draft.connection.host, prompt: Text("web1.example.com"))
-                    .autocorrectionDisabled()
+            if sshDetailsAreOptional {
+                Toggle("Connect over SSH", isOn: connectsOverSSH)
             }
-            field("Port", problem: problems[.port]) {
-                TextField("Port", value: $draft.connection.port, format: .number.grouping(.never))
-            }
-            field("SSH user", problem: problems[.user]) {
-                TextField("SSH user", text: $draft.connection.user, prompt: Text("root"))
-                    .autocorrectionDisabled()
+            if draft.connection != nil {
+                ServerFieldRow(title: "Host", problem: problems[.host]) {
+                    TextField("Host", text: connection(\.host), prompt: Text("web1.example.com"))
+                        .autocorrectionDisabled()
+                }
+                ServerFieldRow(title: "Port", problem: problems[.port]) {
+                    TextField("Port", value: connection(\.port), format: .number.grouping(.never))
+                }
+                ServerFieldRow(title: "SSH user", problem: problems[.user]) {
+                    TextField("SSH user", text: connection(\.user), prompt: Text("root"))
+                        .autocorrectionDisabled()
+                }
             }
         } footer: {
-            Text("The host is a name or address the Hive's Mac can reach, such as a Tailscale name.")
-                .foregroundStyle(.secondary)
+            Group {
+                if draft.connection != nil {
+                    Text("The host is a name or address the Hive's Mac can reach, such as a Tailscale name.")
+                } else if sshDetailsAreOptional {
+                    Text("Hive needs SSH details to back the server up. You can add them later from its page.")
+                }
+            }
+            .foregroundStyle(.secondary)
         }
     }
 
-    private func field(_ title: String, problem: String?, @ViewBuilder input: () -> some View) -> some View {
+    /// Not `Binding($draft.connection)`, whose fields crash when they're updated once more after the
+    /// connection is turned off.
+    private func connection<Value>(_ field: WritableKeyPath<ServerConnection, Value>) -> Binding<Value> {
+        Binding {
+            (draft.connection ?? .empty)[keyPath: field]
+        } set: {
+            draft.connection?[keyPath: field] = $0
+        }
+    }
+
+    /// Turning it off and on again keeps what was typed.
+    private var connectsOverSSH: Binding<Bool> {
+        Binding {
+            draft.connection != nil
+        } set: { isOn in
+            if isOn {
+                draft.connection = setAside ?? .empty
+            } else {
+                setAside = draft.connection
+                draft.connection = nil
+            }
+        }
+    }
+}
+
+private struct ServerFieldRow<Input: View>: View {
+    let title: String
+    let problem: String?
+    @ViewBuilder let input: Input
+
+    var body: some View {
         StackedRow(title: title) {
-            input()
+            input
                 .stackedField(title)
             if let problem {
                 Text(problem)
@@ -43,12 +91,19 @@ struct ServerFields: View {
 
 extension ServerDraft {
     static var empty: ServerDraft {
-        ServerDraft(name: "", connection: ServerConnection(host: "", user: ""), quotaBytes: nil)
+        ServerDraft(name: "", connection: .empty, quotaBytes: nil)
     }
 
     /// Hive checks the rest, and says which field it turned down.
     var isComplete: Bool {
-        [name, connection.host, connection.user].allSatisfy { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        let required = [name] + (connection.map { [$0.host, $0.user] } ?? [])
+        return required.allSatisfy { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
+}
+
+extension ServerConnection {
+    static var empty: ServerConnection {
+        ServerConnection(host: "", user: "")
     }
 }
 

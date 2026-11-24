@@ -12,8 +12,9 @@ struct ServerSSHKeyStore: Sendable {
     }
 
     /// Replaces the server's key, or gives it its first, with an audit entry. Throws
-    /// `ConfirmationError.required` when it would replace one without confirmation. Returns nil when no
-    /// server has that ID.
+    /// `ConfirmationError.required` when it would replace one without confirmation, and
+    /// `ConfigurationChangeError.refused` for a server without SSH details, which gets its key with
+    /// them. Returns nil when no server has that ID.
     func replaceKey(
         forServer id: UUID,
         with key: SealedSSHKey,
@@ -23,6 +24,9 @@ struct ServerSSHKeyStore: Sendable {
     ) throws -> SSHKeyReplacement? {
         try database.writer.write { database in
             guard var record = try ServerRecord.fetchOne(database, key: id) else { return nil }
+            guard record.connection != nil else {
+                throw ConfigurationChangeError.refused([ConfigurationProblem(field: .connection, reason: .missing)])
+            }
             let old = record.sshPublicKey.flatMap(OpenSSHPublicKey.init(line:))
             try ConfirmationRequirement.check(ConfirmationRequirement.reasons(replacingSSHKey: old), isConfirmed: isConfirmed)
             record.sealedSSHKey = key.sealedSeed.data

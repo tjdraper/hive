@@ -16,10 +16,13 @@ enum SSHKeyRoutes {
         router.post(path) { request, context in
             guard let id = context.idParameter else { return JSONResponse(status: .notFound) }
             let confirmed = try await ConfirmedRequest.read(request, context: context, verifier: confirmations)
-            guard let key = try workflow.makeNewKey(forServer: id, isConfirmed: confirmed.isConfirmed, by: context.requireDevice()) else {
-                return JSONResponse(status: .notFound)
+            return try await ConfigurationChangeError.answering {
+                let deviceID = try context.requireDevice()
+                guard let key = try workflow.makeNewKey(forServer: id, isConfirmed: confirmed.isConfirmed, by: deviceID) else {
+                    return JSONResponse(status: .notFound)
+                }
+                return try JSONResponse(key, status: .created)
             }
-            return try JSONResponse(key, status: .created)
         }
     }
 }

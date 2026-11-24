@@ -4,9 +4,10 @@ import HiveKit
 /// Which changes need the device's confirmation key as well as its session (§6). Each is checked against
 /// the stored values inside the change's write transaction, so a change made in between can't slip through.
 enum ConfirmationRequirement {
+    /// A server's first SSH details replace nothing, and it has no jobs with passwords to send them to.
     static func reasons(from old: Server, to new: Server) -> Set<ConfirmationReason> {
         var reasons: Set<ConfirmationReason> = []
-        if old.connection != new.connection { reasons.insert(.connectionChanged) }
+        if old.connection != nil, old.connection != new.connection { reasons.insert(.connectionChanged) }
         if isLower(new.quotaBytes, than: old.quotaBytes) { reasons.insert(.quotaLowered) }
         return reasons
     }

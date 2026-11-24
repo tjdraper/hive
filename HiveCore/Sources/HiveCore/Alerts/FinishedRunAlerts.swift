@@ -68,7 +68,7 @@ struct FinishedRunAlerts: Sendable {
 
     /// Scanned the way Beekeeper scans before confirming, so the email shows the fingerprint Beekeeper will.
     private func offeredKey(by server: Server) async throws -> HostKeyFingerprint? {
-        guard case .found(let key) = try await scanner.scan(server.connection) else { return nil }
+        guard let connection = server.connection, case .found(let key) = try await scanner.scan(connection) else { return nil }
         return key.hostKeyFingerprint
     }
 

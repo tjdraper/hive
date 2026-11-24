@@ -7,6 +7,7 @@ extension BackupFailure {
         case .driveNotChosen: "No backup drive has been chosen."
         case .driveMissing: "The backup drive isn't connected."
         case .driveNotThisHives: "The connected backup drive isn't marked as this Hive's."
+        case .noSSHDetails: "The server has no SSH details for Hive to connect with."
         case .noSSHKey: "Hive has no SSH key for the server yet."
         case .noConfirmedHostKey: "The server's host key hasn't been confirmed in Beekeeper."
         case .hostKeyChanged: "The server answered with a host key other than the confirmed one, so Hive didn't connect."

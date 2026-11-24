@@ -14,6 +14,8 @@ public struct ConnectionTestResult: Codable, Hashable, Sendable {
 
 /// Why Hive couldn't reach a server over SSH, or didn't try.
 public enum ConnectionFailure: String, Codable, Hashable, Sendable {
+    /// The server was added without SSH details, only for metrics.
+    case noSSHDetails
     /// The server has no SSH key of Hive's yet.
     case noSSHKey
     /// Hive connects only once a device has confirmed the server's host key.

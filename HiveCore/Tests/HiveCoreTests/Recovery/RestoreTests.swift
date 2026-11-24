@@ -42,6 +42,54 @@ struct RestoreTests {
         #expect(try new.auditEvents().first == .restoredFromRecoveryFile(writtenAt: old.signIn.clock.now, serverCount: 1, jobCount: 1))
     }
 
+    @Test("A server without SSH details is restored without them, beside one with them")
+    func restoresServerWithoutSSHDetails() async throws {
+        // Arrange
+        let old = try APIFixture()
+        _ = try await old.addEverything()
+        let nameOnly = try await old.addServer(ServerDraft(name: "Metrics Only", connection: nil, quotaBytes: nil))
+        let key = RecoveryKey()
+        try await old.saveRecoveryKey(key)
+        let new = try APIFixture()
+
+        // Act
+        try new.restore(Data(contentsOf: old.recoveryFile), key: key)
+
+        // Assert
+        #expect(try new.openedContents() == old.openedContents())
+        #expect(try new.servers.server(id: nameOnly.id) == nameOnly)
+        #expect(try new.servers.all().count == 2)
+    }
+
+    @Test("A recovery file written before servers could go without SSH details restores each server with its own")
+    func restoresFileFromBefore() throws {
+        // Arrange
+        let (serverID, jobID) = (UUID(), UUID())
+        let sshKey = SSHKeyPair()
+        // As Hive wrote it then, with every server's host, port and user.
+        let json = """
+        {"format":1,"hive":{"createdAt":0,"id":"\(UUID())","name":"Studio Hive","networkAccess":"thisMacOnly"},\
+        "servers":[{"createdAt":0,"host":"web.example.com","hostKey":"\(ConfigurationSamples.hostKey.line)","id":"\(serverID)",\
+        "jobs":[{"createdAt":0,"dailySnapshots":14,"databases":[],"directories":[{"folder":"uploads","path":"/var/www/uploads"}],\
+        "id":"\(jobID)","minutesOfDay":[150],"monthlySnapshots":12,"name":"Site"}],"name":"Web","port":2222,\
+        "sshKey":{"publicKey":"\(sshKey.publicKey.line)","seed":"\(sshKey.seed.base64EncodedString())"},"user":"backup"}],\
+        "writtenAt":0}
+        """
+        let key = RecoveryKey()
+        let file = try RecoveryFile.seal(RecoveryContents.decoded(from: Data(json.utf8)), to: key.publicKey)
+        let new = try APIFixture()
+
+        // Act
+        try new.restore(file, key: key)
+
+        // Assert
+        let server = try #require(try new.servers.server(id: serverID))
+        #expect(server.connection == ServerConnection(host: "web.example.com", port: 2222, user: "backup"))
+        #expect(server.confirmedHostKey == ConfigurationSamples.hostKey.hostKeyFingerprint)
+        #expect(server.sshKeyFingerprint == sshKey.publicKey.fingerprint)
+        #expect(try new.jobs.job(id: jobID)?.serverID == serverID)
+    }
+
     @Test("A restored Hive listens on the old Hive's port, says so, and keeps its address options, advertising and warnings")
     func keepsPort() async throws {
         // Arrange

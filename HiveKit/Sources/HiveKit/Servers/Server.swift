@@ -1,10 +1,11 @@
 import Foundation
 
-/// A machine Hive backs up, entered once, with a backup job for each site on it.
+/// A machine Hive backs up or watches, entered once, with a backup job for each site on it.
 public struct Server: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public let name: String
-    public let connection: ServerConnection
+    /// Nil for a server added only for metrics. It needs them before it can have a backup job.
+    public let connection: ServerConnection?
     /// The most space its jobs' snapshots may take on the backup drive, in bytes. Nil for no limit.
     public let quotaBytes: Int64?
     /// Hive connects only once a device has confirmed the server's host key. Changing the connection clears it.
@@ -15,7 +16,7 @@ public struct Server: Codable, Hashable, Identifiable, Sendable {
     public init(
         id: UUID,
         name: String,
-        connection: ServerConnection,
+        connection: ServerConnection?,
         quotaBytes: Int64?,
         confirmedHostKey: HostKeyFingerprint?,
         sshKeyFingerprint: String?
@@ -51,10 +52,11 @@ public struct ServerConnection: Codable, Hashable, Sendable {
 /// A server as Beekeeper sends it, to add one or to change one whole.
 public struct ServerDraft: Codable, Hashable, Sendable {
     public var name: String
-    public var connection: ServerConnection
+    /// Hive refuses a draft without them for a server that has them.
+    public var connection: ServerConnection?
     public var quotaBytes: Int64?
 
-    public init(name: String, connection: ServerConnection, quotaBytes: Int64?) {
+    public init(name: String, connection: ServerConnection?, quotaBytes: Int64?) {
         self.name = name
         self.connection = connection
         self.quotaBytes = quotaBytes

@@ -7,9 +7,10 @@ struct ServerRecord: Codable, FetchableRecord, PersistableRecord {
 
     let id: UUID
     var name: String
-    var host: String
-    var port: Int
-    var user: String
+    /// All three or none.
+    var host: String?
+    var port: Int?
+    var user: String?
     var quotaBytes: Int64?
     /// The host key a device confirmed, as `OpenSSHPublicKey.line` writes it.
     var hostKey: String?
@@ -19,21 +20,23 @@ struct ServerRecord: Codable, FetchableRecord, PersistableRecord {
     /// As `OpenSSHPublicKey.line` writes it.
     var sshPublicKey: String?
 
-    init(id: UUID, draft: ServerDraft, sshKey: SealedSSHKey, createdAt: Date) {
+    /// `sshKey` is nil for a server without SSH details.
+    init(id: UUID, draft: ServerDraft, sshKey: SealedSSHKey?, createdAt: Date) {
         self.id = id
         name = draft.name
-        host = draft.connection.host
-        port = draft.connection.port
-        user = draft.connection.user
+        host = draft.connection?.host
+        port = draft.connection?.port
+        user = draft.connection?.user
         quotaBytes = draft.quotaBytes
         hostKey = nil
         self.createdAt = createdAt
-        sealedSSHKey = sshKey.sealedSeed.data
-        sshPublicKey = sshKey.publicKey.line
+        sealedSSHKey = sshKey?.sealedSeed.data
+        sshPublicKey = sshKey?.publicKey.line
     }
 
-    var connection: ServerConnection {
-        ServerConnection(host: host, port: port, user: user)
+    var connection: ServerConnection? {
+        guard let host, let port, let user else { return nil }
+        return ServerConnection(host: host, port: port, user: user)
     }
 
     var server: Server {
@@ -49,9 +52,9 @@ struct ServerRecord: Codable, FetchableRecord, PersistableRecord {
 
     mutating func apply(_ draft: ServerDraft) {
         name = draft.name
-        host = draft.connection.host
-        port = draft.connection.port
-        user = draft.connection.user
+        host = draft.connection?.host
+        port = draft.connection?.port
+        user = draft.connection?.user
         quotaBytes = draft.quotaBytes
     }
 }

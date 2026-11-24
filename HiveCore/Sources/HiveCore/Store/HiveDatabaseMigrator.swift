@@ -31,12 +31,7 @@ enum HiveDatabaseMigrator {
 
         migrator.registerMigration("Add servers and backup jobs", migrate: addServersAndJobs)
 
-        migrator.registerMigration("Add Hive's SSH key for each server") { database in
-            try database.alter(table: "server") { table in
-                table.add(column: "sealedSSHKey", .blob)
-                table.add(column: "sshPublicKey", .text)
-            }
-        }
+        migrator.registerMigration("Add Hive's SSH key for each server", migrate: addSSHKeys)
 
         migrator.registerMigration("Add the backup drive and the snapshot catalog", migrate: addBackupDriveAndSnapshots)
         migrator.registerMigration("Add schedules, the job queue and the job log", migrate: addQueueAndJobLog)
@@ -66,6 +61,7 @@ enum HiveDatabaseMigrator {
         migrator.registerMigration("Add advertising on the local network", migrate: addLocalNetworkAdvertising)
         migrator.registerMigration("Add the builds devices report", migrate: addDeviceBuilds)
         migrator.registerMigration("Add Scouts", migrate: addScouts)
+        migrator.registerMigration("Make servers' SSH details optional", migrate: makeSSHDetailsOptional)
 
         return migrator
     }
@@ -243,6 +239,13 @@ enum HiveDatabaseMigrator {
         }
     }
 
+    private static func addSSHKeys(_ database: Database) throws {
+        try database.alter(table: "server") { table in
+            table.add(column: "sealedSSHKey", .blob)
+            table.add(column: "sshPublicKey", .text)
+        }
+    }
+
     private static func addBackupDriveAndSnapshots(_ database: Database) throws {
         try database.alter(table: "hive") { table in
             table.add(column: "backupDriveUUID", .text)
@@ -364,5 +367,33 @@ extension HiveDatabaseMigrator {
             table.column("version", .text)
             table.column("platform", .text)
         }
+    }
+
+    /// SQLite can't make a column optional in place, so the table is made again, keeping every server.
+    /// The migration runs with foreign keys off, so dropping the old table leaves the tables that refer
+    /// to it alone.
+    static func makeSSHDetailsOptional(_ database: Database) throws {
+        try database.create(table: "newServer") { table in
+            table.primaryKey("id", .blob)
+            table.column("name", .text).notNull()
+            // All three or none, for a server added only for metrics.
+            table.column("host", .text)
+            table.column("port", .integer)
+            table.column("user", .text)
+            table.check(sql: "(host IS NULL) = (port IS NULL) AND (host IS NULL) = (user IS NULL)")
+            table.column("quotaBytes", .integer)
+            table.column("hostKey", .text)
+            table.column("createdAt", .datetime).notNull()
+            table.column("sealedSSHKey", .blob)
+            table.column("sshPublicKey", .text)
+            table.column("snapshotFolder", .text)
+        }
+        try database.execute(sql: """
+        INSERT INTO newServer (id, name, host, port, user, quotaBytes, hostKey, createdAt, sealedSSHKey, sshPublicKey, snapshotFolder)
+        SELECT id, name, host, port, user, quotaBytes, hostKey, createdAt, sealedSSHKey, sshPublicKey, snapshotFolder
+        FROM server
+        """)
+        try database.drop(table: "server")
+        try database.rename(table: "newServer", to: "server")
     }
 }

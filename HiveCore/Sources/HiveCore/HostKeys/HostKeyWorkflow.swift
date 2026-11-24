@@ -20,12 +20,16 @@ struct HostKeyWorkflow: Sendable {
     /// Nil when no server has that ID. Records nothing.
     func scan(serverID: UUID) async throws -> HostKeyScanResult? {
         guard let server = try servers.server(id: serverID) else { return nil }
+        guard let connection = server.connection else {
+            Self.logger.notice("Didn't scan a host key: the server has no SSH details")
+            return .failed(reason: .noSSHDetails)
+        }
         let started = ContinuousClock.now
-        let outcome = try await scanner.scan(server.connection)
+        let outcome = try await scanner.scan(connection)
         let seconds = (ContinuousClock.now - started).roundedSeconds
         switch outcome {
         case .found(let key):
-            pending.record(key, forServer: serverID, connection: server.connection, at: now())
+            pending.record(key, forServer: serverID, connection: connection, at: now())
             let comparison = switch server.confirmedHostKey {
             case nil: "none confirmed"
             case key.hostKeyFingerprint: "the confirmed key"

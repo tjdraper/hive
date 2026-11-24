@@ -98,6 +98,8 @@ public enum BackupFailure: String, Codable, Hashable, Sendable {
     case driveMissing
     /// The mounted drive's `Hive` folder isn't marked as this Hive's. Nothing was written.
     case driveNotThisHives
+    /// The server has no SSH details.
+    case noSSHDetails
     /// The server has no SSH key of Hive's yet.
     case noSSHKey
     /// Hive connects only once a device has confirmed the server's host key.
@@ -152,6 +154,7 @@ public enum BackupFailure: String, Codable, Hashable, Sendable {
 
     public init(_ connection: ConnectionFailure) {
         self = switch connection {
+        case .noSSHDetails: .noSSHDetails
         case .noSSHKey: .noSSHKey
         case .noConfirmedHostKey: .noConfirmedHostKey
         case .hostKeyChanged: .hostKeyChanged

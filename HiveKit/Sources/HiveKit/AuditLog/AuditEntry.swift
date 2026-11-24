@@ -80,10 +80,12 @@ public enum SnapshotDeletion: Codable, Hashable, Sendable {
 }
 
 public enum ServerChange: Codable, Hashable, Sendable {
-    case added(connection: ServerConnection)
+    /// Nil for a server added only for metrics.
+    case added(connection: ServerConnection?)
     case renamed(old: String, new: String)
-    /// Also cleared its jobs' database passwords and its confirmed host key.
-    case connection(old: ServerConnection, new: ServerConnection)
+    /// Also cleared its jobs' database passwords and its confirmed host key. Nil when the server had no
+    /// SSH details, which Hive also made its SSH key for.
+    case connection(old: ServerConnection?, new: ServerConnection)
     case quota(old: Int64?, new: Int64?)
     /// Fingerprints. A device confirmed the key a scan found.
     case hostKeyConfirmed(old: HostKeyFingerprint?, new: HostKeyFingerprint)

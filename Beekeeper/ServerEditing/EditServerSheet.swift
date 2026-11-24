@@ -2,7 +2,8 @@ import HiveKit
 import SwiftUI
 
 /// Changing a server's name, where Hive connects, or its quota. Changing where Hive connects or lowering
-/// the quota asks for Touch ID or the password on Save.
+/// the quota asks for Touch ID or the password on Save. A server without SSH details has only its name
+/// here, since its details are added with the steps that set them up.
 struct EditServerSheet: View {
     let servers: ServerList
     let server: Server
@@ -41,13 +42,15 @@ struct EditServerSheet: View {
                         .foregroundStyle(.orange)
                     }
                 }
-                QuotaField(
-                    quotaBytes: $draft.quotaBytes,
-                    saved: server.quotaBytes,
-                    space: space,
-                    estimate: quotaEstimate,
-                    problem: problems[.quota]
-                )
+                if server.connection != nil {
+                    QuotaField(
+                        quotaBytes: $draft.quotaBytes,
+                        saved: server.quotaBytes,
+                        space: space,
+                        estimate: quotaEstimate,
+                        problem: problems[.quota]
+                    )
+                }
                 if let failure {
                     Text(failure)
                         .foregroundStyle(.red)
@@ -55,7 +58,7 @@ struct EditServerSheet: View {
             }
             .formStyle(.grouped)
         }
-        .macSheetSize(width: 560, height: 560)
+        .macSheetSize(width: 560, height: server.connection == nil ? 240 : 560)
         .task { space = try? await servers.space(of: server.id) }
         .task(id: draft.quotaBytes) { await estimateQuota() }
     }
@@ -90,10 +93,10 @@ struct EditServerSheet: View {
 
     /// Hive lowercases the host and trims the user, so compare them as it will store them.
     private var changesConnection: Bool {
-        let connection = draft.connection
-        return connection.host.trimmingCharacters(in: .whitespaces).lowercased() != server.connection.host
-            || connection.port != server.connection.port
-            || connection.user.trimmingCharacters(in: .whitespaces) != server.connection.user
+        guard let connection = draft.connection, let saved = server.connection else { return false }
+        return connection.host.trimmingCharacters(in: .whitespaces).lowercased() != saved.host
+            || connection.port != saved.port
+            || connection.user.trimmingCharacters(in: .whitespaces) != saved.user
     }
 
     private func save() async {

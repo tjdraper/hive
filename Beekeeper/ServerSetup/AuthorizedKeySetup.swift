@@ -73,7 +73,8 @@ struct AuthorizedKeySetup: View {
     }
 
     @ViewBuilder private func keyRows(_ key: ServerSSHKey) -> some View {
-        Text("Add this line to \(authorizedKeysPath) on \(server.connection.host), so Hive can sign in as \(server.connection.user).")
+        let connection = server.setupConnection
+        Text("Add this line to \(authorizedKeysPath) on \(connection.host), so Hive can sign in as \(connection.user).")
         if let line = line(for: key) {
             CommandText(text: line)
         } else {
@@ -95,7 +96,7 @@ struct AuthorizedKeySetup: View {
     }
 
     private var authorizedKeysPath: String {
-        let user = server.connection.user
+        let user = server.setupConnection.user
         return user == "root" ? "/root/.ssh/authorized_keys" : "~\(user)/.ssh/authorized_keys"
     }
 

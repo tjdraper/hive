@@ -29,9 +29,10 @@ struct SSHTargetLoader: Sendable {
     /// Nil when no server has that ID.
     func target(forServer id: UUID) throws -> SSHTargetLookup? {
         guard let record = try database.writer.read({ try ServerRecord.fetchOne($0, key: id) }) else { return nil }
+        guard let connection = record.connection else { return .unavailable(.noSSHDetails) }
         guard let sealedKey = record.sealedSSHKey else { return .unavailable(.noSSHKey) }
         guard let hostKey = record.hostKey.flatMap(OpenSSHPublicKey.init(line:)) else { return .unavailable(.noConfirmedHostKey) }
         let key = try SSHKeyPair(seed: sealer.open(SealedSecret(data: sealedKey)))
-        return .ready(SSHTarget(serverID: id, connection: record.connection, hostKey: hostKey, key: key))
+        return .ready(SSHTarget(serverID: id, connection: connection, hostKey: hostKey, key: key))
     }
 }

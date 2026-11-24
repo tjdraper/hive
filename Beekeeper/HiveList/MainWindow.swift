@@ -72,7 +72,7 @@ struct MainWindow: View {
             #endif
             .sheet(item: $addingServer) { request in
                 if let link = store.link(for: request.hiveID), let servers = store.servers(for: request.hiveID) {
-                    AddServerSheet(link: link, servers: servers) { serverID in
+                    AddServerSheet(link: link, servers: servers, addingSSHDetailsTo: request.serverID.flatMap(servers.server)) { serverID in
                         selection = .server(hiveID: request.hiveID, serverID: serverID)
                     }
                 }
@@ -215,11 +215,16 @@ struct MainWindow: View {
     }
 
     private func addServer(to hiveID: UUID) {
-        addingServer = AddServerRequest(hiveID: hiveID)
+        addingServer = AddServerRequest(hiveID: hiveID, serverID: nil)
     }
 
+    /// A server without SSH details gets them first, since Hive can't back it up without them.
     private func addJob(to serverID: UUID, on hiveID: UUID) {
-        addingJob = AddJobRequest(hiveID: hiveID, serverID: serverID)
+        if let server = store.servers(for: hiveID)?.server(serverID), server.connection == nil {
+            addingServer = AddServerRequest(hiveID: hiveID, serverID: serverID)
+        } else {
+            addingJob = AddJobRequest(hiveID: hiveID, serverID: serverID)
+        }
     }
 }
 
@@ -233,11 +238,12 @@ struct AddJobRequest: Identifiable {
     }
 }
 
-/// Which Hive the Add Server sheet adds to.
+/// Which Hive the Add Server sheet adds to, or which server without SSH details it gives them to.
 struct AddServerRequest: Identifiable {
     let hiveID: UUID
+    let serverID: UUID?
 
     var id: UUID {
-        hiveID
+        serverID ?? hiveID
     }
 }

@@ -38,9 +38,11 @@ struct RecoveryContents: Codable, Equatable {
     struct Server: Codable, Equatable {
         let id: UUID
         let name: String
-        let host: String
-        let port: Int
-        let user: String
+        /// All three or none, for a server added only for metrics. Files written before servers could
+        /// be added without them always have them.
+        let host: String?
+        let port: Int?
+        let user: String?
         let quotaBytes: Int64?
         let createdAt: Date
         /// The host key a device confirmed, as `OpenSSHPublicKey.line` writes it. There's no other
