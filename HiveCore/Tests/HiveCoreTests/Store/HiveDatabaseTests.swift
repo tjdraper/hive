@@ -282,4 +282,28 @@ struct HiveDatabaseTests {
         #expect(try BackupJobStore(database: database).all().isEmpty)
         #expect(try database.writer.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM scout") } == 0)
     }
+
+    @Test("A store from before servers' metrics gives metrics to each server with a Scout, and only those")
+    func migratesToServerMetrics() throws {
+        // Arrange
+        let writer = try HiveDatabase.inMemory(migratedUpTo: "Make servers' SSH details optional")
+        let (withScout, without) = (UUID(), UUID())
+        try writer.write { database in
+            for (id, name) in [(withScout, "Web"), (without, "Mail")] {
+                try database.execute(sql: "INSERT INTO server (id, name, createdAt) VALUES (?, ?, ?)", arguments: [id, name, Date()])
+            }
+            try database.execute(
+                sql: "INSERT INTO scout (id, serverID, publicKey, enrolledAt) VALUES (?, ?, ?, ?)",
+                arguments: [UUID(), withScout, P256.Signing.PrivateKey().publicKey.x963Representation, Date()]
+            )
+        }
+
+        // Act
+        let database = try HiveDatabase.migrate(writer, defaultHiveName: "Ignored")
+
+        // Assert
+        let scouts = ScoutStore(database: database)
+        #expect(try scouts.hasMetrics(withScout) == true)
+        #expect(try scouts.hasMetrics(without) == false)
+    }
 }

@@ -129,11 +129,11 @@ struct MetricsReportTests {
         #expect(try fixture.metricsDatabase.count("metricsServer") == 0)
     }
 
-    @Test("A removed Scout's open session can't send samples")
+    @Test("A Scout's open session can't send samples once its server's metrics are removed")
     func revokedScoutRefused() async throws {
         // Arrange
         let token = try await fixture.scoutToken(scout)
-        _ = try await fixture.send(.delete, HiveEndpoint.scout(ofServer: server.id))
+        _ = try await fixture.send(.delete, HiveEndpoint.metrics(ofServer: server.id))
 
         // Act
         let answer = try await send(TestMetrics.report([TestMetrics.sample(at: now)]), token: token)
@@ -336,7 +336,7 @@ struct MetricsReportTests {
         #expect(try storedTimes() == [now])
     }
 
-    @Test("Removing a server removes its metrics, and removing only its Scout keeps them")
+    @Test("Removing a server removes its metrics history, and removing only its metrics keeps it")
     func historyOnRemoval() async throws {
         // Arrange
         let other = try await fixture.addOtherServer()
@@ -345,11 +345,11 @@ struct MetricsReportTests {
         _ = try await send(TestMetrics.report([TestMetrics.sample(at: now)]), token: fixture.scoutToken(otherScout))
 
         // Act
-        let scoutRemoved = try await fixture.send(.delete, HiveEndpoint.scout(ofServer: server.id))
+        let metricsRemoved = try await fixture.send(.delete, HiveEndpoint.metrics(ofServer: server.id))
         let serverRemoved = try await fixture.send(.delete, HiveEndpoint.server(other.id))
 
         // Assert
-        #expect(scoutRemoved.status == .noContent)
+        #expect(metricsRemoved.status == .noContent)
         #expect(serverRemoved.status == .noContent)
         #expect(try fixture.metricsDatabase.cpuUser(ofServer: server.id).count == 1)
         #expect(try fixture.api.metrics.server(other.id) == nil)

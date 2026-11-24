@@ -52,6 +52,10 @@ struct RecoveryContents: Codable, Equatable {
         /// Kept, so snapshots after a restore go in the same folder as those before.
         let snapshotFolder: String?
         let jobs: [Job]
+        /// Whether its Scout reports, so a restored Hive asks for it to enroll again. Its key isn't
+        /// kept, since the restored Hive has a new identity the Scout doesn't trust. Missing from files
+        /// written before metrics.
+        let hasMetrics: Bool?
     }
 
     struct SSHKey: Codable, Equatable {
@@ -144,7 +148,8 @@ private extension RecoveryContents.Server {
             hostKey: hostKey,
             sshKey: try sshKey.map { RecoveryContents.SSHKey(seed: try transform($0.seed), publicKey: $0.publicKey) },
             snapshotFolder: snapshotFolder,
-            jobs: try jobs.map { try $0.mappingSecrets(transform) }
+            jobs: try jobs.map { try $0.mappingSecrets(transform) },
+            hasMetrics: hasMetrics
         )
     }
 }

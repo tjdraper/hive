@@ -6,5 +6,8 @@
 	<string>$(HIVE_BUNDLE_ID).Pairing</string>
 	<key>HiveBeekeeperSigningIdentifier</key>
 	<string>$(BEEKEEPER_BUNDLE_ID)</string>
+	<!-- The version of the Scout binaries Hive.app carries, from Scripts/build-scout.sh. -->
+	<key>ScoutVersion</key>
+	<string>$(SCOUT_VERSION)</string>
 </dict>
 </plist>

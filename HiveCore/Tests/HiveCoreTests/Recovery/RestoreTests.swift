@@ -61,6 +61,26 @@ struct RestoreTests {
         #expect(try new.servers.all().count == 2)
     }
 
+    @Test("A server that had metrics is restored waiting for its Scout to enroll again, and one without stays without")
+    func restoresServerWithMetrics() async throws {
+        // Arrange
+        let old = try APIFixture()
+        try old.setAddressOptions()
+        let (server, _) = try await old.addEverything()
+        let nameOnly = try await old.addServer(ServerDraft(name: "Metrics Only", connection: nil, quotaBytes: nil))
+        _ = try await old.enrollScout(for: nameOnly)
+        let key = RecoveryKey()
+        try await old.saveRecoveryKey(key)
+        let new = try APIFixture()
+
+        // Act
+        try new.restore(Data(contentsOf: old.recoveryFile), key: key)
+
+        // Assert
+        #expect(try new.api.metricsState.state(ofServer: nameOnly.id) == ServerMetricsState(hasMetrics: true, scout: nil))
+        #expect(try new.api.metricsState.state(ofServer: server.id) == ServerMetricsState(hasMetrics: false, scout: nil))
+    }
+
     @Test("A recovery file written before servers could go without SSH details restores each server with its own")
     func restoresFileFromBefore() throws {
         // Arrange
@@ -88,6 +108,7 @@ struct RestoreTests {
         #expect(server.confirmedHostKey == ConfigurationSamples.hostKey.hostKeyFingerprint)
         #expect(server.sshKeyFingerprint == sshKey.publicKey.fingerprint)
         #expect(try new.jobs.job(id: jobID)?.serverID == serverID)
+        #expect(try new.api.metricsState.state(ofServer: serverID) == ServerMetricsState(hasMetrics: false, scout: nil))
     }
 
     @Test("A restored Hive listens on the old Hive's port, says so, and keeps its address options, advertising and warnings")

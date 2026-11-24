@@ -111,7 +111,7 @@ extension ScoutChange {
         case .enrolled(replacedAnother: true):
             "A Scout on “\(serverName)” enrolled, replacing its last one"
         case .removed:
-            "Removed the Scout on “\(serverName)”, which can no longer send"
+            "Removed metrics from “\(serverName)”, whose Scout can no longer send"
         }
     }
 }

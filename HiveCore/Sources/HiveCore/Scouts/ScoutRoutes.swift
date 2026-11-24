@@ -3,18 +3,14 @@ import HiveKit
 import Hummingbird
 import ScoutProtocol
 
-/// A device's routes for a server's Scout, and the routes a Scout's own session reaches. Enrolling and
+/// A device's routes for a server's metrics and Scout, and the routes a Scout's own session reaches. Enrolling and
 /// signing in go through the pairing and sign-in routes, in `PairingRoutes` and `SignInRoutes`.
 enum ScoutRoutes {
     static let enrollmentWindowPath = RouterPath("\(HiveEndpoint.servers)/:id/enrollment-window")
-    static let scoutPath = RouterPath("\(HiveEndpoint.servers)/:id/scout")
+    static let metricsPath = RouterPath("\(HiveEndpoint.servers)/:id/metrics")
 
-    static func add(
-        to router: Router<HiveRequestContext>,
-        windows: EnrollmentWindowWorkflow,
-        removal: ScoutRemovalWorkflow,
-        confirmations: ConfirmationVerifier
-    ) {
+    static func add(to router: Router<HiveRequestContext>, api: HiveAPI) {
+        let (windows, state, removal, confirmations) = (api.enrollmentWindow, api.metricsState, api.metricsRemoval, api.confirmations)
         router.post(enrollmentWindowPath) { request, context in
             guard let id = context.idParameter else { return JSONResponse(status: .notFound) }
             let confirmed = try await ConfirmedRequest.read(request, context: context, verifier: confirmations)
@@ -36,7 +32,12 @@ enum ScoutRoutes {
             return JSONResponse(status: .noContent)
         }
 
-        router.delete(scoutPath) { _, context in
+        router.get(metricsPath) { _, context in
+            guard let id = context.idParameter, let state = try state.state(ofServer: id) else { return JSONResponse(status: .notFound) }
+            return try JSONResponse(state)
+        }
+
+        router.delete(metricsPath) { _, context in
             guard let id = context.idParameter else { return JSONResponse(status: .notFound) }
             let removed = try removal.remove(forServer: id, by: context.requireDevice())
             return JSONResponse(status: removed ? .noContent : .notFound)

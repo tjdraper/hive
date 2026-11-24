@@ -5,18 +5,21 @@ enum DaemonInfoError: Error {
     case missing(key: String)
 }
 
-/// The daemon's version, and names that differ between the installed daemon and the development one. The
+/// The daemon's version and Scout's, and names that differ between the installed daemon and the development one. The
 /// build writes the names into the daemon's Info.plist from the bundle ID prefix (Configuration/HiveDaemon-Info.plist).
 struct DaemonInfo {
     let pairingMachService: String
     let beekeeperSigningIdentifier: String
     let version: ReleaseVersion?
+    /// The release of Scout Hive.app carries, against which servers' Scouts are out of date.
+    let scoutVersion: String?
 
     static func read(from bundle: Bundle = .main) throws -> DaemonInfo {
         DaemonInfo(
             pairingMachService: try value(for: "HivePairingMachService", in: bundle),
             beekeeperSigningIdentifier: try value(for: "HiveBeekeeperSigningIdentifier", in: bundle),
-            version: (try? value(for: "CFBundleShortVersionString", in: bundle)).flatMap(ReleaseVersion.init)
+            version: (try? value(for: "CFBundleShortVersionString", in: bundle)).flatMap(ReleaseVersion.init),
+            scoutVersion: try? value(for: "ScoutVersion", in: bundle)
         )
     }
 

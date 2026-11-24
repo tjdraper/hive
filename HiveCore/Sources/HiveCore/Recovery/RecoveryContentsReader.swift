@@ -39,7 +39,8 @@ enum RecoveryContentsReader {
     private static func servers(in database: Database) throws -> [RecoveryContents.Server] {
         let jobs = Dictionary(grouping: try self.jobs(in: database), by: \.serverID)
         let rows = try Row.fetchAll(database, sql: """
-        SELECT id, name, host, port, user, quotaBytes, createdAt, hostKey, sealedSSHKey, sshPublicKey, snapshotFolder
+        SELECT id, name, host, port, user, quotaBytes, createdAt, hostKey, sealedSSHKey, sshPublicKey, snapshotFolder,
+            hasMetrics
         FROM server ORDER BY createdAt, id
         """)
         return rows.map { row in
@@ -57,7 +58,8 @@ enum RecoveryContentsReader {
                 hostKey: row["hostKey"],
                 sshKey: seed.flatMap { seed in publicKey.map { RecoveryContents.SSHKey(seed: seed, publicKey: $0) } },
                 snapshotFolder: row["snapshotFolder"],
-                jobs: jobs[id, default: []].map(\.job)
+                jobs: jobs[id, default: []].map(\.job),
+                hasMetrics: row["hasMetrics"]
             )
         }
     }

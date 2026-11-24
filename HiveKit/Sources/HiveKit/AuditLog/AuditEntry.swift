@@ -106,7 +106,7 @@ public enum ScoutChange: Codable, Hashable, Sendable {
     /// A Scout enrolled through the window the device opened, replacing the server's last one when
     /// `replacedAnother`.
     case enrolled(replacedAnother: Bool)
-    /// The server's Scout can no longer sign in, and its sessions ended.
+    /// The server's metrics were removed: its Scout can no longer sign in, and its sessions ended.
     case removed
 }
 

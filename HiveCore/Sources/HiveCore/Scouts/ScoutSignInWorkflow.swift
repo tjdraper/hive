@@ -50,20 +50,22 @@ struct ScoutSignInWorkflow: Sendable {
         addressLimiter.reset(address)
         scoutLimiter.reset(scout.id)
 
-        guard ScoutProtocolVersion.isAccepted(request.protocolVersion) else {
-            Self.logger.error("Refused a Scout on protocol version \(request.protocolVersion, privacy: .public)")
-            return .incompatible
-        }
-
+        // Recorded before the protocol is checked, so a Scout too old to sign in shows as out of date.
         do {
             try scouts.recordSignIn(
                 id: scout.id,
                 version: Self.validated(request.scoutVersion),
                 platform: Self.validated(request.platform),
+                protocolVersion: request.protocolVersion,
                 at: now
             )
         } catch {
             Self.logger.error("Couldn't record when a Scout was last seen: \(String(describing: error), privacy: .public)")
+        }
+
+        guard ScoutProtocolVersion.isAccepted(request.protocolVersion) else {
+            Self.logger.error("Refused a Scout on protocol version \(request.protocolVersion, privacy: .public)")
+            return .incompatible
         }
         let session = sessions.start(for: .scout(SignedInScout(scoutID: scout.id, serverID: scout.serverID)), at: now)
         Self.logger.notice("A Scout signed in")

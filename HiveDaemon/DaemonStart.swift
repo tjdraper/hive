@@ -34,7 +34,7 @@ enum DaemonStart {
                 sealer: SecretSealer(key: keys.storage),
                 identityKeys: keyStore,
                 rsync: bundledRsync(),
-                version: info.version,
+                version: info.version, scoutVersion: info.scoutVersion,
                 executable: executable
             )
             server = try APIServer(api: api, identity: identity, listeners: listeners)

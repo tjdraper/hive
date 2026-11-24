@@ -44,6 +44,8 @@ public struct HiveAPI: Sendable {
     let fullDiskAccess: @Sendable () -> FullDiskAccess
     let macSleep: @Sendable () async -> MacSleep
     let version: ReleaseVersion?
+    /// The release of Scout Hive.app carries. Nil when it carries none, such as in tests.
+    let scoutVersion: String?
     /// Nil where nothing should restart Hive for an update, such as in tests.
     let replacementWatcher: ExecutableReplacementWatcher?
 
@@ -121,14 +123,6 @@ public struct HiveAPI: Sendable {
         restart.isRequested
     }
 
-    var recoveryKey: RecoveryKeyWorkflow {
-        RecoveryKeyWorkflow(store: RecoveryKeyStore(database: servers.store.database), files: recoveryFiles, now: signIn.now)
-    }
-
-    var restoreState: RestoreStateReader {
-        RestoreStateReader(database: servers.store.database)
-    }
-
     var retentionPause: RetentionPauseStore {
         RetentionPauseStore(database: servers.store.database)
     }
@@ -165,6 +159,7 @@ public struct HiveAPI: Sendable {
         identityKeys: HiveKeyStore,
         rsync: URL,
         version: ReleaseVersion?,
+        scoutVersion: String?,
         executable: URL
     ) throws {
         let devices = DeviceStore(database: database)
@@ -198,6 +193,7 @@ public struct HiveAPI: Sendable {
             liveUpdateHeartbeat: .seconds(15),
             now: Date.init,
             version: version,
+            scoutVersion: scoutVersion,
             replacementWatcher: ExecutableReplacementWatcher(executable: executable)
         )
     }
@@ -232,10 +228,12 @@ public struct HiveAPI: Sendable {
         liveUpdateHeartbeat: Duration,
         now: @escaping @Sendable () -> Date,
         version: ReleaseVersion? = nil,
+        scoutVersion: String? = nil,
         replacementWatcher: ExecutableReplacementWatcher? = nil
     ) {
         self.hiveID = hiveID
         self.version = version
+        self.scoutVersion = scoutVersion
         self.replacementWatcher = replacementWatcher
         self.pin = pin
         self.signIn = signIn

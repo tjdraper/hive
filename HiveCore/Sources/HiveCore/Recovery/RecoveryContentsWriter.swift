@@ -64,12 +64,14 @@ enum RecoveryContentsWriter {
     private static func write(_ server: RecoveryContents.Server, in database: Database) throws {
         try database.execute(
             sql: """
-            INSERT INTO server (id, name, host, port, user, quotaBytes, createdAt, hostKey, sealedSSHKey, sshPublicKey, snapshotFolder)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO server (
+                id, name, host, port, user, quotaBytes, createdAt, hostKey, sealedSSHKey, sshPublicKey, snapshotFolder, hasMetrics
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             arguments: [
                 server.id, server.name, server.host, server.port, server.user, server.quotaBytes, server.createdAt,
-                server.hostKey, server.sshKey?.seed, server.sshKey?.publicKey, server.snapshotFolder,
+                server.hostKey, server.sshKey?.seed, server.sshKey?.publicKey, server.snapshotFolder, server.hasMetrics ?? false,
             ]
         )
         for job in server.jobs {

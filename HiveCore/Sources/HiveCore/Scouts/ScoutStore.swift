@@ -16,6 +16,8 @@ struct ScoutRecord: Codable, Hashable, FetchableRecord, PersistableRecord {
     var version: String?
     /// The system and CPU it was built for, such as `linux-x86_64`.
     var platform: String?
+    /// The protocol version it last signed in with, accepted or not.
+    var protocolVersion: Int?
 }
 
 enum ScoutStoreError: Error, Equatable {
@@ -50,6 +52,7 @@ struct ScoutStore: Sendable {
                 guard let serverName = try Self.serverName(serverID, in: database) else { throw ScoutStoreError.noServer }
                 let replaced = try ScoutRecord.filter(Column("serverID") == serverID).deleteAll(database) > 0
                 try scout.insert(database)
+                try database.execute(sql: "UPDATE server SET hasMetrics = 1 WHERE id = ?", arguments: [serverID])
                 let event = AuditEvent.scout(serverID: serverID, serverName: serverName, change: .enrolled(replacedAnother: replaced))
                 try AuditLog.record(event, by: deviceID, at: date, in: database)
                 return (scout, replaced)
@@ -60,28 +63,36 @@ struct ScoutStore: Sendable {
     }
 
     /// Only what changed is written, so a Scout signing in again with nothing new costs nothing more.
-    func recordSignIn(id: UUID, version: String?, platform: String?, at date: Date) throws {
+    func recordSignIn(id: UUID, version: String?, platform: String?, protocolVersion: Int, at date: Date) throws {
         try database.writer.write { database in
             guard var scout = try ScoutRecord.fetchOne(database, key: id) else { return }
             scout.lastSeenAt = date
             scout.version = version
             scout.platform = platform
+            scout.protocolVersion = protocolVersion
             try scout.update(database)
         }
     }
 
-    /// Its key can't sign in again. Its sessions are ended separately, by `SessionStore`. Returns false
-    /// when the server has no Scout.
-    func remove(forServer serverID: UUID, by deviceID: UUID, at date: Date) throws -> Bool {
+    /// The server no longer has metrics: its Scout's key can't sign in again, and a restored server
+    /// stops waiting for its Scout to enroll. Its Scout's sessions are ended separately, by
+    /// `SessionStore`. Returns false when the server has no metrics.
+    func removeMetrics(forServer serverID: UUID, by deviceID: UUID, at date: Date) throws -> Bool {
         try database.writer.write { database in
-            guard let scout = try ScoutRecord.filter(Column("serverID") == serverID).fetchOne(database),
-                  let serverName = try Self.serverName(serverID, in: database)
+            guard let server = try Row.fetchOne(database, sql: "SELECT name, hasMetrics FROM server WHERE id = ?", arguments: [serverID])
             else { return false }
-            let event = AuditEvent.scout(serverID: serverID, serverName: serverName, change: .removed)
+            let removedScout = try ScoutRecord.filter(Column("serverID") == serverID).deleteAll(database) > 0
+            guard removedScout || server["hasMetrics"] else { return false }
+            try database.execute(sql: "UPDATE server SET hasMetrics = 0 WHERE id = ?", arguments: [serverID])
+            let event = AuditEvent.scout(serverID: serverID, serverName: server["name"], change: .removed)
             try AuditLog.record(event, by: deviceID, at: date, in: database)
-            try scout.delete(database)
             return true
         }
+    }
+
+    /// Whether the server has metrics, with or without a Scout enrolled. Nil when there's no such server.
+    func hasMetrics(_ serverID: UUID) throws -> Bool? {
+        try database.writer.read { try Bool.fetchOne($0, sql: "SELECT hasMetrics FROM server WHERE id = ?", arguments: [serverID]) }
     }
 
     static func serverName(_ serverID: UUID, in database: Database) throws -> String? {

@@ -126,9 +126,10 @@ public enum HiveEndpoint {
         "\(server(id))/enrollment-window"
     }
 
-    /// `DELETE` removes the server's Scout, so it can't sign in again, and ends its sessions.
-    public static func scout(ofServer id: UUID) -> String {
-        "\(server(id))/scout"
+    /// `GET` reads the server's `ServerMetricsState`. `DELETE` removes its metrics: its Scout can't sign
+    /// in again and its sessions end, while the figures already kept age out.
+    public static func metrics(ofServer id: UUID) -> String {
+        "\(server(id))/metrics"
     }
 
     /// `POST` a `QuotaEstimateRequest` for the `RemovalEstimate` of changing the server's quota.

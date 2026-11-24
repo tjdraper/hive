@@ -1,7 +1,8 @@
 import HiveKit
 import SwiftUI
 
-/// One server: its backup jobs, where Hive connects, its keys, a connection test, and editing or removing it.
+/// One server: its backup jobs, where Hive connects, its keys, a connection test, its metrics, and editing
+/// or removing it.
 /// A server without SSH details has none of those until they're added.
 struct ServerDetail: View {
     let hive: KnownHive
@@ -49,8 +50,10 @@ struct ServerDetail: View {
                     Button("Add SSH Details…", systemImage: "plus", action: onAddJob)
                 }
             }
+            ServerMetricsSection(link: link, server: server)
         }
         .formStyle(.grouped)
+        .hostsFormSheets()
         .toolbar {
             ToolbarSpacer(.flexible)
             ToolbarItemGroup {

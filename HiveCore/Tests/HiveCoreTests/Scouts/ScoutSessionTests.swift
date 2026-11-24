@@ -126,7 +126,8 @@ struct ScoutSessionTests {
             (HiveEndpoint.server(server.id), .delete),
             (HiveEndpoint.sshKey(onServer: server.id), .get),
             (HiveEndpoint.enrollmentWindow(forServer: server.id), .post),
-            (HiveEndpoint.scout(ofServer: server.id), .delete),
+            (HiveEndpoint.metrics(ofServer: server.id), .get),
+            (HiveEndpoint.metrics(ofServer: server.id), .delete),
         ]
 
         for (path, method) in paths {
@@ -156,20 +157,21 @@ struct ScoutSessionTests {
         #expect(answer.body.isEmpty || (try? answer.decoded(as: ScoutSessionCheck.self)) == nil)
     }
 
-    @Test("Removing a server's Scout stops it signing in and ends its open session at once, and is recorded")
-    func removingScoutRevokes() async throws {
+    @Test("Removing a server's metrics stops its Scout signing in and ends its open session at once, and is recorded")
+    func removingMetricsRevokes() async throws {
         // Arrange
         let token = try await fixture.scoutToken(scout)
 
         // Act
-        let removed = try await fixture.send(.delete, HiveEndpoint.scout(ofServer: server.id))
+        let removed = try await fixture.send(.delete, HiveEndpoint.metrics(ofServer: server.id))
 
         // Assert
         #expect(removed.status == .noContent)
         #expect(try await fixture.send(.get, ScoutEndpoint.session, token: token).status == .unauthorized)
         #expect(try await fixture.sendScoutSignIn(fixture.scoutSignInRequest(scout)).status == .unauthorized)
         #expect(try fixture.auditEvents().first == .scout(serverID: server.id, serverName: server.name, change: .removed))
-        #expect(try await fixture.send(.delete, HiveEndpoint.scout(ofServer: server.id)).status == .notFound)
+        #expect(try fixture.api.metricsState.state(ofServer: server.id) == ServerMetricsState(hasMetrics: false, scout: nil))
+        #expect(try await fixture.send(.delete, HiveEndpoint.metrics(ofServer: server.id)).status == .notFound)
     }
 
     @Test("Removing the server removes its Scout and ends its session, leaving other servers' Scouts")

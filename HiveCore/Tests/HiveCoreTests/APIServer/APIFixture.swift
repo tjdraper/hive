@@ -227,7 +227,8 @@ struct APIFixture {
         sealer: SecretSealer? = nil,
         dumpSearchPath: String = "/usr/bin:/bin",
         startupDriveGrace: TimeInterval = 0,
-        liveUpdateHeartbeat: Duration = .seconds(15)
+        liveUpdateHeartbeat: Duration = .seconds(15),
+        scoutVersion: String? = nil
     ) throws {
         self.signIn = try signIn ?? SignInFixture()
         let sealer = sealer ?? SecretSealer(key: P256.KeyAgreement.PrivateKey())
@@ -279,7 +280,7 @@ struct APIFixture {
             },
             liveUpdateHeartbeat: liveUpdateHeartbeat,
             now: { clock.now },
-            version: ReleaseVersion("2026.3")
+            version: ReleaseVersion("2026.3"), scoutVersion: scoutVersion
         )
     }
 

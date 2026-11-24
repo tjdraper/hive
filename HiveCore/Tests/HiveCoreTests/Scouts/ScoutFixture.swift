@@ -50,7 +50,8 @@ extension APIFixture {
     func scoutSignInRequest(
         _ scout: TestScout,
         key: P256.Signing.PrivateKey? = nil,
-        protocolVersion: Int = ScoutProtocolVersion.current
+        protocolVersion: Int = ScoutProtocolVersion.current,
+        scoutVersion: String = "0.1.0"
     ) -> ScoutSignInRequest {
         let challenge = signIn.workflow.issueChallenge().challenge
         let statement = ScoutSignInStatement.bytes(hiveID: signIn.hiveID, scoutID: scout.enrollment.scoutID, challenge: challenge)
@@ -59,7 +60,7 @@ extension APIFixture {
             challenge: challenge,
             signature: (try? (key ?? scout.key).signature(for: statement).rawRepresentation) ?? Data(),
             protocolVersion: protocolVersion,
-            scoutVersion: "0.1.0",
+            scoutVersion: scoutVersion,
             platform: "linux-x86_64"
         )
     }

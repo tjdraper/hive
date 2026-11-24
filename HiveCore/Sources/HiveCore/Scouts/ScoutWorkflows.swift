@@ -6,8 +6,12 @@ extension HiveAPI {
         ScoutStore(database: servers.store.database)
     }
 
-    var scoutRemoval: ScoutRemovalWorkflow {
-        ScoutRemovalWorkflow(scouts: scouts, sessions: signIn.sessions, now: signIn.now)
+    var metricsRemoval: MetricsRemovalWorkflow {
+        MetricsRemovalWorkflow(scouts: scouts, sessions: signIn.sessions, now: signIn.now)
+    }
+
+    var metricsState: ServerMetricsStateReader {
+        ServerMetricsStateReader(scouts: scouts, metrics: metrics, carriedScoutVersion: scoutVersion)
     }
 
     var enrollmentWindow: EnrollmentWindowWorkflow {
