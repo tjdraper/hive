@@ -29,6 +29,14 @@ struct HiveSidebar: View {
                         Button("Remove from Beekeeper…", role: .destructive) { removing = hive }
                     }
                 } children: {
+                    NavigationLink(value: SidebarItem.dashboard(hiveID: hive.id)) {
+                        HStack {
+                            Label("Metrics", systemImage: "chart.xyaxis.line")
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                        .tappableAcrossRow()
+                    }
                     if let servers = store.servers(for: hive.id) {
                         ForEach(servers.servers) { server in
                             serverRow(server, in: servers, hiveID: hive.id)

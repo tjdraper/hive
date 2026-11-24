@@ -29,6 +29,8 @@ private extension SidebarItem {
         switch self {
         case .hive:
             [self]
+        case .dashboard(let hiveID):
+            [.hive(hiveID), self]
         case .server(let hiveID, _):
             [.hive(hiveID), self]
         case .job(let hiveID, let serverID, _):
