@@ -41,8 +41,15 @@ struct MacProcessReader {
         var userID: UInt32
     }
 
+    /// A name is read again when the short name changes, as it does when a process runs another program.
+    struct NameKey: Hashable {
+        var id: ProcessID
+        var shortName: String
+    }
+
     private var previousCPU: [ProcessID: UInt64] = [:]
     private var previousReadAt: UInt64?
+    private var names: [NameKey: String] = [:]
     private var users: [UInt32: String] = [:]
     private let timebase: (numerator: UInt64, denominator: UInt64)
 
@@ -56,9 +63,10 @@ struct MacProcessReader {
     ///   reading, which what other users' processes used is worked out from.
     mutating func read(elapsed: Double?, busyCores: Double?) -> ProcessFigures? {
         let readAt = mach_absolute_time()
-        let processes = Self.all(timebase: timebase)
+        let (processes, names) = Self.all(timebase: timebase, knownNames: names)
         guard !processes.isEmpty else { return nil }
         defer {
+            self.names = names
             previousCPU = Dictionary(processes.compactMap { process in
                 process.usage.map { (ProcessID(pid: process.pid, startTime: $0.startTime), $0.cpuNanoseconds) }
             }) { first, _ in first }
@@ -122,27 +130,43 @@ struct MacProcessReader {
         )
     }
 
-    private static func all(timebase: (numerator: UInt64, denominator: UInt64)) -> [MacProcess] {
+    /// Every process, with the long names of those that can be read, by process and short name.
+    /// Each is a few calls into the kernel for each of hundreds of processes, the most a sample costs,
+    /// so names already known aren't read again, nor anything of another user's but its user and state
+    /// without root, since macOS refuses it.
+    private static func all(
+        timebase: (numerator: UInt64, denominator: UInt64),
+        knownNames: [NameKey: String]
+    ) -> (processes: [MacProcess], names: [NameKey: String]) {
         let capacity = Int(proc_listallpids(nil, 0)) + 64
-        guard capacity > 64 else { return [] }
+        guard capacity > 64 else { return ([], [:]) }
         var pids = [Int32](repeating: 0, count: capacity)
         let count = Int(proc_listallpids(&pids, Int32(capacity * MemoryLayout<Int32>.size)))
-        guard count > 0 else { return [] }
-        return pids.prefix(min(count, capacity)).compactMap { pid in
+        guard count > 0 else { return ([], [:]) }
+        let user = geteuid()
+        var names: [NameKey: String] = [:]
+        let processes = pids.prefix(min(count, capacity)).compactMap { pid -> MacProcess? in
             // One that exits between listing and reading is skipped.
             var info = proc_bsdshortinfo()
             let size = Int32(MemoryLayout<proc_bsdshortinfo>.size)
             guard proc_pidinfo(pid, PROC_PIDT_SHORTBSDINFO, 0, &info, size) == size else { return nil }
             let shortName = MacMount.string(&info.pbsi_comm)
-            let usage = Self.usage(of: pid, timebase: timebase)
+            let usage = user == 0 || info.pbsi_uid == user ? Self.usage(of: pid, timebase: timebase) : nil
+            var command = shortName
+            if let usage {
+                let key = NameKey(id: ProcessID(pid: pid, startTime: usage.startTime), shortName: shortName)
+                command = knownNames[key] ?? Self.name(of: pid) ?? shortName
+                names[key] = command
+            }
             return MacProcess(
                 pid: pid,
                 userID: info.pbsi_uid,
-                command: usage == nil ? shortName : Self.name(of: pid) ?? shortName,
+                command: command,
                 isZombie: info.pbsi_status == UInt32(SZOMB),
                 usage: usage
             )
         }
+        return (processes, names)
     }
 
     /// Its CPU times are in `mach_absolute_time`'s units, which are nanoseconds on an Intel Mac but

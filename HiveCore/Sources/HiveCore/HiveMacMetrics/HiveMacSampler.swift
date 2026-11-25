@@ -45,7 +45,7 @@ extension HiveAPI {
                 board: metricsBoard,
                 figureAlerts: figureAlerts,
                 drives: backupDrive.store,
-                volumes: backupDrive.volumes,
+                driveMount: BackupDriveMountResolver(volumes: backupDrive.volumes),
                 now: signIn.now
             ),
             settings: settingsStore

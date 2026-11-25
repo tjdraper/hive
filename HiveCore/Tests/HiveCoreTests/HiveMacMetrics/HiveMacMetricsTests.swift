@@ -170,4 +170,34 @@ struct HiveMacMetricsTests {
         let summary = try fixture.api.metricsSummaries.summaries().first { $0.serverID == fixture.signIn.hiveID }
         #expect(summary?.alerts == [.filesystemFilling(mountPoint: "/")])
     }
+
+    @Test("A backup drive mounted after the Mac's figures were kept is still left out of its disk alerts")
+    func backupDriveMountedLater() async throws {
+        // Arrange: a sample kept while the drive wasn't mounted.
+        let alerts = try await MetricAlertFixture()
+        let fixture = alerts.api
+        let workflow = Self.workflow(fixture)
+        let drive = try TemporaryDirectory()
+        let volume = BackupRunFixture.volume(at: drive.url)
+        try await fixture.signIn.database.writer.write { database in
+            try database.execute(sql: "UPDATE hive SET backupDriveUUID = ?", arguments: [volume.uuid.uuidString])
+        }
+        var unmounted = alerts.sample()
+        unmounted.filesystems = [TestMetrics.filesystem("/", available: 50_000_000_000)]
+        workflow.keep(unmounted)
+
+        // Act
+        fixture.volumes.set([volume])
+        alerts.clock.advance(by: 10)
+        var mounted = alerts.sample()
+        mounted.filesystems = [
+            TestMetrics.filesystem("/", available: 50_000_000_000),
+            TestMetrics.filesystem(drive.url.fileSystemPath, available: 1_000_000_000),
+        ]
+        workflow.keep(mounted)
+        await alerts.check()
+
+        // Assert
+        #expect(try alerts.subjects().isEmpty)
+    }
 }

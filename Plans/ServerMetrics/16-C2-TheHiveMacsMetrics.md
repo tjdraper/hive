@@ -55,11 +55,19 @@ Built in the second session:
 - **Other users' processes** are one row, "Other users' processes ×N", with their CPU and "—" for memory, and a note in the caption saying why.
 - **The setting** is "Read the Hive Mac's Metrics" in the Hive's settings, after Build Expiry Warnings, and saves as soon as it's changed. While it's off the dashboard leaves the Mac out.
 - **Checked against macOS on Ivy** with the development daemon: memory in use, swap and "/" agree with `vm_stat` (counted as Activity Monitor counts it), `sysctl vm.swapusage` and `df`; CPU is within a couple of points of `top`.
-- **The installed build** shows the Mac on the dashboard and its own page, with the daemon running as the installing user. Its added CPU, measured with `ps` over a minute with the setting on (0.46% of a core) and a minute off (0.24%), was about 0.22% of a core, over §3's 0.15%. The engine session's 5 ms a sample counts only reading the figures, so most of the rest is likely keeping them: writing the sample, rollups, alert checks and live updates. Its memory was about 30 MB in all, so what the sampling adds couldn't be told apart.
+- **The installed build** shows the Mac on the dashboard and its own page, with the daemon running as the installing user. Its added CPU, measured with `ps` over three minutes each with the setting on, off and on again, was about 0.26% of a core, over §3's 0.15%. Its memory was about 30 MB in all, so what the sampling adds couldn't be told apart.
+- **Bringing it under budget:** a sample cost 8 ms of CPU back to back but 29 ms with 10 seconds between them, as the daemon takes them, since nothing is still in the CPU's caches and an idle Mac runs it on its efficiency cores. Measured that way, in a release build on Ivy (49 interfaces, 750 processes):
+  - Naming each interface with `if_indextoname` read the whole list again for each one. The names now come from `getifaddrs`' link-layer entries, which the reader already walks.
+  - Finding the backup drive's mount point listed every volume with its resource values on every sample. `BackupDriveMountResolver` lists them again only when the sample's filesystems or the chosen drive change.
+  - The process reader no longer asks for other users' CPU and memory without root, which macOS refuses, and reads a process's long name only when it's new or its short name changed.
+
+  A sample now costs 13.5 ms with 10-second gaps (8.8 ms reading, 4.6 ms keeping), about 0.135% of a core. Most of what's left is a few calls into the kernel for each process, and writing the sample.
+
+  Installed again, the daemon used 0.33% and 0.37% of a core in three-minute windows with the setting on and 0.18% with it off, so the sampling adds about 0.17%: down from 0.26%, but still a little over §3's 0.15%.
 
 Follow-ups:
 
-- Find where the daemon's added CPU goes, with a longer measurement and a profile, and bring it under §3's budget. C2 isn't checked off until it is.
+- Bring the installed daemon's added CPU under §3's 0.15%. Keeping a sample, 4.6 ms of the 13.5, is the next place to look, and it's the same path every Scout's report takes. C2 isn't checked off until it's under budget.
 - A Mac filesystem's page shows no disk charts: `disk(holding:)` matches Linux device names, and an APFS volume such as `disk3s1s1` is on a synthesized container, not the physical disk IOKit counts. Mapping it needs the container's physical store from the engine.
 - The Hive Mac uses the default alert limits, with no way to change them from Beekeeper yet.
 - The processes table's Where column is always empty for the Hive Mac.

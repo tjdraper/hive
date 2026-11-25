@@ -14,7 +14,7 @@ struct HiveMacMetricsWorkflow: Sendable {
     let board: MetricsLiveBoard
     let figureAlerts: FigureAlertCheck
     let drives: BackupDriveStore
-    let volumes: any VolumeListing
+    let driveMount: BackupDriveMountResolver
     let now: @Sendable () -> Date
 
     func keep(_ sample: MetricsSample) {
@@ -43,7 +43,8 @@ struct HiveMacMetricsWorkflow: Sendable {
     private func checkAlerts(_ sample: MetricsSample) {
         var checked = sample
         do {
-            if let drive = try backupDriveMountPoint() {
+            if let chosen = try drives.chosen(),
+               let drive = driveMount.mountPoint(of: chosen.volumeUUID, among: sample.filesystems) {
                 checked.filesystems = Self.leavingOutBackupDrive(sample.filesystems, mountPoint: drive)
             }
             let applied = try figureAlerts.check(checked, forServer: hiveID)
@@ -56,11 +57,6 @@ struct HiveMacMetricsWorkflow: Sendable {
         } catch {
             Self.logger.error("Couldn't check the Hive Mac's figures for alerts: \(String(describing: error), privacy: .public)")
         }
-    }
-
-    private func backupDriveMountPoint() throws -> String? {
-        guard let chosen = try drives.chosen() else { return nil }
-        return volumes.mountedVolumes().first { $0.uuid == chosen.volumeUUID }?.url.fileSystemPath
     }
 
     /// Leaves out the drive's own volume, and the other APFS volumes in its container, which share its
