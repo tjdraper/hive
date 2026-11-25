@@ -10,6 +10,7 @@ struct ServerMetricsPage: View {
     let serverID: UUID
     let onShowHive: () -> Void
     let onShowDashboard: () -> Void
+    let onShowPage: (FigurePage) -> Void
 
     @State private var range = MetricsRange.hour
     @State private var state: ServerMetricsState?
@@ -93,14 +94,15 @@ struct ServerMetricsPage: View {
     }
 
     @ViewBuilder private func charts(_ history: ServerHistory, timeline: MetricsTimeline) -> some View {
-        MetricsChart(title: "CPU", lines: history.cpu, format: .share, timeline: timeline, yDomain: 0 ... 1)
+        MetricsChart(title: "CPU", lines: history.cpu, format: .share, timeline: timeline, yDomain: 0 ... 1, links: [processesLink])
         MetricsChart(title: "Load", lines: history.load, format: .load, timeline: timeline)
         MetricsChart(
             title: "Memory",
             lines: history.memory,
             format: .bytes,
             timeline: timeline,
-            yDomain: history.memoryTotal.map { 0 ... max($0, 1) }
+            yDomain: history.memoryTotal.map { 0 ... max($0, 1) },
+            links: [processesLink]
         )
         if let swapTotal = history.swapTotal {
             MetricsChart(title: "Swap", lines: history.swap, format: .bytes, timeline: timeline, yDomain: 0 ... swapTotal)
@@ -110,7 +112,16 @@ struct ServerMetricsPage: View {
             MetricsChart(title: "Pressure, time stalled", lines: history.pressure, format: .share, timeline: timeline)
         }
         if !history.filesystems.isEmpty {
-            MetricsChart(title: "Disk space used", lines: history.diskSpace, format: .share, timeline: timeline, yDomain: 0 ... 1)
+            MetricsChart(
+                title: "Disk space used",
+                lines: history.diskSpace,
+                format: .share,
+                timeline: timeline,
+                yDomain: 0 ... 1,
+                links: history.filesystems.compactMap(\.name).map { mountPoint in
+                    MetricsChartLink(title: mountPoint) { onShowPage(.filesystem(mountPoint: mountPoint)) }
+                }
+            )
         }
         ForEach(history.disks) { disk in
             MetricsChart(title: "Disk \(disk.name ?? "")", lines: history.activity(of: disk), format: .bytesPerSecond, timeline: timeline)
@@ -123,6 +134,10 @@ struct ServerMetricsPage: View {
                 timeline: timeline
             )
         }
+    }
+
+    private var processesLink: MetricsChartLink {
+        MetricsChartLink(title: "Processes") { onShowPage(.processes) }
     }
 
     @ViewBuilder private var processes: some View {
@@ -147,26 +162,9 @@ struct ServerMetricsPage: View {
 
     private func load() async {
         do {
-            let state = try await link.perform {
-                try await $0.get(HiveEndpoint.metrics(ofServer: serverID), as: ServerMetricsState.self)
-            }
-            let end = Int64(Date.now.timeIntervalSince1970.rounded(.down)) + Int64(state.scout?.clockOffsetSeconds ?? 0)
-            let span = end - range.seconds ..< end
-            let seriesPath = HiveEndpoint.metricsSeries(
-                ofServer: serverID,
-                from: span.lowerBound,
-                to: span.upperBound,
-                figures: ServerHistory.figures
-            )
-            let series = try await link.perform { try await $0.get(seriesPath, as: MetricsSeries.self) }
-            let runs = try await link.perform {
-                try await $0.get(
-                    HiveEndpoint.backupRunMarks(ofServer: serverID, from: span.lowerBound, to: span.upperBound),
-                    as: [BackupRunMark].self
-                )
-            }
-            self.state = state
-            history = ServerHistory(series: series, range: span, backupRuns: runs)
+            let read = try await ServerHistory.read(ServerHistory.figures, over: range, ofServer: serverID, from: link)
+            state = read.state
+            history = read.history
             failure = nil
         } catch is CancellationError {
             return

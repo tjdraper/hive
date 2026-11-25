@@ -35,6 +35,8 @@ private extension SidebarItem {
             [.hive(hiveID), self]
         case .serverMetrics(let hiveID, let serverID), .job(let hiveID, let serverID, _):
             [.hive(hiveID), .server(hiveID: hiveID, serverID: serverID), self]
+        case .figurePage(let hiveID, let serverID, _):
+            [.hive(hiveID), .server(hiveID: hiveID, serverID: serverID), .serverMetrics(hiveID: hiveID, serverID: serverID), self]
         }
     }
 }

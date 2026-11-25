@@ -31,18 +31,21 @@ enum SidebarItem: Hashable {
     case server(hiveID: UUID, serverID: UUID)
     /// A server's metrics page, reached from the dashboard and from the server's page.
     case serverMetrics(hiveID: UUID, serverID: UUID)
+    /// One kind of a server's figures, reached from its metrics page.
+    case figurePage(hiveID: UUID, serverID: UUID, page: FigurePage)
     case job(hiveID: UUID, serverID: UUID, jobID: UUID)
 
     var hiveID: UUID {
         switch self {
-        case .hive(let id), .dashboard(let id), .server(let id, _), .serverMetrics(let id, _), .job(let id, _, _): id
+        case .hive(let id), .dashboard(let id), .server(let id, _), .serverMetrics(let id, _), .figurePage(let id, _, _),
+             .job(let id, _, _): id
         }
     }
 
     var serverID: UUID? {
         switch self {
         case .hive, .dashboard: nil
-        case .server(_, let id), .serverMetrics(_, let id), .job(_, let id, _): id
+        case .server(_, let id), .serverMetrics(_, let id), .figurePage(_, let id, _), .job(_, let id, _): id
         }
     }
 }
@@ -172,7 +175,7 @@ struct MainWindow: View {
                 }
                 // Otherwise another Hive's page keeps this one's state, and its loads stay on this Hive.
                 .id(hive.id)
-            case .dashboard, .serverMetrics:
+            case .dashboard, .serverMetrics, .figurePage:
                 metricsDetail(for: item, hive: hive, link: link, servers: servers)
             case .server(_, let serverID):
                 ServerDetail(
@@ -208,17 +211,36 @@ struct MainWindow: View {
 
     @ViewBuilder
     private func metricsDetail(for item: SidebarItem, hive: KnownHive, link: HiveLink, servers: ServerList) -> some View {
-        if case .serverMetrics(_, let serverID) = item {
+        switch item {
+        case .serverMetrics(_, let serverID):
             ServerMetricsPage(
                 hive: hive,
                 link: link,
                 servers: servers,
                 serverID: serverID,
                 onShowHive: { self.selection = .hive(hive.id) },
-                onShowDashboard: { self.selection = .dashboard(hiveID: hive.id) }
+                onShowDashboard: { self.selection = .dashboard(hiveID: hive.id) },
+                onShowPage: { self.selection = .figurePage(hiveID: hive.id, serverID: serverID, page: $0) }
             )
             .id(serverID)
-        } else {
+        case .figurePage(_, let serverID, let page):
+            let path = MetricsPagePath(
+                hiveName: hive.name,
+                serverName: servers.server(serverID)?.name ?? "Server",
+                onShowHive: { self.selection = .hive(hive.id) },
+                onShowDashboard: { self.selection = .dashboard(hiveID: hive.id) },
+                onShowServer: { self.selection = .serverMetrics(hiveID: hive.id, serverID: serverID) }
+            )
+            Group {
+                switch page {
+                case .processes:
+                    ProcessesPage(hive: hive, link: link, serverID: serverID, path: path)
+                case .filesystem(let mountPoint):
+                    FilesystemPage(hive: hive, link: link, serverID: serverID, mountPoint: mountPoint, path: path)
+                }
+            }
+            .id(item)
+        default:
             MetricsDashboard(
                 hive: hive,
                 link: link,

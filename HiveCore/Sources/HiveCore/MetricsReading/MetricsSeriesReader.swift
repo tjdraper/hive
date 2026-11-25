@@ -62,6 +62,12 @@ struct MetricsSeriesReader: Sendable {
     }
 }
 
+private struct SubjectName {
+    let name: String
+    let device: String?
+    let type: String?
+}
+
 /// One table's figures for a server, bucketed.
 private struct SubjectReading {
     /// A row of one resolution, or a bucket's worth of them. Pieces never overlap.
@@ -120,7 +126,14 @@ private struct SubjectReading {
                 }
             }
             guard !starts.isEmpty else { return nil }
-            return MetricsSeriesSubject(kind: kind, name: name, bucketStarts: starts, figures: figureSeries(buckets))
+            return MetricsSeriesSubject(
+                kind: kind,
+                name: name?.name,
+                device: name?.device,
+                filesystemType: name?.type,
+                bucketStarts: starts,
+                figures: figureSeries(buckets)
+            )
         }
         return subjects.sorted { ($0.name ?? "") < ($1.name ?? "") }
     }
@@ -150,14 +163,19 @@ private struct SubjectReading {
         }
     }
 
-    private func names(in database: Database) throws -> [Int64: String] {
+    /// With a filesystem's device and type.
+    private func names(in database: Database) throws -> [Int64: SubjectName] {
         guard let kind = table.nameKind else { return [:] }
         let rows = try Row.fetchAll(
             database,
-            sql: "SELECT id, name FROM metricsName WHERE serverKey = ? AND kind = ?",
+            sql: "SELECT id, name, device, type FROM metricsName WHERE serverKey = ? AND kind = ?",
             arguments: [serverKey, kind]
         )
-        return Dictionary(uniqueKeysWithValues: rows.map { ($0["id"], $0["name"]) })
+        var names: [Int64: SubjectName] = [:]
+        for row in rows {
+            names[row["id"]] = SubjectName(name: row["name"], device: row["device"], type: row["type"])
+        }
+        return names
     }
 
     private func figureSeries(_ buckets: [[Double?]]) -> [MetricsFigureSeries] {

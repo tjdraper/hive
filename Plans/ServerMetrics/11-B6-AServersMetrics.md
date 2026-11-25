@@ -50,3 +50,19 @@ Follow-ups:
 
 - **The processes page, each disk's page with its forecast, and the "done when"** (finding a spike an hour old, and a filling filesystem's forecast) are session 2.
 - **Containers' processes show a numeric user,** such as `postgres` as 70, since Scout looks the ID up on the host. B7 already has this.
+
+## Session 2
+
+Done: the processes page and each filesystem's page, and the "done when".
+
+- **Processes** (`ProcessesPage`), from Processes beside the CPU and Memory charts: CPU and the number of processes and zombies over the range, and below them a table of the groups, live every 10 seconds, or at the moment clicked on either chart, with Show Live to go back. Columns sort; CPU under 10% of a core shows a decimal, since most groups would otherwise all read 0%.
+- **Each filesystem** (`FilesystemPage`), from its mount point beside Disk space used: device, type, size, used, available and free inodes; the forecast (B4), orange when it fills within a week; space used, inodes used, and the activity and busy share of the disk it's on. Loop devices and those layered on disks, such as LVM's, have no disk of their own in Scout's figures, so they show no disk charts. It opens on Day, since filling is slow.
+- **Hive sends each filesystem's device and type** with its series, from what it already kept, so the page needs no new route.
+- Both are `figurePage` sidebar items, under the server's metrics page in the path.
+- **Each process on its own is left for later** (§4). Scout sends only the top groups, so it needs a protocol change, not a page.
+
+Checked on Ivy with the development Hive (2026-11-24), on the Debian VM's Scout (B3 Debian root):
+
+- **The spike:** `stress-ng --cpu 2`, run as `deploy` at 18:47. At 19:50 the processes page's 6 Hours range showed it, and clicking it showed the sample at 18:48:30 with `stress-ng-cpu ×2`, `deploy`, 200% at the top.
+- **The forecast:** `/home` filled 12 MB every 5 minutes by `scout-test-fill.service`, which stops at 300 MB free. Its page showed a forecast from the first hour of filling, "fills in 2 weeks", slowed by the flat hours before it began in the week's figures. The forecast once more hours had filled was left to everyday use. `/` showed "fills in 3 days", which is real: the VM's btrfs disk is shared with OrbStack's other machines.
+- **Light and dark** approved on the Mac.

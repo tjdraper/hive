@@ -26,6 +26,30 @@ struct ServerHistory {
     let interfaces: [SubjectFigures]
     private let server: SubjectFigures?
 
+    /// The server's state, and `figures` over the range ending now on the server's clock, which Hive
+    /// knows the offset of.
+    static func read(
+        _ figures: [MetricsFigure],
+        over range: MetricsRange,
+        ofServer serverID: UUID,
+        from link: HiveLink
+    ) async throws -> (state: ServerMetricsState, history: ServerHistory) {
+        let state = try await link.perform {
+            try await $0.get(HiveEndpoint.metrics(ofServer: serverID), as: ServerMetricsState.self)
+        }
+        let end = Int64(Date.now.timeIntervalSince1970.rounded(.down)) + Int64(state.scout?.clockOffsetSeconds ?? 0)
+        let span = end - range.seconds ..< end
+        let seriesPath = HiveEndpoint.metricsSeries(ofServer: serverID, from: span.lowerBound, to: span.upperBound, figures: figures)
+        let series = try await link.perform { try await $0.get(seriesPath, as: MetricsSeries.self) }
+        let runs = try await link.perform {
+            try await $0.get(
+                HiveEndpoint.backupRunMarks(ofServer: serverID, from: span.lowerBound, to: span.upperBound),
+                as: [BackupRunMark].self
+            )
+        }
+        return (state, ServerHistory(series: series, range: span, backupRuns: runs))
+    }
+
     init(series: MetricsSeries, range: Range<Int64>, backupRuns: [BackupRunMark]) {
         self.range = range
         self.backupRuns = backupRuns
@@ -121,10 +145,19 @@ struct ServerHistory {
         .filter { !$0.points.isEmpty }
     }
 
+    /// Zombies have exited, but their parent hasn't collected them.
+    var processCount: [MetricsChartLine] {
+        guard let server else { return [] }
+        return [
+            server.line("Processes", color: Color(.metricsCPU), figure: .processes),
+            server.line("Zombies", color: .red, figure: .zombies),
+        ]
+    }
+
     /// Each filesystem's share used, of what's usable without root's reserve, as `df` shows it.
     var diskSpace: [MetricsChartLine] {
-        filesystems.enumerated().map { offset, filesystem in
-            filesystem.line(filesystem.name ?? "", color: Self.palette[offset % Self.palette.count]) { index in
+        filesystems.map { filesystem in
+            filesystem.line(filesystem.name ?? "", color: color(of: filesystem)) { index in
                 guard let used = filesystem.average(.filesystemUsed, index),
                       let available = filesystem.average(.filesystemAvailable, index),
                       used + available > 0
@@ -137,6 +170,62 @@ struct ServerHistory {
                 )
             }
         }
+    }
+
+    /// The same on every chart a filesystem is on.
+    func color(of filesystem: SubjectFigures) -> Color {
+        Self.palette[(filesystems.firstIndex { $0.id == filesystem.id } ?? 0) % Self.palette.count]
+    }
+
+    /// Bytes used, of what's usable without root's reserve, so the band's highest comes from available's lowest.
+    func space(of filesystem: SubjectFigures) -> [MetricsChartLine] {
+        let used = filesystem.line("Used", color: color(of: filesystem)) { index in
+            guard let used = filesystem.average(.filesystemUsed, index),
+                  let available = filesystem.average(.filesystemAvailable, index)
+            else { return nil }
+            let usable = used + available
+            return SubjectFigures.Reading(
+                average: used,
+                highest: filesystem.lowest(.filesystemAvailable, index).map { usable - $0 },
+                lowest: filesystem.highest(.filesystemAvailable, index).map { usable - $0 }
+            )
+        }
+        return [used]
+    }
+
+    /// Empty for filesystems without a fixed number of inodes, such as Btrfs.
+    func inodes(of filesystem: SubjectFigures) -> [MetricsChartLine] {
+        let used = filesystem.line("Used", color: color(of: filesystem)) { index in
+            guard let used = filesystem.average(.filesystemInodesUsed, index),
+                  let free = filesystem.average(.filesystemInodesFree, index),
+                  used + free > 0
+            else { return nil }
+            let total = used + free
+            return SubjectFigures.Reading(
+                average: used / total,
+                highest: filesystem.lowest(.filesystemInodesFree, index).map { (total - $0) / total },
+                lowest: filesystem.highest(.filesystemInodesFree, index).map { (total - $0) / total }
+            )
+        }
+        return used.points.isEmpty ? [] : [used]
+    }
+
+    /// The disk a filesystem is on, by its device's name: `/dev/vdb1` is on `vdb`, and `/dev/nvme0n1p2`
+    /// on `nvme0n1`. Nil for loop devices and those layered on disks, such as LVM's, which Scout
+    /// doesn't send as disks.
+    func disk(holding filesystem: SubjectFigures) -> SubjectFigures? {
+        guard let device = filesystem.device, device.hasPrefix("/dev/") else { return nil }
+        let name = device.dropFirst("/dev/".count)
+        return disks.first { disk in
+            guard let diskName = disk.name, name.hasPrefix(diskName) else { return false }
+            var partition = name.dropFirst(diskName.count)
+            if diskName.last?.isNumber == true, partition.first == "p" { partition = partition.dropFirst() }
+            return partition.allSatisfy(\.isNumber)
+        }
+    }
+
+    func busy(of disk: SubjectFigures) -> [MetricsChartLine] {
+        [disk.line("Busy", color: .purple, figure: .diskBusy)]
     }
 
     func activity(of disk: SubjectFigures) -> [MetricsChartLine] {
@@ -164,6 +253,9 @@ struct SubjectFigures: Identifiable {
 
     let kind: MetricsSubjectKind
     let name: String?
+    /// A filesystem's device, such as `/dev/vda1`, and type, such as `ext4`.
+    let device: String?
+    let filesystemType: String?
     private let bucketSeconds: Int64
     private let bucketStarts: [Int64]
     private let figures: [MetricsFigure: MetricsFigureSeries]
@@ -175,6 +267,8 @@ struct SubjectFigures: Identifiable {
     init(_ subject: MetricsSeriesSubject, bucketSeconds: Int64) {
         kind = subject.kind
         name = subject.name
+        device = subject.device
+        filesystemType = subject.filesystemType
         self.bucketSeconds = bucketSeconds
         bucketStarts = subject.bucketStarts
         figures = Dictionary(subject.figures.map { ($0.figure, $0) }, uniquingKeysWith: { first, _ in first })
@@ -190,6 +284,10 @@ struct SubjectFigures: Identifiable {
 
     func lowest(_ figure: MetricsFigure, _ index: Int) -> Double? {
         figures[figure]?.lowest?[index]
+    }
+
+    func newest(_ figure: MetricsFigure) -> Double? {
+        figures[figure]?.average.compactMap(\.self).last
     }
 
     func largest(_ figure: MetricsFigure) -> Double? {

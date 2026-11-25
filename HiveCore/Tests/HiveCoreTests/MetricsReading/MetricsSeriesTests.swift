@@ -163,11 +163,14 @@ struct MetricsSeriesTests {
         #expect(cpu.highest == [0.4, 0.7])
     }
 
-    @Test("Figures kept by name come back for each name, and only the subjects asked for")
+    @Test("Figures kept by name come back for each name, with a filesystem's device and type, and only the subjects asked for")
     func namedSubjects() throws {
         // Arrange
         var first = sample(at: start, cpu: 0.1)
-        first.filesystems = [TestMetrics.filesystem("/var", available: 20), TestMetrics.filesystem("/", available: 10)]
+        var data = TestMetrics.filesystem("/var", available: 20)
+        data.device = "/dev/vdb1"
+        data.type = "xfs"
+        first.filesystems = [data, TestMetrics.filesystem("/", available: 10)]
         try keep([first])
 
         // Act
@@ -176,6 +179,8 @@ struct MetricsSeriesTests {
         // Assert
         #expect(series.subjects.map(\.kind) == [.filesystem, .filesystem])
         #expect(series.subjects.map(\.name) == ["/", "/var"])
+        #expect(series.subjects.map(\.device) == ["/dev/vda1", "/dev/vdb1"])
+        #expect(series.subjects.map(\.filesystemType) == ["ext4", "xfs"])
         #expect(series.subjects.map { $0.figures.only?.lowest } == [[10], [20]])
     }
 

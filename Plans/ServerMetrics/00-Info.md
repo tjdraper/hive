@@ -23,7 +23,7 @@ Check off a slice here when its "done when" is true.
 - [x] [B3. Installing Scout from Beekeeper](08-B3-InstallingScoutFromBeekeeper.md) — Mixed, 1–2 sessions, needs you
 - [x] [B4. Reading metrics from Hive](09-B4-ReadingMetricsFromHive.md) — Engine, 1 session
 - [x] [B5. The dashboard](10-B5-TheDashboard.md) — UI, 1–2 sessions
-- [ ] [B6. A server's metrics](11-B6-AServersMetrics.md) — UI, 2 sessions
+- [x] [B6. A server's metrics](11-B6-AServersMetrics.md) — UI, 2 sessions
 - [ ] [B7. Containers and services in Scout and Hive](12-B7-ContainersAndServicesInScoutAndHive.md) — Engine, 1–2 sessions
 - [ ] [B8. Containers and services in Beekeeper](13-B8-ContainersAndServicesInBeekeeper.md) — UI, 1 session
 - [ ] [B9. Metrics on iPhone and iPad](14-B9-MetricsOnIPhoneAndIPad.md) — UI, 1 session, TestFlight
@@ -110,6 +110,7 @@ From `/proc` and `/sys` on Linux. Each is a handful of small reads.
 Left for later:
 
 - **Failed systemd units, open file handles, TCP connection counts,** and other figures, once the dashboard shows what's missing.
+- **Each process on its own,** rather than grouped by command and user. Scout sends only the top groups, so this needs Scout to send single processes, a new protocol version, and Hive to keep them (B6).
 
 ## §5. Timing
 
@@ -145,7 +146,7 @@ Built with you in Phase B. The starting point:
 - **Servers with metrics** sit under servers, where Beekeeper already lists each server's backup jobs. A server can have metrics, backup jobs or both, so one added only for metrics needs no SSH details (B1).
 - **A dashboard** of every server reporting to the Hive, and the Hive Mac once C2 adds it, with a card each: whether it's reporting, CPU, memory, swap, its fullest disk, and a sparkline of the last hour. Servers with a problem come first.
 - **A page for each server:** what it is (distribution, kernel, cores, memory, uptime, Scout's version), a range from an hour to a year, and charts for CPU, load, memory and swap, pressure, each disk, disk activity and the network. Choosing a moment on a chart shows the processes and containers at that moment. Backup runs are marked on the charts, so you can see when a backup loaded the server.
-- **A page for each kind of figure,** reached from the server's page: processes, live, grouped and ungrouped; each disk with a forecast of when it fills at its recent rate; containers and services; and so on.
+- **A page for each kind of figure,** reached from the server's page: processes, live and grouped (each process on its own is left for later, §4); each disk with a forecast of when it fills at its recent rate; containers and services; and so on.
 - **Live while open:** the dashboard and a server's page update with every sample through live updates (§12), which carry only each server's latest figures, never a backlog.
 - **iPhone and iPad** in B9.
 

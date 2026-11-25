@@ -13,22 +13,6 @@ struct MomentProcesses: View {
         }
     }
 
-    /// A group as the list shows it, from a sample or an hour.
-    private struct Row: Identifiable {
-        let command: String
-        let user: String
-        let count: Int
-        let cpuCores: Double?
-        let memoryBytes: UInt64
-        /// The hour's highest, beside its average.
-        var highestCPUCores: Double?
-        var highestMemoryBytes: UInt64?
-
-        var id: String {
-            "\(command) \(user)"
-        }
-    }
-
     let link: HiveLink
     let serverID: UUID
     /// Seconds since 1970 on the server's clock.
@@ -71,26 +55,8 @@ struct MomentProcesses: View {
 
     @ViewBuilder private var content: some View {
         switch processes {
-        case .sample(_, let groups):
-            list(
-                groups.map {
-                    Row(command: $0.command, user: $0.user, count: $0.count, cpuCores: $0.cpuCores, memoryBytes: $0.ownMemoryBytes)
-                }
-            )
-        case .hour(_, let groups):
-            list(
-                groups.map {
-                    Row(
-                        command: $0.command,
-                        user: $0.user,
-                        count: $0.highestCount,
-                        cpuCores: $0.averageCPUCores,
-                        memoryBytes: $0.averageOwnMemoryBytes,
-                        highestCPUCores: $0.highestCPUCores,
-                        highestMemoryBytes: $0.highestOwnMemoryBytes
-                    )
-                }
-            )
+        case .sample, .hour:
+            list(processes.map(ProcessRow.rows) ?? [])
         case .notKept:
             ContentUnavailableView(
                 "No Processes Kept",
@@ -111,7 +77,7 @@ struct MomentProcesses: View {
         }
     }
 
-    private func list(_ rows: [Row]) -> some View {
+    private func list(_ rows: [ProcessRow]) -> some View {
         List(sorted(rows)) { row in
             rowView(row)
         }
@@ -121,19 +87,19 @@ struct MomentProcesses: View {
     private var caption: String? {
         switch processes {
         case .sample(let takenAt, _):
-            "At \(Self.time(takenAt)). Memory is each group's own, so it's approximate."
+            "At \(ProcessRow.time(takenAt)). Memory is each group's own, so it's approximate."
         case .hour(let startsAt, _):
-            "The busiest over the hour from \(Self.time(startsAt)), on average, with their highest. "
+            "The busiest over the hour from \(ProcessRow.time(startsAt)), on average, with their highest. "
                 + "Single samples are kept for a day. Memory is approximate."
         case .notKept, nil:
             nil
         }
     }
 
-    private func rowView(_ row: Row) -> some View {
+    private func rowView(_ row: ProcessRow) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(row.count > 1 ? "\(row.command) ×\(row.count)" : row.command)
+                Text(row.name)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(row.user)
@@ -143,9 +109,9 @@ struct MomentProcesses: View {
             }
             Spacer(minLength: 4)
             VStack(alignment: .trailing, spacing: 2) {
-                Text(Self.cores(row.cpuCores, highest: row.highestCPUCores))
+                Text("\(row.cpuText) CPU")
                     .fontWeight(order == .cpu ? .semibold : .regular)
-                Text(Self.bytes(row.memoryBytes, highest: row.highestMemoryBytes))
+                Text(row.memoryText)
                     .font(.caption)
                     .fontWeight(order == .memory ? .semibold : .regular)
                     .foregroundStyle(.secondary)
@@ -156,9 +122,9 @@ struct MomentProcesses: View {
     }
 
     /// Scout sends the busiest by CPU and by memory, so each order's top is complete.
-    private func sorted(_ rows: [Row]) -> [Row] {
+    private func sorted(_ rows: [ProcessRow]) -> [ProcessRow] {
         switch order {
-        case .cpu: rows.sorted { ($0.cpuCores ?? 0) > ($1.cpuCores ?? 0) }
+        case .cpu: rows.sorted { $0.cpuOrder > $1.cpuOrder }
         case .memory: rows.sorted { $0.memoryBytes > $1.memoryBytes }
         }
     }
@@ -176,23 +142,5 @@ struct MomentProcesses: View {
         } catch {
             failure = HiveLink.message(for: error)
         }
-    }
-
-    /// A share of one core, so 2 busy cores read 200%.
-    private static func cores(_ cores: Double?, highest: Double?) -> String {
-        guard let cores else { return "— CPU" }
-        let average = cores.formatted(.percent.precision(.fractionLength(0)))
-        guard let highest else { return "\(average) CPU" }
-        return "\(average) CPU, up to \(highest.formatted(.percent.precision(.fractionLength(0))))"
-    }
-
-    private static func bytes(_ bytes: UInt64, highest: UInt64?) -> String {
-        let average = Int64(clamping: bytes).formatted(.byteCount(style: .memory))
-        guard let highest else { return average }
-        return "\(average), up to \(Int64(clamping: highest).formatted(.byteCount(style: .memory)))"
-    }
-
-    private static func time(_ second: Int64) -> String {
-        Date(timeIntervalSince1970: TimeInterval(second)).formatted(date: .abbreviated, time: .standard)
     }
 }

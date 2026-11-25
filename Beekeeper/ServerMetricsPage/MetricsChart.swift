@@ -9,6 +9,7 @@ enum MetricsValueFormat {
     case bytesPerSecond
     case load
     case perSecond
+    case count
 
     func text(_ value: Double) -> String {
         if value == 0 { return "0" }
@@ -23,6 +24,8 @@ enum MetricsValueFormat {
             value.formatted(.number.precision(.fractionLength(0 ... 2)))
         case .perSecond:
             "\(value.formatted(.number.precision(.fractionLength(0 ... 1))))/s"
+        case .count:
+            value.formatted(.number.precision(.fractionLength(0)))
         }
     }
 
@@ -91,10 +94,12 @@ struct MetricsChart: View {
     let timeline: MetricsTimeline
     /// Nil fits the figures, from 0.
     var yDomain: ClosedRange<Double>?
+    /// Pages with more of what the chart shows, such as each filesystem's.
+    var links: [MetricsChartLink] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            MetricsChartLegend(title: title, lines: lines, format: format, timeline: timeline)
+            MetricsChartLegend(title: title, lines: lines, format: format, timeline: timeline, links: links)
             chart
                 .frame(height: 150)
         }
@@ -148,6 +153,7 @@ struct MetricsChart: View {
         let floor: Double = switch format {
         case .share: 0.05
         case .load, .perSecond: 1
+        case .count: 10
         case .bytes, .bytesPerSecond: 1_024
         }
         return 0 ... max(highest * 1.1, floor)
@@ -208,12 +214,22 @@ struct MetricsChart: View {
     }
 }
 
+struct MetricsChartLink: Identifiable {
+    let title: String
+    let action: () -> Void
+
+    var id: String {
+        title
+    }
+}
+
 /// A chart's title, and each line's figure at the moment shown, or its newest.
 private struct MetricsChartLegend: View {
     let title: String
     let lines: [MetricsChartLine]
     let format: MetricsValueFormat
     let timeline: MetricsTimeline
+    let links: [MetricsChartLink]
 
     @Environment(MetricsMoment.self) private var moment
 
@@ -224,6 +240,18 @@ private struct MetricsChartLegend: View {
                     .font(.headline)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                ForEach(links) { link in
+                    Button(action: link.action) {
+                        HStack(spacing: 2) {
+                            Text(link.title)
+                            Image(systemName: "chevron.forward")
+                                .imageScale(.small)
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                    .lineLimit(1)
+                }
                 Spacer(minLength: 8)
                 if let shown = moment.shown {
                     Text(timeline.time(shown))
