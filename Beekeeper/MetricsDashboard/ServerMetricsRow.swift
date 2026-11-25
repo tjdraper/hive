@@ -22,6 +22,8 @@ struct ServerMetricsRow: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            FigureAlertsLine(alerts: server.figureAlerts)
+                .font(.subheadline)
             if let latest = server.latest, server.reporting != .waiting {
                 figures(latest)
                     // Figures from before it stopped are still worth seeing, but aren't current.
@@ -36,22 +38,22 @@ struct ServerMetricsRow: View {
             RowFigure(
                 title: "CPU",
                 value: latest.cpu.map { ServerMetricsCard.percent($0.busy) },
-                isConcern: !server.concerns.isDisjoint(with: [.cpu, .load])
+                hasAlert: server.figureAlerts.contains(.cpuBusy)
             )
             RowFigure(
                 title: "Memory",
                 value: latest.memory.map { ServerMetricsCard.percent($0.usedShare) },
-                isConcern: server.concerns.contains(.memory)
+                hasAlert: server.figureAlerts.contains(.memoryShort)
             )
             RowFigure(
                 title: "Swap",
                 value: latest.memory.map { $0.swapTotalBytes == 0 ? "None" : ServerMetricsCard.percent($0.swapUsedShare) },
-                isConcern: false
+                hasAlert: false
             )
             RowFigure(
                 title: "Fullest disk",
                 value: latest.fullestFilesystem.map { ServerMetricsCard.percent($0.usedShare) },
-                isConcern: server.concerns.contains(.disk)
+                hasAlert: server.isFillingFullest
             )
         }
     }
@@ -60,7 +62,7 @@ struct ServerMetricsRow: View {
 private struct RowFigure: View {
     let title: String
     let value: String?
-    let isConcern: Bool
+    let hasAlert: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -72,11 +74,11 @@ private struct RowFigure: View {
                 Text(value ?? "—")
                     .font(.body.weight(.semibold))
                     .monospacedDigit()
-                if isConcern {
+                if hasAlert {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundStyle(.orange)
-                        .accessibilityLabel("Past its alert limit")
+                        .accessibilityLabel("Alert")
                 }
             }
         }

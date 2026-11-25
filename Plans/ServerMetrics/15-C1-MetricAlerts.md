@@ -40,3 +40,14 @@ Built in the first session, in `HiveCore/MetricAlerts/`:
 - **Limits** are `GET`/`PUT /servers/:id/metrics/alert-limits`, audited as a `ServerChange`, kept as JSON on the server's row (none for the defaults) and in recovery files. Current alerts are on each `ServerMetricsSummary`.
 
 **Done when:** with the test VM, stopping Scout sends a "stopped reporting" email and starting it a recovery email; filling a disk past its limit sends one email; cutting off both test VMs sends one email; sleeping and waking the Mac sends none; and the tests pass.
+
+## UI notes
+
+Built in the second session:
+
+- **Current alerts come from Hive,** on each `ServerMetricsSummary` and now on `ServerMetricsState` too, so a server's page and its Metrics section show them without reading every summary. The dashboard no longer works out its own concerns from fixed limits (`MetricsConcern` is gone), so the card agrees with the emails.
+- **On a card,** alerts about figures show as one orange line under the name (“CPU busy · Short of memory · “/home” filling up”), in the order the figures show, with a triangle beside CPU, memory, and the fullest disk when it's the one filling. Stopped and clock ahead stay with the reporting badge; a server that stopped with others says the Hive's own connection is the likelier cause.
+- **On a server's metrics page,** each alert is a sentence above what the server is. In its Metrics section, the same sentences, then Alert limits (Defaults or Changed) and Change Alert Limits….
+- **The limits sheet** (`MetricAlerts/AlertLimitsSheet.swift`) groups Disks, Memory and CPU, each limit with a field, a stepper and its default under its name, and Use Defaults to go back. Values outside Hive's ranges say so and keep Save off.
+
+Seen on Ivy with the development Hive (2026-11-25), with the Debian VM's limits lowered by hand to open real CPU and memory alerts beside its `/home` one, then put back: the dashboard, the server's page, its Metrics section and the sheet, in light and dark.

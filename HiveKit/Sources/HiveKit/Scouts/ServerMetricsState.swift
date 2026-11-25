@@ -7,10 +7,25 @@ public struct ServerMetricsState: Codable, Hashable, Sendable {
     public let hasMetrics: Bool
     /// Nil while a server with metrics waits for its Scout to enroll again, such as after a restore.
     public let scout: ScoutState?
+    /// Its alerts open now, as on its `ServerMetricsSummary`.
+    public let alerts: [MetricAlert]
 
-    public init(hasMetrics: Bool, scout: ScoutState?) {
+    public init(hasMetrics: Bool, scout: ScoutState?, alerts: [MetricAlert] = []) {
         self.hasMetrics = hasMetrics
         self.scout = scout
+        self.alerts = alerts
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case hasMetrics, scout, alerts
+    }
+
+    /// A Hive from before metric alerts sends none.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hasMetrics = try container.decode(Bool.self, forKey: .hasMetrics)
+        scout = try container.decodeIfPresent(ScoutState.self, forKey: .scout)
+        alerts = try container.decodeIfPresent([MetricAlert].self, forKey: .alerts) ?? []
     }
 }
 

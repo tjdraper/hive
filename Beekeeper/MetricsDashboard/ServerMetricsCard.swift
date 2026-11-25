@@ -21,6 +21,8 @@ struct ServerMetricsCard: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            FigureAlertsLine(alerts: server.figureAlerts)
+                .font(.callout)
             if let latest = server.latest, server.reporting != .waiting {
                 figures(latest)
                     // Figures from before it stopped are still worth seeing, but aren't current.
@@ -44,6 +46,15 @@ struct ServerMetricsCard: View {
             nil
         case .waiting:
             "Waiting for its Scout's first report."
+        case .stopped where server.stoppedWithOthers:
+            if let last = server.summary.lastReportAt {
+                """
+                Last report \(last.formatted(.relative(presentation: .named))). Others stopped with it, so the Hive's own \
+                connection is the likelier cause.
+                """
+            } else {
+                "Others stopped with it, so the Hive's own connection is the likelier cause."
+            }
         case .stopped:
             if let last = server.summary.lastReportAt {
                 "Last report \(last.formatted(.relative(presentation: .named)))."
@@ -61,7 +72,7 @@ struct ServerMetricsCard: View {
         switch server.reporting {
         case .stopped, .refused: AnyShapeStyle(.red.opacity(0.7))
         case .clockAhead: AnyShapeStyle(.orange.opacity(0.8))
-        case .reporting where !server.concerns.isEmpty: AnyShapeStyle(.orange.opacity(0.8))
+        case .reporting where !server.figureAlerts.isEmpty: AnyShapeStyle(.orange.opacity(0.8))
         case .reporting, .waiting: AnyShapeStyle(.separator)
         }
     }
@@ -73,13 +84,13 @@ struct ServerMetricsCard: View {
                     title: "CPU",
                     value: latest.cpu.map { Self.percent($0.busy) },
                     detail: cpuDetail(latest),
-                    isConcern: !server.concerns.isDisjoint(with: [.cpu, .load])
+                    hasAlert: server.figureAlerts.contains(.cpuBusy)
                 )
                 FigureCell(
                     title: "Memory",
                     value: latest.memory.map { Self.percent($0.usedShare) },
                     detail: latest.memory.map { "\(Self.bytes($0.usedBytes)) of \(Self.bytes($0.totalBytes))" },
-                    isConcern: server.concerns.contains(.memory)
+                    hasAlert: server.figureAlerts.contains(.memoryShort)
                 )
             }
             GridRow {
@@ -91,13 +102,13 @@ struct ServerMetricsCard: View {
                             ? nil
                             : "\(Self.bytes(memory.swapUsedBytes)) of \(Self.bytes(memory.swapTotalBytes))"
                     },
-                    isConcern: false
+                    hasAlert: false
                 )
                 FigureCell(
                     title: "Fullest disk",
                     value: latest.fullestFilesystem.map { Self.percent($0.usedShare) },
                     detail: latest.fullestFilesystem.map { "\($0.mountPoint), \(Self.bytes($0.availableBytes)) free" },
-                    isConcern: server.concerns.contains(.disk)
+                    hasAlert: server.isFillingFullest
                 )
             }
         }
@@ -129,7 +140,7 @@ private struct FigureCell: View {
     let title: String
     let value: String?
     let detail: String?
-    let isConcern: Bool
+    let hasAlert: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -140,11 +151,11 @@ private struct FigureCell: View {
                 Text(value ?? "—")
                     .font(.title3.weight(.semibold))
                     .monospacedDigit()
-                if isConcern {
+                if hasAlert {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
-                        .help("Past its alert limit")
-                        .accessibilityLabel("Past its alert limit")
+                        .help("Hive has an alert open about it")
+                        .accessibilityLabel("Alert")
                 }
             }
             Text(detail ?? " ")
@@ -155,6 +166,27 @@ private struct FigureCell: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The server's open alerts about its figures, in a few words each.
+struct FigureAlertsLine: View {
+    let alerts: [MetricAlert]
+
+    var body: some View {
+        if !alerts.isEmpty {
+            Label(alerts.map(\.title).joined(separator: " · "), systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+extension DashboardServer {
+    /// Whether the filesystem the card shows has an alert open, rather than another that's filling.
+    var isFillingFullest: Bool {
+        guard let mountPoint = latest?.fullestFilesystem?.mountPoint else { return false }
+        return figureAlerts.contains(.filesystemFilling(mountPoint: mountPoint))
     }
 }
 

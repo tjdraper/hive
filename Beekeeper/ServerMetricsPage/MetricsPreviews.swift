@@ -84,7 +84,14 @@ enum MetricsPreviewData {
         update: nil
     )
 
-    static func server(_ name: String, _ reporting: MetricsReporting, cpu: Double, memory: Double, disk: Double) -> DashboardServer {
+    static func server(
+        _ name: String,
+        _ reporting: MetricsReporting,
+        cpu: Double,
+        memory: Double,
+        disk: Double,
+        alerts: [MetricAlert] = []
+    ) -> DashboardServer {
         let gigabyte: UInt64 = 1_073_741_824
         let latest = ServerMetricsLatest(
             serverID: UUID(),
@@ -110,14 +117,18 @@ enum MetricsPreviewData {
             reporting: reporting,
             lastReportAt: .now.addingTimeInterval(reporting == .stopped ? -2_700 : 0),
             latest: latest,
-            lastHour: []
+            lastHour: [],
+            alerts: alerts
         )
         return DashboardServer(name: name, summary: summary, live: nil)
     }
 
     static let dashboard = [
-        server("buzzingpixel-hetzner-docker", .stopped, cpu: 0.2, memory: 0.5, disk: 0.6),
-        server("mail", .reporting, cpu: 0.95, memory: 0.4, disk: 0.93),
+        server(
+            "buzzingpixel-hetzner-docker", .stopped, cpu: 0.2, memory: 0.5, disk: 0.6,
+            alerts: [.stoppedReporting(since: .now.addingTimeInterval(-2_700), withOthers: false)]
+        ),
+        server("mail", .reporting, cpu: 0.95, memory: 0.4, disk: 0.93, alerts: [.cpuBusy, .filesystemFilling(mountPoint: "/")]),
         server("B3 Debian root", .reporting, cpu: 0.12, memory: 0.38, disk: 0.64),
         server("Test: A4 Alpine", .reporting, cpu: 0.03, memory: 0.21, disk: 0.12),
     ]

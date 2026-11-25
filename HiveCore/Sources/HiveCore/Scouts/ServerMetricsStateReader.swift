@@ -14,8 +14,11 @@ struct ServerMetricsStateReader: Sendable {
     /// Nil when there's no such server.
     func state(ofServer serverID: UUID) throws -> ServerMetricsState? {
         guard let hasMetrics = try scouts.hasMetrics(serverID) else { return nil }
+        let alerts = try AlertStore(database: scouts.database).all().flatMap(\.facts.metricAlerts)
+            .filter { $0.serverID == serverID }
+            .map(\.alert)
         guard let scout = try scouts.scout(forServer: serverID) else {
-            return ServerMetricsState(hasMetrics: hasMetrics, scout: nil)
+            return ServerMetricsState(hasMetrics: hasMetrics, scout: nil, alerts: alerts)
         }
         // What the server reported before this Scout enrolled may be another Scout's, or another machine's.
         let reported = try metrics.server(serverID).flatMap { record in
@@ -38,7 +41,7 @@ struct ServerMetricsStateReader: Sendable {
             lastRefusal: reported?.lastRefusal,
             update: update(for: scout)
         )
-        return ServerMetricsState(hasMetrics: hasMetrics, scout: state)
+        return ServerMetricsState(hasMetrics: hasMetrics, scout: state, alerts: alerts)
     }
 
     private func update(for scout: ScoutRecord) -> ScoutUpdate? {

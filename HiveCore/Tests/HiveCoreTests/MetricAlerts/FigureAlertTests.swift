@@ -30,6 +30,8 @@ struct FigureAlertTests {
         #expect(sent.map(\.subject) == ["CPU busy: “Studio Web”"])
         #expect(sent.first?.body.contains("95% busy") == true)
         #expect(try fixture.alerts() == [.cpuBusy])
+        #expect(try fixture.api.api.metricsState.state(ofServer: fixture.web.id)?.alerts == [.cpuBusy])
+        #expect(try fixture.api.api.metricsState.state(ofServer: fixture.other.id)?.alerts == [])
     }
 
     @Test("Busy CPU ends only after an hour within its limits, and a later spell sends a second email")

@@ -24,6 +24,7 @@ struct ServerMetricsSection: View {
     @State private var platform = ScoutRelease.Platform.x86
     @State private var ssh: ScoutOverSSH?
     @State private var isConfirmingUninstall = false
+    @State private var alertLimits: MetricAlertLimits?
 
     var body: some View {
         Section {
@@ -43,6 +44,7 @@ struct ServerMetricsSection: View {
             let ssh = ScoutOverSSH(link: link, server: server)
             self.ssh = ssh
             Task { await ssh.refresh() }
+            Task { await loadAlertLimits() }
             while !Task.isCancelled {
                 await load()
                 try? await Task.sleep(for: Self.refreshInterval)
@@ -120,6 +122,7 @@ struct ServerMetricsSection: View {
             Label(Self.refusalMessage(refusal), systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
         }
+        alerts
         LabeledContent("Scout", value: [scout.version, scout.platform].compactMap(\.self).joined(separator: ", "))
         if let update = scout.update {
             updateRows(update, platform: scout.platform)
@@ -152,6 +155,17 @@ struct ServerMetricsSection: View {
                 .help("For when the Hive's addresses for other devices have changed, so Scout needn't enroll again")
         }
         removal
+    }
+
+    /// Its open alerts, and the limits they're from.
+    @ViewBuilder private var alerts: some View {
+        ForEach((state?.alerts ?? []).sorted { $0.figureOrder < $1.figureOrder }, id: \.self) { MetricAlertLabel(alert: $0) }
+        LabeledContent("Alert limits", value: alertLimits.map { $0 == .defaults ? "Defaults" : "Changed" } ?? "…")
+        Button("Change Alert Limits…", systemImage: "bell") {
+            presentSheet? {
+                AlertLimitsSheet(link: link, server: server) { alertLimits = $0 }
+            }
+        }
     }
 
     @ViewBuilder private func updateRows(_ update: ScoutUpdate, platform reported: String?) -> some View {
@@ -225,6 +239,10 @@ struct ServerMetricsSection: View {
         } catch {
             if state == nil { failure = HiveLink.message(for: error) }
         }
+    }
+
+    private func loadAlertLimits() async {
+        alertLimits = try? await link.perform { try await $0.get(HiveEndpoint.metricAlertLimits(ofServer: server.id)) }
     }
 
     private func removeMetrics() async {

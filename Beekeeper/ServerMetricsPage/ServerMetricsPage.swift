@@ -86,6 +86,7 @@ struct ServerMetricsPage: View {
     private func page(_ history: ServerHistory, scout: ScoutState) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                alerts
                 ServerFacts(scout: scout, history: history, serverNow: serverNow)
                 hint
                 LazyVGrid(columns: MetricsChart.columns, spacing: 16) {
@@ -107,6 +108,7 @@ struct ServerMetricsPage: View {
                     .frame(height: 320)
                 VStack(alignment: .leading, spacing: 16) {
                     hint
+                    alerts
                     ServerFacts(scout: scout, history: history, serverNow: serverNow)
                 }
                 .padding(.horizontal)
@@ -115,6 +117,14 @@ struct ServerMetricsPage: View {
         }
     }
     #endif
+
+    @ViewBuilder private var alerts: some View {
+        if let alerts = state?.alerts, !alerts.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(alerts.sorted { $0.figureOrder < $1.figureOrder }, id: \.self) { MetricAlertLabel(alert: $0) }
+            }
+        }
+    }
 
     private var hint: some View {
         #if os(macOS)

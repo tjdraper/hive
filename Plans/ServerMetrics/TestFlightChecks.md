@@ -14,6 +14,7 @@ Add a check here whenever a slice leaves one, with the slice it came from. Check
 - [ ] **B9:** Processes, a filesystem, and Containers and Services each open from the links beside a chart's title. Each shows its charts one at a time above a list, and Show Live returns to live figures after a moment's chosen.
 - [ ] **B9:** On Containers and Services, tapping a group opens its processes in a sheet. By Service and Each Container both list, and an unnamed container shows its short ID and what it runs.
 - [ ] **B9:** Every page reads well in light and dark, and with larger text in Settings › Display & Brightness.
+- [ ] **C1:** A dashboard row with an alert shows it in a line under the server's name, with a triangle beside the figure it's about. Change Alert Limits… on a server's page opens the limits as a sheet, with number keyboards, and Save and Cancel in its bar.
 
 ## iPad
 
