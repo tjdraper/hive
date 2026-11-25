@@ -18,6 +18,8 @@ struct ScoutRecord: Codable, Hashable, FetchableRecord, PersistableRecord {
     var platform: String?
     /// The protocol version it last signed in with, accepted or not.
     var protocolVersion: Int?
+    /// When the server last started, on its clock, as `FigureAlertCheck` last noted it.
+    var bootedAt: Int64?
 }
 
 enum ScoutStoreError: Error, Equatable {

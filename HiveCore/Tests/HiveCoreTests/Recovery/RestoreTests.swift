@@ -61,7 +61,7 @@ struct RestoreTests {
         #expect(try new.servers.all().count == 2)
     }
 
-    @Test("A server that had metrics is restored waiting for its Scout to enroll again, and one without stays without")
+    @Test("A server that had metrics is restored waiting for its Scout to enroll again, with its alert limits, and one without doesn't")
     func restoresServerWithMetrics() async throws {
         // Arrange
         let old = try APIFixture()
@@ -69,6 +69,9 @@ struct RestoreTests {
         let (server, _) = try await old.addEverything()
         let nameOnly = try await old.addServer(ServerDraft(name: "Metrics Only", connection: nil, quotaBytes: nil))
         _ = try await old.enrollScout(for: nameOnly)
+        var limits = MetricAlertLimits.defaults
+        limits.filesystemUsedPercent = 80
+        _ = try await old.send(.put, HiveEndpoint.metricAlertLimits(ofServer: nameOnly.id), json: limits)
         let key = RecoveryKey()
         try await old.saveRecoveryKey(key)
         let new = try APIFixture()
@@ -79,6 +82,8 @@ struct RestoreTests {
         // Assert
         #expect(try new.api.metricsState.state(ofServer: nameOnly.id) == ServerMetricsState(hasMetrics: true, scout: nil))
         #expect(try new.api.metricsState.state(ofServer: server.id) == ServerMetricsState(hasMetrics: false, scout: nil))
+        #expect(try new.api.metricAlertLimits.limits(forServer: nameOnly.id) == limits)
+        #expect(try new.api.metricAlertLimits.limits(forServer: server.id) == .defaults)
     }
 
     @Test("A recovery file written before servers could go without SSH details restores each server with its own")

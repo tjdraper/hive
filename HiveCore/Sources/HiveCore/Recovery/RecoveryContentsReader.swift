@@ -40,7 +40,7 @@ enum RecoveryContentsReader {
         let jobs = Dictionary(grouping: try self.jobs(in: database), by: \.serverID)
         let rows = try Row.fetchAll(database, sql: """
         SELECT id, name, host, port, user, quotaBytes, createdAt, hostKey, sealedSSHKey, sshPublicKey, snapshotFolder,
-            hasMetrics
+            hasMetrics, metricAlertLimits
         FROM server ORDER BY createdAt, id
         """)
         return rows.map { row in
@@ -59,7 +59,8 @@ enum RecoveryContentsReader {
                 sshKey: seed.flatMap { seed in publicKey.map { RecoveryContents.SSHKey(seed: seed, publicKey: $0) } },
                 snapshotFolder: row["snapshotFolder"],
                 jobs: jobs[id, default: []].map(\.job),
-                hasMetrics: row["hasMetrics"]
+                hasMetrics: row["hasMetrics"],
+                metricAlertLimits: row["metricAlertLimits"]
             )
         }
     }

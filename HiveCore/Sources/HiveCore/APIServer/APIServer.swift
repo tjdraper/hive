@@ -80,6 +80,7 @@ public struct APIServer: Sendable {
         ScoutRoutes.add(to: router, api: api)
         ScoutManagementRoutes.add(to: router, workflow: api.scoutManagement, confirmations: api.confirmations)
         MetricsRoutes.add(to: router, workflow: api.metricsReports)
+        MetricAlertLimitsRoutes.add(to: router, store: api.metricAlertLimits)
         MetricsReadingRoutes.add(to: router, api: api)
         ServerSpaceRoutes.add(to: router, reader: api.serverSpace)
         RemovalEstimateRoutes.add(to: router, estimator: api.removalEstimator)

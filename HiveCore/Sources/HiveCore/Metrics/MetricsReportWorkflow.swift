@@ -26,6 +26,7 @@ struct MetricsReportWorkflow: Sendable {
     /// Given each report's newest sample while it's current, for live updates.
     let board: MetricsLiveBoard
     let naming: ContainerNamingWorkflow
+    let figureAlerts: FigureAlertCheck
     let now: @Sendable () -> Date
 
     /// False when the server's Scout has sent more often than Hive takes, checked before its body is read.
@@ -60,7 +61,10 @@ struct MetricsReportWorkflow: Sendable {
                 Self.logger.info(
                     "Kept \(samples, privacy: .public) samples and \(minutes, privacy: .public) minutes in \(duration, privacy: .public)"
                 )
-                postIfCurrent(report, forServer: serverID)
+                if let current = Self.currentSample(of: report) {
+                    postLatest(ofServer: serverID)
+                    checkAlerts(current, forServer: serverID)
+                }
                 nameContainers(in: report, forServer: serverID)
                 return .kept
             case .refused(let reason):
@@ -74,15 +78,35 @@ struct MetricsReportWorkflow: Sendable {
     }
 
     /// A backlog's batches are older than the newest sample Scout sent first, so they never reach live
-    /// updates. The newest is read back as kept, so a repeat of an older sample can't replace it.
-    private func postIfCurrent(_ report: MetricsReport, forServer serverID: UUID) {
-        guard let newest = report.samples.map(\.takenAt).max(), newest >= report.sentAt - Self.currentSeconds else { return }
+    /// updates or alerts.
+    private static func currentSample(of report: MetricsReport) -> MetricsSample? {
+        guard let newest = report.samples.max(by: { $0.takenAt < $1.takenAt }), newest.takenAt >= report.sentAt - currentSeconds
+        else { return nil }
+        return newest
+    }
+
+    /// The newest is read back as kept, so a repeat of an older sample can't replace it.
+    private func postLatest(ofServer serverID: UUID) {
         do {
             if let latest = try ServerMetricsSummaryReader.latest(ofServer: serverID, in: store.database) {
                 board.post(latest)
             }
         } catch {
             Self.logger.error("Couldn't read a server's newest figures: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    private func checkAlerts(_ sample: MetricsSample, forServer serverID: UUID) {
+        do {
+            let applied = try figureAlerts.check(sample, forServer: serverID)
+            for facts in applied.opened {
+                Self.logger.notice("Opened an alert: \(facts.kind, privacy: .public)")
+            }
+            for facts in applied.ended {
+                Self.logger.notice("Ended an alert: \(facts.kind, privacy: .public)")
+            }
+        } catch {
+            Self.logger.error("Couldn't check a server's figures for alerts: \(String(describing: error), privacy: .public)")
         }
     }
 

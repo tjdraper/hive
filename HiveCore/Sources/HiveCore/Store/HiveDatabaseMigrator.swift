@@ -63,6 +63,7 @@ enum HiveDatabaseMigrator {
         migrator.registerMigration("Add Scouts", migrate: addScouts)
         migrator.registerMigration("Make servers' SSH details optional", migrate: makeSSHDetailsOptional)
         migrator.registerMigration("Add servers' metrics", migrate: addServerMetrics)
+        migrator.registerMigration("Add metric alerts", migrate: addMetricAlerts)
 
         return migrator
     }

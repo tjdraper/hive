@@ -134,6 +134,11 @@ public enum HiveEndpoint {
         "\(server(id))/metrics"
     }
 
+    /// `GET` reads the server's `MetricAlertLimits`, and `PUT` changes them.
+    public static func metricAlertLimits(ofServer id: UUID) -> String {
+        "\(metrics(ofServer: id))/alert-limits"
+    }
+
     /// `GET` reads the `MetricsSeries` of `figures` from `from` up to `to`, seconds since 1970 on the
     /// server's clock, at most `longestMetricsRange` apart.
     public static func metricsSeries(ofServer id: UUID, from start: Int64, to end: Int64, figures: [MetricsFigure]) -> String {

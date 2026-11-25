@@ -9,19 +9,38 @@ public struct ServerMetricsSummary: Codable, Hashable, Sendable {
     public let latest: ServerMetricsLatest?
     /// Each minute of the last hour, on the server's clock, that something was kept in, oldest first.
     public let lastHour: [MetricsSparkPoint]
+    /// Its alerts open now, from its figures and from whether it's reporting.
+    public let alerts: [MetricAlert]
 
     public init(
         serverID: UUID,
         reporting: MetricsReporting,
         lastReportAt: Date?,
         latest: ServerMetricsLatest?,
-        lastHour: [MetricsSparkPoint]
+        lastHour: [MetricsSparkPoint],
+        alerts: [MetricAlert] = []
     ) {
         self.serverID = serverID
         self.reporting = reporting
         self.lastReportAt = lastReportAt
         self.latest = latest
         self.lastHour = lastHour
+        self.alerts = alerts
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case serverID, reporting, lastReportAt, latest, lastHour, alerts
+    }
+
+    /// A Hive from before metric alerts sends none.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        serverID = try container.decode(UUID.self, forKey: .serverID)
+        reporting = try container.decode(MetricsReporting.self, forKey: .reporting)
+        lastReportAt = try container.decodeIfPresent(Date.self, forKey: .lastReportAt)
+        latest = try container.decodeIfPresent(ServerMetricsLatest.self, forKey: .latest)
+        lastHour = try container.decode([MetricsSparkPoint].self, forKey: .lastHour)
+        alerts = try container.decodeIfPresent([MetricAlert].self, forKey: .alerts) ?? []
     }
 }
 

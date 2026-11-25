@@ -56,6 +56,9 @@ struct RecoveryContents: Codable, Equatable {
         /// kept, since the restored Hive has a new identity the Scout doesn't trust. Missing from files
         /// written before metrics.
         let hasMetrics: Bool?
+        /// `MetricAlertLimits` as the store keeps it, nil for the defaults. Missing from files written
+        /// before metric alerts.
+        let metricAlertLimits: String?
     }
 
     struct SSHKey: Codable, Equatable {
@@ -149,7 +152,8 @@ private extension RecoveryContents.Server {
             sshKey: try sshKey.map { RecoveryContents.SSHKey(seed: try transform($0.seed), publicKey: $0.publicKey) },
             snapshotFolder: snapshotFolder,
             jobs: try jobs.map { try $0.mappingSecrets(transform) },
-            hasMetrics: hasMetrics
+            hasMetrics: hasMetrics,
+            metricAlertLimits: metricAlertLimits
         )
     }
 }

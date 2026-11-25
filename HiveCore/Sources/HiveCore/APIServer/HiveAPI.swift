@@ -232,7 +232,8 @@ public struct HiveAPI: Sendable {
         now: @escaping @Sendable () -> Date,
         version: ReleaseVersion? = nil,
         carriedScout: CarriedScout? = nil,
-        replacementWatcher: ExecutableReplacementWatcher? = nil
+        replacementWatcher: ExecutableReplacementWatcher? = nil,
+        timeAsleep: @escaping @Sendable () -> Duration = MacSleepClock().timeAsleep
     ) {
         self.hiveID = hiveID
         self.version = version
@@ -276,8 +277,8 @@ public struct HiveAPI: Sendable {
         let mail = EmailSender(database: database, settings: settingsStore, sealer: sealer, connector: smtp, calendar: calendar, now: now)
         emailDelivery = EmailDelivery(sender: mail, pause: pause, now: now)
         alerts = AlertMonitor(
-            database: database, drives: drives, statuses: jobStatus, scanner: hostKeyScanner,
-            fullDiskAccess: fullDiskAccess, delivery: emailDelivery, calendar: calendar, now: now
+            database: database, drives: drives, statuses: jobStatus, scanner: hostKeyScanner, delivery: emailDelivery, metrics: metrics,
+            listeners: listeners, timeAsleep: timeAsleep, fullDiskAccess: fullDiskAccess, calendar: calendar, now: now
         )
         self.identityKeys = identityKeys
         self.restart = restart

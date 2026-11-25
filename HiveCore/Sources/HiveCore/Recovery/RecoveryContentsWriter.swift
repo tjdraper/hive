@@ -62,16 +62,22 @@ enum RecoveryContentsWriter {
     }
 
     private static func write(_ server: RecoveryContents.Server, in database: Database) throws {
+        // Read back before it's stored, since a server whose limits can't be read would never be checked.
+        let limits = server.metricAlertLimits.flatMap { stored in
+            (try? JSONDecoder().decode(MetricAlertLimits.self, from: Data(stored.utf8)))?.isValid == true ? stored : nil
+        }
         try database.execute(
             sql: """
             INSERT INTO server (
-                id, name, host, port, user, quotaBytes, createdAt, hostKey, sealedSSHKey, sshPublicKey, snapshotFolder, hasMetrics
+                id, name, host, port, user, quotaBytes, createdAt, hostKey, sealedSSHKey, sshPublicKey, snapshotFolder, hasMetrics,
+                metricAlertLimits
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             arguments: [
                 server.id, server.name, server.host, server.port, server.user, server.quotaBytes, server.createdAt,
                 server.hostKey, server.sshKey?.seed, server.sshKey?.publicKey, server.snapshotFolder, server.hasMetrics ?? false,
+                limits,
             ]
         )
         for job in server.jobs {

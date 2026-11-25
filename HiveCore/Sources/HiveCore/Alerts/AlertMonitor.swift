@@ -2,8 +2,9 @@ import Foundation
 import HiveKit
 import os
 
-/// Works out which alerts are open (§13) from finished runs and the state of Hive, once a minute,
-/// and has their emails sent.
+/// Works out which alerts are open (§13) from finished runs, the state of Hive and whether servers are
+/// reporting, once a minute, and has their emails sent. Alerts from servers' figures are worked out as
+/// they arrive, by `FigureAlertCheck`.
 actor AlertMonitor {
     static let checkInterval: Duration = .seconds(60)
 
@@ -14,6 +15,9 @@ actor AlertMonitor {
     private let finishedRuns: FinishedRunAlerts
     private let standing: StandingAlertCheck
     private let buildExpiry: BuildExpiryCheck
+    private let reporting: ReportingAlertCheck
+    private let grace: ReportingGrace
+    private let listeners: any ListenerControl
     private let now: @Sendable () -> Date
 
     init(
@@ -21,8 +25,11 @@ actor AlertMonitor {
         drives: BackupDriveLocator,
         statuses: JobStatusReader,
         scanner: any HostKeyScanning,
-        fullDiskAccess: @escaping @Sendable () -> FullDiskAccess,
         delivery: EmailDelivery,
+        metrics: MetricsDatabase,
+        listeners: any ListenerControl,
+        timeAsleep: @escaping @Sendable () -> Duration,
+        fullDiskAccess: @escaping @Sendable () -> FullDiskAccess,
         calendar: Calendar,
         now: @escaping @Sendable () -> Date
     ) {
@@ -35,6 +42,9 @@ actor AlertMonitor {
         )
         standing = StandingAlertCheck(database: database, drives: drives, statuses: statuses, fullDiskAccess: fullDiskAccess)
         buildExpiry = BuildExpiryCheck(database: database)
+        reporting = ReportingAlertCheck(scouts: ScoutStore(database: database), metrics: metrics)
+        grace = ReportingGrace(startedAt: now(), timeAsleep: timeAsleep)
+        self.listeners = listeners
         mailer = AlertMailer(
             store: store,
             messages: AlertMessageBuilder(database: database, drives: drives, calendar: calendar),
@@ -63,6 +73,8 @@ actor AlertMonitor {
             let changes = try await standing.changes(open: store.all())
             log(try store.apply(changes, at: now()))
             log(try buildExpiry.openDueWarnings(at: now()))
+            let inGrace = grace.isInGrace(at: now(), listeningHosts: await listeners.listeningHosts())
+            log(try store.apply(reporting.changes(open: store.all(), at: now(), inGrace: inGrace), at: now()))
             let reminders = try store.oweReminders(at: now())
             if reminders > 0 { Self.logger.notice("Reminders owed for \(reminders, privacy: .public) alerts") }
         } catch {

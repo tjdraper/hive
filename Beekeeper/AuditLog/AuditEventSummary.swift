@@ -151,10 +151,9 @@ extension ServerChange {
                 ?? "Added SSH details to “\(serverName)”: \(new.summary)"
         case .quota(let old, let new):
             "Changed the quota of “\(serverName)” from \(Self.quota(old)) to \(Self.quota(new))"
-        case .hostKeyConfirmed(nil, let new):
-            "Confirmed the host key of “\(serverName)”, \(new.fingerprint)"
-        case .hostKeyConfirmed(.some(let old), let new):
-            "Confirmed a new host key for “\(serverName)”, \(new.fingerprint), replacing \(old.fingerprint)"
+        case .hostKeyConfirmed(let old, let new):
+            old.map { "Confirmed a new host key for “\(serverName)”, \(new.fingerprint), replacing \($0.fingerprint)" }
+                ?? "Confirmed the host key of “\(serverName)”, \(new.fingerprint)"
         case .newSSHKey(nil, let new):
             "Made Hive's SSH key for “\(serverName)”, \(new)"
         case .newSSHKey(.some(let old), let new):
@@ -163,6 +162,10 @@ extension ServerChange {
             "Rotated Hive's SSH key on “\(serverName)” to \(new), replacing \(old)"
         case .removed:
             "Removed the server “\(serverName)” and its jobs, keeping their snapshots"
+        case .metricAlertLimits(_, let new):
+            new == .defaults
+                ? "Set the alert limits of “\(serverName)” back to the defaults"
+                : "Changed the alert limits of “\(serverName)”"
         }
     }
 

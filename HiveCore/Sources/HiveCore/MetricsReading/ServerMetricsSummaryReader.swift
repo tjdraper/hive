@@ -15,6 +15,7 @@ struct ServerMetricsSummaryReader: Sendable {
 
     func summaries() throws -> [ServerMetricsSummary] {
         let servers = try scouts.serversWithMetrics()
+        let alerts = Dictionary(grouping: try AlertStore(database: scouts.database).all().flatMap(\.facts.metricAlerts), by: \.serverID)
         let now = now()
         return try database.writer.read { database in
             try servers.map { serverID, scout in
@@ -25,7 +26,8 @@ struct ServerMetricsSummaryReader: Sendable {
                     reporting: Self.reporting(record, scout: scout, at: now),
                     lastReportAt: record?.lastReportAt,
                     latest: latest,
-                    lastHour: try record.map { try Self.lastHour(of: $0, at: now, in: database) } ?? []
+                    lastHour: try record.map { try Self.lastHour(of: $0, at: now, in: database) } ?? [],
+                    alerts: alerts[serverID, default: []].map(\.alert)
                 )
             }
         }

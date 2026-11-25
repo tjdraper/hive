@@ -10,6 +10,7 @@ import Synchronization
 /// Stands in for `ListenerCoordinator`, recording what it was asked to listen on.
 final class FakeListenerControl: ListenerControl {
     private let state = Mutex<(applied: [ListenTarget], refuseLoopback: Bool)>(([], false))
+    private let hosts = Mutex([ListenerAddress.loopbackHost])
 
     var applied: [ListenTarget] {
         state.withLock { $0.applied }
@@ -28,7 +29,25 @@ final class FakeListenerControl: ListenerControl {
     }
 
     func listeningHosts() async -> [String] {
-        [ListenerAddress.loopbackHost]
+        hosts.withLock { $0 }
+    }
+
+    /// As when an address Hive listens on appears or goes away.
+    func listen(on hosts: [String]) {
+        self.hosts.withLock { $0 = hosts }
+    }
+}
+
+/// How long the Mac has slept, which tests move on in place of sleeping it.
+final class FakeMacSleep: Sendable {
+    private let asleep = Mutex(Duration.zero)
+
+    var timeAsleep: Duration {
+        asleep.withLock { $0 }
+    }
+
+    func sleep(for duration: Duration) {
+        asleep.withLock { $0 += duration }
     }
 }
 
@@ -159,6 +178,7 @@ struct APIFixture {
     let volumes = FakeVolumes()
     let sleepPrevention = FakeSleepPrevention()
     let pauses = FakePauses()
+    let macSleep = FakeMacSleep()
     /// The fixture's data directory: where its Hive keeps its identity key, which regenerating replaces,
     /// and writes its recovery file.
     let keyFolder: TemporaryDirectory
@@ -178,11 +198,12 @@ struct APIFixture {
 
     /// `dumpSearchPath` is where database dumps find `docker` and the dump tools, which tests stand in
     /// for with scripts. Runs wait for the backup drive only within `startupDriveGrace` of the fixture's
-    /// start, and waiting moves the clock on rather than sleeping. Sharing `signIn` and `sealer` with
-    /// another fixture starts the same Hive again.
+    /// start, and waiting moves the clock on rather than sleeping. Sharing `signIn` and `sealer`, and
+    /// `metrics` where it matters, with another fixture starts the same Hive again.
     init(
         signIn: SignInFixture? = nil,
         sealer: SecretSealer? = nil,
+        metrics: MetricsDatabase? = nil,
         dumpSearchPath: String = "/usr/bin:/bin",
         startupDriveGrace: TimeInterval = 0,
         liveUpdateHeartbeat: Duration = .seconds(15),
@@ -210,7 +231,7 @@ struct APIFixture {
             hiveID: signIn.hiveID,
             pin: pin,
             database: signIn.database,
-            metrics: try MetricsDatabase.inMemory(),
+            metrics: try metrics ?? MetricsDatabase.inMemory(),
             dataDirectory: keyFolder.url,
             signIn: signIn.workflow,
             settingsStore: settings,
@@ -237,9 +258,9 @@ struct APIFixture {
                 clock.advance(by: TimeInterval($0.components.seconds))
                 try await pauses.pause()
             },
-            liveUpdateHeartbeat: liveUpdateHeartbeat,
-            now: { clock.now },
-            version: ReleaseVersion("2026.3"), carriedScout: CarriedScout(folder: scoutFolder ?? keyFolder.url, version: scoutVersion)
+            liveUpdateHeartbeat: liveUpdateHeartbeat, now: { clock.now },
+            version: ReleaseVersion("2026.3"), carriedScout: CarriedScout(folder: scoutFolder ?? keyFolder.url, version: scoutVersion),
+            timeAsleep: { [macSleep] in macSleep.timeAsleep }
         )
     }
 

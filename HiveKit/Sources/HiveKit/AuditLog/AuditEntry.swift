@@ -95,6 +95,8 @@ public enum ServerChange: Codable, Hashable, Sendable {
     case sshKeyRotated(old: String, new: String)
     /// Its configuration only. Its snapshots stay on the backup drive.
     case removed
+    /// When Hive emails about its figures.
+    case metricAlertLimits(old: MetricAlertLimits, new: MetricAlertLimits)
 }
 
 /// A change to the Scout that reports a server's figures.

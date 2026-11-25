@@ -10,6 +10,8 @@ struct AlertMessageBuilder: Sendable {
     let drives: BackupDriveLocator
     let calendar: Calendar
 
+    // A case for each kind of alert, each handed to what writes its email, which splitting would only scatter.
+    // swiftlint:disable:next cyclomatic_complexity
     func message(for alert: AlertRecord) throws -> EmailMessage {
         let isReminder = alert.emailOwed == .reminder
         // Looked up before reading the store, which the lookup reads too.
@@ -37,6 +39,24 @@ struct AlertMessageBuilder: Sendable {
                 return try quotasExceedDrive(drive, text: text)
             case .buildExpiring(_, let deviceName, let build, let warning):
                 return try BuildExpiryEmail.message(deviceName: deviceName, build: build, warning: warning, text: text)
+            case .stoppedReporting(let server):
+                return try MetricAlertEmail.stoppedReporting(server, isReminder: isReminder, text: text)
+            case .stoppedTogether(let servers):
+                return try MetricAlertEmail.stoppedTogether(servers, isReminder: isReminder, text: text)
+            case .clockAhead(let serverID, let offsetSeconds):
+                return try MetricAlertEmail.clockAhead(serverID: serverID, offsetSeconds: offsetSeconds, isReminder: isReminder, text: text)
+            case .filesystemFilling(let serverID, let mountPoint, let reading):
+                return try MetricAlertEmail.filesystemFilling(
+                    serverID: serverID, mountPoint: mountPoint, reading: reading, since: isReminder ? alert.openedAt : nil, text: text
+                )
+            case .memoryShort(let serverID, let reading):
+                return try MetricAlertEmail.memoryShort(serverID: serverID, reading: reading, text: text)
+            case .cpuBusy(let serverID, let reading):
+                return try MetricAlertEmail.cpuBusy(serverID: serverID, reading: reading, text: text)
+            case .reportingAgain(let serverIDs, let since):
+                return try MetricAlertEmail.reportingAgain(serverIDs: serverIDs, since: since, text: text)
+            case .serverRestarted(let serverID, let bootedAt):
+                return try MetricAlertEmail.serverRestarted(serverID: serverID, bootedAt: bootedAt, text: text)
             }
         }
     }

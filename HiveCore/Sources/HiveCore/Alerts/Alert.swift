@@ -39,6 +39,19 @@ enum AlertFacts: Codable, Equatable, Sendable {
     case snapshotShrank(jobID: UUID, logEntryID: Int64, parts: [ShrunkPart])
     /// The device's name is kept, since it may be revoked before the email goes.
     case buildExpiring(deviceID: UUID, deviceName: String, build: BeekeeperBuild, warning: BuildExpiryWarning)
+    /// Servers' figures (§8).
+    case stoppedReporting(StoppedServer)
+    /// Servers that stopped at the same time, which usually means Hive's own connection, so they're
+    /// one email.
+    case stoppedTogether([StoppedServer])
+    case clockAhead(serverID: UUID, offsetSeconds: Int64?)
+    case filesystemFilling(serverID: UUID, mountPoint: String, reading: FilesystemReading)
+    case memoryShort(serverID: UUID, reading: MemoryReading)
+    case cpuBusy(serverID: UUID, reading: CPUReading)
+    /// Notices. `since` is when the first of them reported again.
+    case reportingAgain(serverIDs: [UUID], since: Date)
+    /// `bootedAt` is on the server's clock.
+    case serverRestarted(serverID: UUID, bootedAt: Int64)
 
     /// Nil for a notice.
     var condition: AlertCondition? {
@@ -50,7 +63,13 @@ enum AlertFacts: Codable, Equatable, Sendable {
         case .overQuota(let serverID, _): .overQuota(serverID: serverID)
         case .driveFillingUp: .driveFillingUp
         case .quotasExceedDrive: .quotasExceedDrive
-        case .backingUpAgain, .snapshotShrank, .buildExpiring: nil
+        case .stoppedReporting(let server): .stoppedReporting(serverID: server.serverID)
+        case .stoppedTogether(let servers): .stoppedTogether(serverIDs: servers.map(\.serverID))
+        case .clockAhead(let serverID, _): .clockAhead(serverID: serverID)
+        case .filesystemFilling(let serverID, let mountPoint, _): .filesystemFilling(serverID: serverID, mountPoint: mountPoint)
+        case .memoryShort(let serverID, _): .memoryShort(serverID: serverID)
+        case .cpuBusy(let serverID, _): .cpuBusy(serverID: serverID)
+        case .backingUpAgain, .snapshotShrank, .buildExpiring, .reportingAgain, .serverRestarted: nil
         }
     }
 
@@ -67,6 +86,14 @@ enum AlertFacts: Codable, Equatable, Sendable {
         case .backingUpAgain: "backingUpAgain"
         case .snapshotShrank: "snapshotShrank"
         case .buildExpiring(_, _, let build, let warning): "buildExpiring(\(build.distribution.rawValue), \(warning.rawValue))"
+        case .stoppedReporting: "stoppedReporting"
+        case .stoppedTogether(let servers): "stoppedTogether(\(servers.count))"
+        case .clockAhead: "clockAhead"
+        case .filesystemFilling: "filesystemFilling"
+        case .memoryShort: "memoryShort"
+        case .cpuBusy: "cpuBusy"
+        case .reportingAgain(let serverIDs, _): "reportingAgain(\(serverIDs.count))"
+        case .serverRestarted: "serverRestarted"
         }
     }
 
@@ -78,6 +105,9 @@ enum AlertFacts: Codable, Equatable, Sendable {
         case .snapshotShrank(_, let logEntryID, _): "snapshotShrank:\(logEntryID)"
         case .buildExpiring(let deviceID, _, let build, let warning):
             "buildExpiring:\(deviceID.uuidString):\(build.version):\(build.build):\(warning.rawValue)"
+        case .reportingAgain(let serverIDs, let date):
+            "reportingAgain:\(AlertCondition.listKey(serverIDs)):\(Int64(date.timeIntervalSince1970))"
+        case .serverRestarted(let serverID, let bootedAt): "serverRestarted:\(serverID.uuidString):\(bootedAt)"
         default: condition?.key ?? ""
         }
     }
@@ -92,6 +122,12 @@ enum AlertCondition: Hashable, Sendable {
     case overQuota(serverID: UUID)
     case driveFillingUp
     case quotasExceedDrive
+    case stoppedReporting(serverID: UUID)
+    case stoppedTogether(serverIDs: [UUID])
+    case clockAhead(serverID: UUID)
+    case filesystemFilling(serverID: UUID, mountPoint: String)
+    case memoryShort(serverID: UUID)
+    case cpuBusy(serverID: UUID)
 
     var key: String {
         switch self {
@@ -102,15 +138,28 @@ enum AlertCondition: Hashable, Sendable {
         case .overQuota(let serverID): "overQuota:\(serverID.uuidString)"
         case .driveFillingUp: "driveFillingUp"
         case .quotasExceedDrive: "quotasExceedDrive"
+        case .stoppedReporting(let serverID): "stoppedReporting:\(serverID.uuidString)"
+        case .stoppedTogether(let serverIDs): "stoppedTogether:\(Self.listKey(serverIDs))"
+        case .clockAhead(let serverID): "clockAhead:\(serverID.uuidString)"
+        case .filesystemFilling(let serverID, let mountPoint): "filesystemFilling:\(serverID.uuidString):\(mountPoint)"
+        case .memoryShort(let serverID): "memoryShort:\(serverID.uuidString)"
+        case .cpuBusy(let serverID): "cpuBusy:\(serverID.uuidString)"
         }
     }
 
+    /// The same whatever order the servers are in.
+    static func listKey(_ serverIDs: [UUID]) -> String {
+        serverIDs.map(\.uuidString).sorted().joined(separator: ",")
+    }
+
     /// Emailed again each day while it lasts. Space warnings aren't: backups still run meanwhile, and
-    /// fixing them can wait for a quota or retention change.
+    /// fixing them can wait for a quota or retention change. Nor are figures that come and go, such as
+    /// CPU, which stay open until they've cleared for an hour.
     var remindsDaily: Bool {
         switch self {
         case .backupFailing, .driveUnavailable, .jobOverdue, .hostKeyChanged: true
-        case .overQuota, .driveFillingUp, .quotasExceedDrive: false
+        case .stoppedReporting, .stoppedTogether, .clockAhead, .filesystemFilling: true
+        case .overQuota, .driveFillingUp, .quotasExceedDrive, .memoryShort, .cpuBusy: false
         }
     }
 }
