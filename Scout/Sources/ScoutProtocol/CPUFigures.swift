@@ -18,12 +18,12 @@ public struct CPUUse: Codable, Hashable, Sendable {
     public var user: Double
     /// Includes handling interrupts.
     public var system: Double
-    /// Idle while waiting for a disk.
-    public var ioWait: Double
-    /// Taken by a virtual server's host for someone else.
-    public var steal: Double
+    /// Idle while waiting for a disk. Missing on a Mac, which counts it as idle.
+    public var ioWait: Double?
+    /// Taken by a virtual server's host for someone else. Missing on a Mac, which doesn't count it.
+    public var steal: Double?
 
-    public init(user: Double, system: Double, ioWait: Double, steal: Double) {
+    public init(user: Double, system: Double, ioWait: Double?, steal: Double?) {
         self.user = user
         self.system = system
         self.ioWait = ioWait

@@ -44,6 +44,8 @@ let package = Package(
     platforms: [.macOS(.v26)],
     products: [
         .library(name: "ScoutProtocol", targets: ["ScoutProtocol"]),
+        // Hive samples its own Mac with Scout's macOS readers.
+        .library(name: "ScoutCore", targets: ["ScoutCore"]),
         .executable(name: "hive-scout", targets: ["hive-scout"]),
     ],
     dependencies: dependencies,

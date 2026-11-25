@@ -17,10 +17,11 @@ public struct DiskActivity: Codable, Hashable, Sendable {
     public var writtenBytesPerSecond: Double
     public var readsPerSecond: Double
     public var writesPerSecond: Double
-    /// The share of time, from 0 to 1, the disk had requests in progress.
-    public var busy: Double
+    /// The share of time, from 0 to 1, the disk had requests in progress. Missing on a Mac, which
+    /// counts only how long requests took, and those overlap.
+    public var busy: Double?
 
-    public init(readBytesPerSecond: Double, writtenBytesPerSecond: Double, readsPerSecond: Double, writesPerSecond: Double, busy: Double) {
+    public init(readBytesPerSecond: Double, writtenBytesPerSecond: Double, readsPerSecond: Double, writesPerSecond: Double, busy: Double?) {
         self.readBytesPerSecond = readBytesPerSecond
         self.writtenBytesPerSecond = writtenBytesPerSecond
         self.readsPerSecond = readsPerSecond

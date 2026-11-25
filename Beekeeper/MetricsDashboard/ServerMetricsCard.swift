@@ -241,7 +241,7 @@ struct ReportingBadge: View {
 
 extension CPUShares {
     var busy: Double {
-        user + system + ioWait + steal
+        user + system + (ioWait ?? 0) + (steal ?? 0)
     }
 }
 

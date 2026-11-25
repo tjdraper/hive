@@ -87,7 +87,7 @@ enum MetricAlertEmail {
 
     static func memoryShort(serverID: UUID, reading: MemoryReading, text: AlertText) throws -> EmailMessage {
         let name = try text.server(serverID)
-        var lines = ["\(name) has been short of memory for \(reading.minutes) minutes:", ""]
+        var lines = ["\(sentence(name)) has been short of memory for \(reading.minutes) minutes:", ""]
         if let available = reading.availableShare {
             lines.append("Only \(percent(available)) of its memory was available, on average.")
         }
@@ -107,7 +107,7 @@ enum MetricAlertEmail {
 
     static func cpuBusy(serverID: UUID, reading: CPUReading, text: AlertText) throws -> EmailMessage {
         let name = try text.server(serverID)
-        var lines = ["\(name)'s CPU has been busy for \(reading.minutes) minutes:", ""]
+        var lines = ["\(sentence(name))'s CPU has been busy for \(reading.minutes) minutes:", ""]
         if let busy = reading.busyShare { lines.append("Its CPU was \(percent(busy)) busy, on average.") }
         if let steal = reading.stealShare {
             lines.append("""
@@ -144,7 +144,7 @@ enum MetricAlertEmail {
         return EmailMessage(
             subject: "Restarted: \(name)",
             body: """
-            \(name) restarted at about \(text.date(serverTime(bootedAt))), by its own clock.
+            \(sentence(name)) restarted at about \(text.date(serverTime(bootedAt))), by its own clock.
 
             If nobody restarted it, it may have crashed, or been restarted by its provider.
             """
@@ -154,6 +154,11 @@ enum MetricAlertEmail {
     /// Seconds since 1970 on a server's clock, which is close enough to the Hive Mac's for an email.
     private static func serverTime(_ seconds: Int64) -> Date {
         Date(timeIntervalSince1970: TimeInterval(seconds))
+    }
+
+    /// The Hive Mac's name starts in lowercase, as it reads within a sentence.
+    private static func sentence(_ name: String) -> String {
+        name.prefix(1).uppercased() + name.dropFirst()
     }
 
     private static func percent(_ share: Double) -> String {

@@ -75,7 +75,9 @@ enum MetricsReportCheck {
 
     private static func isInRange(_ sample: MetricsSample) -> Bool {
         let processes = sample.processes.map { processes in
-            isCount(processes.count) && isCount(processes.zombies) && processes.groups.allSatisfy { group in
+            isCount(processes.count) && isCount(processes.zombies)
+                && (processes.otherUsers.map { isCount($0.count) && isRate($0.cpuCores) } ?? true)
+                && processes.groups.allSatisfy { group in
                 isName(group.command) && isName(group.user) && isCount(group.count)
                     && isRate(group.cpuCores) && isBytes(group.ownMemoryBytes)
                     && (group.containerID.map(isContainerID) ?? true) && (group.service.map(isName) ?? true)

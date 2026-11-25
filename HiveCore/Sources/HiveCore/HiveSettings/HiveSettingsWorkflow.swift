@@ -12,8 +12,8 @@ enum SettingsChangeError: Error, Equatable {
     case refused(SettingsProblem)
 }
 
-/// Changing the Hive's name, where it listens, whether it advertises itself and whether it warns about
-/// expiring builds. A listening change
+/// Changing the Hive's name, where it listens, whether it advertises itself, whether it warns about
+/// expiring builds and whether it reads its own Mac's figures. A listening change
 /// takes effect before it's saved, so a port that's taken is turned down with nothing changed, and
 /// nothing waits for the daemon to restart.
 struct HiveSettingsWorkflow: Sendable {
@@ -90,7 +90,8 @@ struct HiveSettingsWorkflow: Sendable {
             port: requested.port,
             addressOptions: try AddressOptionCheck.validated(requested.addressOptions),
             advertisesOnLocalNetwork: requested.advertisesOnLocalNetwork,
-            sendsBuildExpiryWarnings: requested.sendsBuildExpiryWarnings
+            sendsBuildExpiryWarnings: requested.sendsBuildExpiryWarnings,
+            collectsMacMetrics: requested.collectsMacMetrics
         )
     }
 }

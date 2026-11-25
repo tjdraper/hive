@@ -6,11 +6,32 @@ public struct ProcessFigures: Codable, Hashable, Sendable {
     /// Processes grouped by command and user: the top 10 groups by CPU and the top 10 by memory,
     /// each sent once, so sorting by either gives its top 10.
     public var groups: [ProcessGroup]
+    /// Where some users' processes can be counted but not read, as other users' are on a Mac to a
+    /// process that isn't root, what they use together. They're in no group. Nil where every process
+    /// can be read.
+    public var otherUsers: OtherUsersProcesses?
 
-    public init(count: Int, zombies: Int, groups: [ProcessGroup]) {
+    public init(count: Int, zombies: Int, groups: [ProcessGroup], otherUsers: OtherUsersProcesses? = nil) {
         self.count = count
         self.zombies = zombies
         self.groups = groups
+        self.otherUsers = otherUsers
+    }
+}
+
+/// Processes that can be counted but not read. Their memory can't be worked out: on a Mac, what the
+/// readable processes use adds up to more than the system counts as in use, since each counts memory
+/// the system counts elsewhere, such as the graphics card's.
+public struct OtherUsersProcesses: Codable, Hashable, Sendable {
+    public var count: Int
+    /// Cores' worth of CPU used since the previous sample: what every core together was busy, less
+    /// what the readable processes used. So it also counts the kernel's own work. Missing from the
+    /// first sample.
+    public var cpuCores: Double?
+
+    public init(count: Int, cpuCores: Double?) {
+        self.count = count
+        self.cpuCores = cpuCores
     }
 }
 

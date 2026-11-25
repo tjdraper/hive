@@ -23,7 +23,9 @@ public struct HiveSettingsStore: Sendable {
     public func settings() throws -> HiveSettings {
         try database.writer.read { database in
             let sql = """
-            SELECT name, networkAccess, listenAddress, port, addressOptions, advertisesOnLocalNetwork, sendsBuildExpiryWarnings FROM hive
+            SELECT name, networkAccess, listenAddress, port, addressOptions, advertisesOnLocalNetwork, sendsBuildExpiryWarnings,
+                collectsMacMetrics
+            FROM hive
             """
             guard let row = try Row.fetchOne(database, sql: sql) else {
                 throw HiveDatabaseError.missingHiveID
@@ -34,7 +36,8 @@ public struct HiveSettingsStore: Sendable {
                 port: row["port"] ?? defaultPort,
                 addressOptions: try Self.addressOptions(from: row["addressOptions"]),
                 advertisesOnLocalNetwork: row["advertisesOnLocalNetwork"],
-                sendsBuildExpiryWarnings: row["sendsBuildExpiryWarnings"]
+                sendsBuildExpiryWarnings: row["sendsBuildExpiryWarnings"],
+                collectsMacMetrics: row["collectsMacMetrics"]
             )
         }
     }
@@ -47,11 +50,11 @@ public struct HiveSettingsStore: Sendable {
             try database.execute(
                 sql: """
                 UPDATE hive SET name = ?, networkAccess = ?, listenAddress = ?, port = ?, addressOptions = ?, advertisesOnLocalNetwork = ?,
-                    sendsBuildExpiryWarnings = ?
+                    sendsBuildExpiryWarnings = ?, collectsMacMetrics = ?
                 """,
                 arguments: [
                     new.name, kind.rawValue, address, new.port == old.port ? (try currentPort(in: database)) : new.port, options,
-                    new.advertisesOnLocalNetwork, new.sendsBuildExpiryWarnings,
+                    new.advertisesOnLocalNetwork, new.sendsBuildExpiryWarnings, new.collectsMacMetrics,
                 ]
             )
             for event in Self.changes(from: old, to: new) {
@@ -78,6 +81,9 @@ public struct HiveSettingsStore: Sendable {
         }
         if old.sendsBuildExpiryWarnings != new.sendsBuildExpiryWarnings {
             events.append(.buildExpiryWarningsChanged(isOn: new.sendsBuildExpiryWarnings))
+        }
+        if old.collectsMacMetrics != new.collectsMacMetrics {
+            events.append(.macMetricsChanged(isOn: new.collectsMacMetrics))
         }
         return events
     }

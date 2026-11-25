@@ -133,6 +133,8 @@ enum MetricsTables {
         .real("pressureIOFull") { $0.pressure?.inputOutput?.full },
         .count("processes") { $0.processes?.count },
         .count("zombies") { $0.processes?.zombies },
+        .count("otherUsersProcesses") { $0.processes?.otherUsers?.count },
+        .real("otherUsersCPU") { $0.processes?.otherUsers?.cpuCores },
     ])
 
     static let filesystem = MetricsTable<FilesystemFigures>(kind: filesystemKind, nameKind: filesystemKind, figures: [

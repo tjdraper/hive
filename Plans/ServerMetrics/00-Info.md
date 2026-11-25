@@ -183,7 +183,7 @@ Logs will also need things metrics don't: reading the journal or `/var/log` mean
 
 - [x] Does a static Swift binary, with its TLS and crypto, meet §3's CPU budget, and how close does it come to the memory goal? Yes, at 0.100% with a few hundred processes, after the budget was raised from 0.1% to 0.15%, since most of the cost is the kernel's and any language pays it. Memory is 22 MB, over the goal (A1).
 - [x] How Scouts update: from Beekeeper over SSH where Hive has root or A4's `sudo` rule, otherwise a pasted command, which keeps the key. Never by updating themselves (§2, A5, B3).
-- [ ] What can an unprivileged process read of other users' processes on macOS? Hive's own Mac depends on it (C2), and whether Scout on other Macs runs as root (C3).
+- [x] What can an unprivileged process read of other users' processes on macOS? Their IDs, users, states and paths, but not their CPU time, memory or names (`proc_pidinfo`'s task and rusage figures and `proc_name` are refused), measured on macOS 27.2 (C2). So the Hive Mac shows other users' processes as one line, with their count and their CPU as what the busy cores leave, which also counts the kernel's work. Their memory can't be had: what the readable processes use adds up to more than the system counts as in use. Scout on other Macs needs root to see every process (C3).
 - [x] Container names without Docker's socket: Hive names them over SSH with `docker ps`, and Scout sends only IDs (§4, B7)
 - [x] Does notarization accept Linux binaries in `Hive.app`'s resources? Yes, with no issues; they add about 15 MB to the downloads (A5)
 

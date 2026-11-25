@@ -26,7 +26,9 @@ struct ReportingAlertCheck: Sendable {
     /// for stopped, though one reporting again still ends its alert.
     func changes(open: [AlertRecord], at now: Date, inGrace: Bool) throws -> [AlertStore.Change] {
         let servers = try watched()
-        let hasMetrics = try Set(scouts.serversWithMetrics().compactMap { $0.scout == nil ? nil : $0.serverID })
+        var hasMetrics = try Set(scouts.serversWithMetrics().compactMap { $0.scout == nil ? nil : $0.serverID })
+        // The Hive Mac's figure alerts last while Hive reads them. It can't tell itself it stopped reporting.
+        if let hiveMac = try HiveMac.collectingID(in: scouts.database) { hasMetrics.insert(hiveMac) }
         let opened = open.map(\.facts)
         var changes = opened.flatMap { ended($0, servers: servers, hasMetrics: hasMetrics) }
         if !inGrace { changes += stopped(servers, opened: opened, at: now) }

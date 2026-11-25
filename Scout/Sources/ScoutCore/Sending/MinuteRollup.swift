@@ -83,8 +83,8 @@ private struct Combination: Sendable {
                 CPUUse(
                     user: doubles(use.map(\.user)),
                     system: doubles(use.map(\.system)),
-                    ioWait: doubles(use.map(\.ioWait)),
-                    steal: doubles(use.map(\.steal))
+                    ioWait: present(use.map(\.ioWait)) { doubles($0) },
+                    steal: present(use.map(\.steal)) { doubles($0) }
                 )
             },
             load: present(values.map(\.load)) { load in
@@ -154,7 +154,7 @@ private struct Combination: Sendable {
                     writtenBytesPerSecond: doubles(activity.map(\.writtenBytesPerSecond)),
                     readsPerSecond: doubles(activity.map(\.readsPerSecond)),
                     writesPerSecond: doubles(activity.map(\.writesPerSecond)),
-                    busy: doubles(activity.map(\.busy))
+                    busy: present(activity.map(\.busy)) { doubles($0) }
                 )
             }
         )
@@ -170,7 +170,7 @@ private struct Combination: Sendable {
                     receiveErrorsPerSecond: doubles(traffic.map(\.receiveErrorsPerSecond)),
                     sendErrorsPerSecond: doubles(traffic.map(\.sendErrorsPerSecond)),
                     receiveDropsPerSecond: doubles(traffic.map(\.receiveDropsPerSecond)),
-                    sendDropsPerSecond: doubles(traffic.map(\.sendDropsPerSecond))
+                    sendDropsPerSecond: present(traffic.map(\.sendDropsPerSecond)) { doubles($0) }
                 )
             }
         )

@@ -34,6 +34,10 @@ public enum MetricsFigure: String, Codable, CaseIterable, Hashable, Sendable {
     case pressureIOFull
     case processes
     case zombies
+    /// Processes that can be counted but not read, as other users' are to Hive on its own Mac, and
+    /// the cores' worth of CPU they and the kernel used together. Nil where every process can be read.
+    case otherUsersProcesses
+    case otherUsersCPU
 
     case filesystemSize = "filesystem.size"
     case filesystemUsed = "filesystem.used"

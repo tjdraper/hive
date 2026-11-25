@@ -148,7 +148,7 @@ struct ProcessesPage: View {
     private var when: String {
         let live = moment.chosen == nil ? "Live: " : ""
         return switch processes {
-        case .sample(let takenAt, _):
+        case .sample(let takenAt, _, _):
             "\(live)\(ProcessRow.time(takenAt))"
         case .hour(let startsAt, _):
             "The busiest over the hour from \(ProcessRow.time(startsAt)), on average, with their highest"

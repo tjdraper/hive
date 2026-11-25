@@ -28,6 +28,8 @@ extension AuditEvent {
             isOn ? "Turned on advertising on the local network" : "Turned off advertising on the local network"
         case .buildExpiryWarningsChanged(let isOn):
             isOn ? "Turned on build expiry warnings" : "Turned off build expiry warnings"
+        case .macMetricsChanged(let isOn):
+            isOn ? "Turned on the Hive Mac's metrics" : "Turned off the Hive Mac's metrics"
         case .server(_, let serverName, let change):
             change.summary(serverName: serverName)
         case .scout(_, let serverName, let change):

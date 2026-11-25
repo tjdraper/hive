@@ -1,11 +1,26 @@
 /// A server's processes at a moment: the sample nearest it within the last day, or the hour's busiest
 /// within the last 14 days (§6). Times are seconds since 1970 on the server's clock.
 public enum ProcessMoment: Codable, Hashable, Sendable {
-    case sample(takenAt: Int64, groups: [ProcessGroupFigures])
+    /// `otherUsers` is nil where every process could be read, and from a Hive from before it was sent.
+    case sample(takenAt: Int64, groups: [ProcessGroupFigures], otherUsers: OtherUsersProcessFigures? = nil)
     /// The hour's top groups by average CPU and by average memory.
     case hour(startsAt: Int64, groups: [HourlyProcessGroupFigures])
     /// Nothing is kept for that moment.
     case notKept
+}
+
+/// Processes the Hive can count but not read, as other users' are on the Hive Mac, since Hive runs as
+/// the user who installed it.
+public struct OtherUsersProcessFigures: Codable, Hashable, Sendable {
+    public let count: Int
+    /// Cores' worth of CPU every core together was busy, less what the readable processes used, so it
+    /// also counts the kernel's own work. Missing from the first sample.
+    public let cpuCores: Double?
+
+    public init(count: Int, cpuCores: Double?) {
+        self.count = count
+        self.cpuCores = cpuCores
+    }
 }
 
 /// Where a process group runs: a container, by its group's name as `CgroupMoment` gives it, or a

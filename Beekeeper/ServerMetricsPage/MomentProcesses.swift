@@ -104,7 +104,7 @@ struct MomentProcesses: View {
     /// When the figures are from, since the nearest kept may be a little off the moment chosen.
     private var caption: String? {
         switch processes {
-        case .sample(let takenAt, _):
+        case .sample(let takenAt, _, _):
             "At \(ProcessRow.time(takenAt)). Memory is each group's own, so it's approximate."
         case .hour(let startsAt, _):
             "The busiest over the hour from \(ProcessRow.time(startsAt)), on average, with their highest. "

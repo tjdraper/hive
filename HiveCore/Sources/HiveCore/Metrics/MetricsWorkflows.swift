@@ -13,6 +13,7 @@ extension HiveAPI {
     var figureAlerts: FigureAlertCheck {
         let database = servers.store.database
         return FigureAlertCheck(
+            hiveID: hiveID,
             alerts: AlertStore(database: database),
             metrics: metrics.database,
             limits: metricAlertLimits,
@@ -31,7 +32,8 @@ extension HiveAPI {
     var metricsUpkeep: MetricsUpkeep {
         MetricsUpkeep(
             database: metrics.database,
-            knownServerIDs: { [store = servers.store] in Set(try store.all().map(\.id)) },
+            // The Hive Mac's figures are kept under the Hive's own ID, and kept while it's turned off.
+            knownServerIDs: { [store = servers.store, hiveID] in Set(try store.all().map(\.id)).union([hiveID]) },
             now: signIn.now
         )
     }

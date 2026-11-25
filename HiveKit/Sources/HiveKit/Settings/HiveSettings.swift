@@ -11,6 +11,9 @@ public struct HiveSettings: Codable, Hashable, Sendable {
     /// Hive emails before a device's iPhone or iPad build expires. With several Hives, it can be left
     /// on for just one, so each warning comes once.
     public var sendsBuildExpiryWarnings: Bool
+    /// Hive reads its own Mac's figures every 10 seconds, as Scout reads a server's, and shows them
+    /// beside the servers'. Turning it off stops reading them and keeps those already kept.
+    public var collectsMacMetrics: Bool
 
     public init(
         name: String,
@@ -18,7 +21,8 @@ public struct HiveSettings: Codable, Hashable, Sendable {
         port: Int,
         addressOptions: [AddressOption] = [],
         advertisesOnLocalNetwork: Bool = true,
-        sendsBuildExpiryWarnings: Bool = true
+        sendsBuildExpiryWarnings: Bool = true,
+        collectsMacMetrics: Bool = true
     ) {
         self.name = name
         self.networkAccess = networkAccess
@@ -26,14 +30,16 @@ public struct HiveSettings: Codable, Hashable, Sendable {
         self.addressOptions = addressOptions
         self.advertisesOnLocalNetwork = advertisesOnLocalNetwork
         self.sendsBuildExpiryWarnings = sendsBuildExpiryWarnings
+        self.collectsMacMetrics = collectsMacMetrics
     }
 
     private enum CodingKeys: String, CodingKey {
-        case name, networkAccess, port, addressOptions, advertisesOnLocalNetwork, sendsBuildExpiryWarnings
+        case name, networkAccess, port, addressOptions, advertisesOnLocalNetwork, sendsBuildExpiryWarnings, collectsMacMetrics
     }
 
-    /// A Hive from before Bonjour sends no `advertisesOnLocalNetwork`, and one from before build expiry
-    /// warnings no `sendsBuildExpiryWarnings`.
+    /// A Hive from before Bonjour sends no `advertisesOnLocalNetwork`, one from before build expiry
+    /// warnings no `sendsBuildExpiryWarnings`, and one from before it read its own Mac's figures no
+    /// `collectsMacMetrics`.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decode(String.self, forKey: .name)
@@ -42,6 +48,7 @@ public struct HiveSettings: Codable, Hashable, Sendable {
         addressOptions = try container.decode([AddressOption].self, forKey: .addressOptions)
         advertisesOnLocalNetwork = try container.decodeIfPresent(Bool.self, forKey: .advertisesOnLocalNetwork) ?? true
         sendsBuildExpiryWarnings = try container.decodeIfPresent(Bool.self, forKey: .sendsBuildExpiryWarnings) ?? true
+        collectsMacMetrics = try container.decodeIfPresent(Bool.self, forKey: .collectsMacMetrics) ?? true
     }
 
     public var addresses: HiveAddresses {

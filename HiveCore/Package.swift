@@ -36,6 +36,7 @@ let package = Package(
             dependencies: [
                 "HiveKit",
                 .product(name: "ScoutProtocol", package: "Scout"),
+                .product(name: "ScoutCore", package: "Scout"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "HummingbirdTLS", package: "hummingbird"),

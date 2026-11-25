@@ -7,6 +7,8 @@ import ScoutProtocol
 /// Only a report's newest sample is checked, and only while it's current, so a backlog never opens an
 /// alert for the past. Durations count back from that sample through the samples kept, so they're
 /// worked out again after a restart, and figures that arrive late are placed when they were taken.
+/// The Hive Mac's figures, kept under the Hive's own ID, are checked the same way, against the default
+/// limits.
 struct FigureAlertCheck: Sendable {
     /// Pages a second, on average over the memory limit's duration.
     static let steadySwapInPages = 50.0
@@ -19,6 +21,7 @@ struct FigureAlertCheck: Sendable {
     /// right moves it by only the correction.
     static let restartedAfter: Int64 = 5 * 60
 
+    let hiveID: UUID
     let alerts: AlertStore
     let metrics: MetricsDatabase
     let limits: MetricAlertLimitsStore
@@ -27,7 +30,8 @@ struct FigureAlertCheck: Sendable {
     /// Returns what it opened and ended.
     @discardableResult
     func check(_ sample: MetricsSample, forServer serverID: UUID) throws -> AlertStore.Applied {
-        guard let limits = try limits.limits(forServer: serverID) else { return AlertStore.Applied() }
+        let limits = serverID == hiveID ? .defaults : try limits.limits(forServer: serverID)
+        guard let limits else { return AlertStore.Applied() }
         let open = try alerts.all().map(\.facts).filter { $0.metricAlerts.contains { $0.serverID == serverID } }
         let history = try history(ofServer: serverID, upTo: sample.takenAt, limits: limits)
         // A week of hours changes little from one sample to the next, so it's read once a minute.
@@ -42,7 +46,9 @@ struct FigureAlertCheck: Sendable {
         guard !changes.isEmpty || bootedAt != nil else { return AlertStore.Applied() }
         let date = now()
         return try alerts.database.writer.write { database in
-            if let bootedAt {
+            if let bootedAt, serverID == hiveID {
+                try database.execute(sql: "UPDATE hive SET macBootedAt = ?", arguments: [bootedAt.at])
+            } else if let bootedAt {
                 try database.execute(sql: "UPDATE scout SET bootedAt = ? WHERE serverID = ?", arguments: [bootedAt.at, serverID])
             }
             return try AlertStore.apply(changes, at: date, in: database)
@@ -109,7 +115,8 @@ struct FigureAlertCheck: Sendable {
         let rows = try metrics.writer.read { database in
             try Row.fetchAll(database, sql: """
             SELECT startsAt, memoryAvailable * 1.0 / NULLIF(memoryTotal, 0) AS availableShare, swapInPages,
-                cpuUser + cpuSystem + cpuIOWait + cpuSteal AS busyShare, cpuSteal, loadOneMinute / NULLIF(cores, 0) AS loadPerCore
+                cpuUser + cpuSystem + IFNULL(cpuIOWait, 0) + IFNULL(cpuSteal, 0) AS busyShare, cpuSteal,
+                loadOneMinute / NULLIF(cores, 0) AS loadPerCore
             FROM serverTenSeconds
             JOIN metricsServer ON metricsServer.id = serverTenSeconds.serverKey
             WHERE metricsServer.serverID = ? AND startsAt > ? AND startsAt <= ?
@@ -184,13 +191,18 @@ struct FigureAlertCheck: Sendable {
 
     /// When the server started, if that's moved since it was last noted, and whether it restarted. The
     /// time is noted in the same transaction as the notice, so each restart is emailed once. The first
-    /// time a Scout reports, there's nothing to compare with.
+    /// time a Scout reports, or Hive reads its Mac, there's nothing to compare with.
     private func newBootedAt(of sample: MetricsSample, serverID: UUID) throws -> (at: Int64, restarted: Bool)? {
-        guard let uptime = sample.server.uptimeSeconds,
-              let scout = try alerts.database.writer.read({ try ScoutRecord.filter(Column("serverID") == serverID).fetchOne($0) })
-        else { return nil }
+        guard let uptime = sample.server.uptimeSeconds else { return nil }
+        let isHiveMac = serverID == hiveID
+        let noted: Int64?? = try alerts.database.writer.read { database in
+            if isHiveMac { return .some(try Int64.fetchOne(database, sql: "SELECT macBootedAt FROM hive")) }
+            return try ScoutRecord.filter(Column("serverID") == serverID).fetchOne(database).map(\.bootedAt)
+        }
+        // A server without a Scout.
+        guard let noted else { return nil }
         let bootedAt = sample.takenAt - Int64(uptime.rounded())
-        if let noted = scout.bootedAt, abs(bootedAt - noted) <= Self.restartedAfter { return nil }
-        return (bootedAt, scout.bootedAt.map { bootedAt > $0 } ?? false)
+        if let noted, abs(bootedAt - noted) <= Self.restartedAfter { return nil }
+        return (bootedAt, noted.map { bootedAt > $0 } ?? false)
     }
 }

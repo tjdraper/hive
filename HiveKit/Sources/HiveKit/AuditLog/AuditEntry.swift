@@ -34,6 +34,7 @@ public enum AuditEvent: Codable, Hashable, Sendable {
     case portChanged(old: Int, new: Int)
     case localNetworkAdvertisingChanged(isOn: Bool)
     case buildExpiryWarningsChanged(isOn: Bool)
+    case macMetricsChanged(isOn: Bool)
     /// The server's name as it was after the change.
     case server(serverID: UUID, serverName: String, change: ServerChange)
     /// The server's name when it happened.

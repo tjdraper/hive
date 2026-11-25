@@ -146,7 +146,7 @@ struct ContainerNamingTests {
         #expect(containers.first { $0.name == "adminer" }?.kind == .container)
         #expect(services.map(\.name) == ["cron.service"])
         #expect(services.first?.cpuCores == 0.25)
-        guard case .sample(_, let groups) = processes else {
+        guard case .sample(_, let groups, _) = processes else {
             Issue.record("Not a sample: \(processes)")
             return
         }

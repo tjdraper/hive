@@ -39,6 +39,7 @@ public struct APIServer: Sendable {
             .init(service: AlertService(monitor: api.alerts)),
             .init(service: RecoveryFileService(writer: api.recoveryFiles)),
             .init(service: MetricsUpkeepService(upkeep: api.metricsUpkeep)),
+            .init(service: HiveMacSamplingService(sampler: api.hiveMacSampler)),
             .init(service: RestartService(restart: api.restart), successTerminationBehavior: .gracefullyShutdownGroup),
         ]
         if let watcher = api.replacementWatcher {
@@ -149,6 +150,16 @@ private struct MetricsUpkeepService: Service {
     func run() async throws {
         await cancelWhenGracefulShutdown {
             await upkeep.run()
+        }
+    }
+}
+
+private struct HiveMacSamplingService: Service {
+    let sampler: HiveMacSampler
+
+    func run() async throws {
+        await cancelWhenGracefulShutdown {
+            await sampler.run()
         }
     }
 }

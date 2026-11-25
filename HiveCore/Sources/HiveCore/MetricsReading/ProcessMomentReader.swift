@@ -25,7 +25,12 @@ struct ProcessMomentReader: Sendable {
             """, arguments: [serverKey, moment - Self.nearestSampleSeconds, moment + Self.nearestSampleSeconds, moment]) {
                 let groups = try ProcessGroupStorage.decode([ProcessGroup].self, from: row["groups"])
                 let names = try ContainerName.kept(forServer: serverKey, in: database)
-                return .sample(takenAt: row["startsAt"], groups: groups.map { ProcessGroupFigures($0, names: names) })
+                let takenAt: Int64 = row["startsAt"]
+                return .sample(
+                    takenAt: takenAt,
+                    groups: groups.map { ProcessGroupFigures($0, names: names) },
+                    otherUsers: try Self.otherUsers(at: takenAt, serverKey: serverKey, in: database)
+                )
             }
 
             let hour = MetricsResolution.hour.periodStart(of: moment)
@@ -40,6 +45,14 @@ struct ProcessMomentReader: Sendable {
             }
             return .notKept
         }
+    }
+
+    private static func otherUsers(at takenAt: Int64, serverKey: Int64, in database: Database) throws -> OtherUsersProcessFigures? {
+        let row = try Row.fetchOne(database, sql: """
+        SELECT otherUsersProcesses, otherUsersCPU FROM serverTenSeconds WHERE serverKey = ? AND startsAt = ?
+        """, arguments: [serverKey, takenAt])
+        guard let row, let count: Int = row["otherUsersProcesses"] else { return nil }
+        return OtherUsersProcessFigures(count: count, cpuCores: row["otherUsersCPU"])
     }
 }
 

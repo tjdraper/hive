@@ -264,8 +264,12 @@ struct AlertText {
         return "“\(names.job)” on “\(names.server)”"
     }
 
+    /// The Hive Mac's figures are kept under the Hive's own ID.
     func server(_ serverID: UUID) throws -> String {
-        try JobNames.lastKnownServerName(serverID, in: database).map { "“\($0)”" } ?? "A removed server"
+        if let hive = try Row.fetchOne(database, sql: "SELECT name FROM hive WHERE id = ?", arguments: [serverID]) {
+            return "the Hive Mac “\(hive["name"] as String)”"
+        }
+        return try JobNames.lastKnownServerName(serverID, in: database).map { "“\($0)”" } ?? "A removed server"
     }
 
     func lastSnapshot(ofJob jobID: UUID) throws -> String {

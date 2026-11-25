@@ -333,6 +333,7 @@ struct RecoveryFileDownloadTests {
         addressOptions: nil,
         advertisesOnLocalNetwork: nil,
         sendsBuildExpiryWarnings: nil,
+        collectsMacMetrics: nil,
         backupDrive: nil
     )
 }

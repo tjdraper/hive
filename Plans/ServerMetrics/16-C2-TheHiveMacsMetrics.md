@@ -28,3 +28,20 @@ Built with you:
 - Turning it off stops sampling and keeps the history
 
 **Done when:** the installed Hive shows its Mac on the dashboard and its own page in Beekeeper, the readings agree with Activity Monitor, the daemon's added CPU and memory are within §3's budget, and the tests pass.
+
+## Engine notes
+
+Built in the first session:
+
+- **Scout's macOS readers** are in `ScoutCore`, each beside its Linux one (`MacCPUReader`, `MacMemoryReader`, `MacFilesystemReader`, `MacDiskReader`, `MacNetworkReader`, `MacProcessReader`, `MacServerFactsReader`), composed by `MacSampler`. `ScoutCore` is now a library product, which HiveCore imports.
+- **What a Mac leaves out:** I/O wait and steal (a Mac counts waiting as idle and has no steal), a disk's busy share (IOKit counts how long requests took, which overlap), sent drops for each interface, pressure, containers and services. Those figures are now optional in `ScoutProtocol` and HiveKit, with no new protocol version: a Linux Scout still sends them all.
+- **Memory** is counted as Activity Monitor counts it: in use is App Memory (less purgeable), Wired and Compressed, and cache is file-backed and purgeable pages. Each process's memory is its footprint, as Activity Monitor shows it.
+- **Filesystems** are the volumes Finder shows: local, not hidden (`MNT_DONTBROWSE`), and not read-only apart from the startup disk's sealed system volume. APFS has no fixed number of inodes, so none are sent, as for Btrfs.
+- **Interfaces** are those up with an address that isn't loopback or link-local, leaving out virtual machines' bridges and links (`bridge100` and up, `vmenet`). **Disks** leave out disk images.
+- **Other users' processes** (§11) are `ProcessFigures.otherUsers`, kept as `otherUsersProcesses` and `otherUsersCPU` in a new metrics migration, readable as `MetricsFigure`s, and returned with a moment's processes as `ProcessMoment.sample`'s `otherUsers`.
+- **Hive samples itself** (`HiveMacMetrics/`): `HiveMacSampler` takes a sample on each 10-second mark while `HiveSettings.collectsMacMetrics` is on, and `HiveMacMetricsWorkflow` keeps it through `MetricsStore` under the Hive's own ID, so it passes the same checks as a Scout's report. The setting is audited (`macMetricsChanged`), in recovery files, and on by default. Turning it off drops the sampler, so no rate spans the gap, and keeps the history: the Mac's routes keep answering for the Hive's ID, and upkeep never removes it.
+- **For Beekeeper:** the dashboard's summaries list the Hive Mac first, under the Hive's ID, while it's on and once it has figures. `GET /servers/<Hive ID>/metrics` gives a `ServerMetricsState` whose Scout is the one Hive is built with, enrolled when the Hive was set up. Every other metrics route takes the Hive's ID as a server's.
+- **Alerts** use the default limits, and the Mac's restart is noted in `hive.macBootedAt`. The backup drive's volumes, and the other APFS volumes in its container, are left out of its disk alerts. Emails call it “the Hive Mac “Name””.
+- **Cost:** a sample takes about 5 ms of CPU in a release build on Ivy (10 cores, 770 processes), about 0.05% of one core. Processes take 1.6 ms of it and the interface list 3.2 ms.
+
+Left for the UI session: Beekeeper drops summaries it has no server name for, so the Hive Mac doesn't show yet; the dashboard card, the page and its charts that a Mac has no figures for; the other users line; and the setting beside the Hive's others.

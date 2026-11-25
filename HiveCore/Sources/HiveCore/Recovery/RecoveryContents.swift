@@ -26,6 +26,8 @@ struct RecoveryContents: Codable, Equatable {
         let advertisesOnLocalNetwork: Bool?
         /// Missing from files written before build expiry warnings, which are then sent.
         let sendsBuildExpiryWarnings: Bool?
+        /// Missing from files written before Hive read its own Mac's figures, which it then does.
+        let collectsMacMetrics: Bool?
         /// Chosen again after a restore, since a drive restored from a Mac backup has a new volume UUID.
         let backupDrive: BackupDrive?
     }

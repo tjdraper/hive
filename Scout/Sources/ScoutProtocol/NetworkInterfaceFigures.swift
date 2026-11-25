@@ -18,7 +18,8 @@ public struct NetworkTraffic: Codable, Hashable, Sendable {
     public var receiveErrorsPerSecond: Double
     public var sendErrorsPerSecond: Double
     public var receiveDropsPerSecond: Double
-    public var sendDropsPerSecond: Double
+    /// Missing on a Mac, which doesn't count them for each interface.
+    public var sendDropsPerSecond: Double?
 
     public init(
         receivedBytesPerSecond: Double,
@@ -26,7 +27,7 @@ public struct NetworkTraffic: Codable, Hashable, Sendable {
         receiveErrorsPerSecond: Double,
         sendErrorsPerSecond: Double,
         receiveDropsPerSecond: Double,
-        sendDropsPerSecond: Double
+        sendDropsPerSecond: Double?
     ) {
         self.receivedBytesPerSecond = receivedBytesPerSecond
         self.sentBytesPerSecond = sentBytesPerSecond

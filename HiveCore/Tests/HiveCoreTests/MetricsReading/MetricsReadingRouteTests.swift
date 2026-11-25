@@ -114,7 +114,7 @@ struct MetricsReadingRouteTests {
         let hourly = try await get(HiveEndpoint.processes(ofServer: server.id, at: start + 70), as: ProcessMoment.self)
 
         // Assert
-        guard case .sample(let takenAt, let groups) = nearest else {
+        guard case .sample(let takenAt, let groups, _) = nearest else {
             Issue.record("Not a sample: \(nearest)")
             return
         }

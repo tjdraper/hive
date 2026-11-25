@@ -4,7 +4,8 @@ import HiveKit
 import ScoutProtocol
 
 /// Every server with metrics, for the dashboard: whether it's reporting, its newest figures and its
-/// last hour.
+/// last hour. The Hive Mac comes first, under the Hive's own ID, while Hive reads its figures and once
+/// it has some.
 struct ServerMetricsSummaryReader: Sendable {
     /// No figures for this long means the server stopped reporting (§8).
     static let stoppedAfter: TimeInterval = 3 * 60
@@ -14,16 +15,22 @@ struct ServerMetricsSummaryReader: Sendable {
     let now: @Sendable () -> Date
 
     func summaries() throws -> [ServerMetricsSummary] {
+        let hiveMac = try HiveMac.collectingID(in: scouts.database)
         let servers = try scouts.serversWithMetrics()
         let alerts = Dictionary(grouping: try AlertStore(database: scouts.database).all().flatMap(\.facts.metricAlerts), by: \.serverID)
         let now = now()
         return try database.writer.read { database in
-            try servers.map { serverID, scout in
+            var watched = servers
+            if let hiveMac, try MetricsServerRecord.filter(Column("serverID") == hiveMac).fetchCount(database) > 0 {
+                watched.insert((hiveMac, nil), at: 0)
+            }
+            return try watched.map { serverID, scout in
                 let record = try MetricsServerRecord.filter(Column("serverID") == serverID).fetchOne(database)
                 let latest = try record.flatMap { try Self.latest(of: $0, in: database) }
                 return ServerMetricsSummary(
                     serverID: serverID,
-                    reporting: Self.reporting(record, scout: scout, at: now),
+                    reporting: serverID == hiveMac ? Self.reporting(record, since: .distantPast, at: now)
+                        : Self.reporting(record, since: scout?.enrolledAt, at: now),
                     lastReportAt: record?.lastReportAt,
                     latest: latest,
                     lastHour: try record.map { try Self.lastHour(of: $0, at: now, in: database) } ?? [],
@@ -40,9 +47,10 @@ struct ServerMetricsSummaryReader: Sendable {
         }
     }
 
-    private static func reporting(_ record: MetricsServerRecord?, scout: ScoutRecord?, at now: Date) -> MetricsReporting {
+    /// - Parameter enrolledAt: when its Scout enrolled, nil while none is.
+    private static func reporting(_ record: MetricsServerRecord?, since enrolledAt: Date?, at now: Date) -> MetricsReporting {
         // What the server reported before its Scout enrolled may be another Scout's, or another machine's.
-        guard let scout, let lastReportAt = record?.lastReportAt, lastReportAt >= scout.enrolledAt else { return .waiting }
+        guard let enrolledAt, let lastReportAt = record?.lastReportAt, lastReportAt >= enrolledAt else { return .waiting }
         if now.timeIntervalSince(lastReportAt) > stoppedAfter { return .stopped }
         switch record?.lastRefusal {
         case nil: return .reporting
@@ -68,9 +76,8 @@ struct ServerMetricsSummaryReader: Sendable {
         }
 
         var cpu: CPUShares?
-        if let user: Double = row["cpuUser"], let system: Double = row["cpuSystem"],
-           let ioWait: Double = row["cpuIOWait"], let steal: Double = row["cpuSteal"] {
-            cpu = CPUShares(user: user, system: system, ioWait: ioWait, steal: steal)
+        if let user: Double = row["cpuUser"], let system: Double = row["cpuSystem"] {
+            cpu = CPUShares(user: user, system: system, ioWait: row["cpuIOWait"], steal: row["cpuSteal"])
         }
         var load: LoadFigures?
         if let one: Double = row["loadOneMinute"], let five: Double = row["loadFiveMinutes"],
@@ -102,7 +109,7 @@ struct ServerMetricsSummaryReader: Sendable {
         guard let serverKey = record.id else { return [] }
         let end = Int64(now.timeIntervalSince1970.rounded(.down)) + (record.clockOffsetSeconds ?? 0)
         return try Row.fetchAll(database, sql: """
-        SELECT startsAt, cpuUser + cpuSystem + cpuIOWait + cpuSteal AS cpuBusy,
+        SELECT startsAt, cpuUser + cpuSystem + IFNULL(cpuIOWait, 0) + IFNULL(cpuSteal, 0) AS cpuBusy,
             1.0 - memoryAvailable * 1.0 / NULLIF(memoryTotal, 0) AS memoryUsed
         FROM serverMinute WHERE serverKey = ? AND startsAt > ? AND startsAt <= ?
         ORDER BY startsAt

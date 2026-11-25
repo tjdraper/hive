@@ -259,6 +259,7 @@ struct SettingsDraft: Equatable {
     var addressOptions: [AddressOption]
     var advertisesOnLocalNetwork: Bool
     var sendsBuildExpiryWarnings: Bool
+    var collectsMacMetrics: Bool
 
     init(_ settings: HiveSettings) {
         name = settings.name
@@ -266,6 +267,7 @@ struct SettingsDraft: Equatable {
         addressOptions = settings.addressOptions
         advertisesOnLocalNetwork = settings.advertisesOnLocalNetwork
         sendsBuildExpiryWarnings = settings.sendsBuildExpiryWarnings
+        collectsMacMetrics = settings.collectsMacMetrics
         switch settings.networkAccess {
         case .thisMacOnly:
             access = .thisMacOnly
@@ -291,7 +293,8 @@ struct SettingsDraft: Equatable {
             port: port,
             addressOptions: addressOptions,
             advertisesOnLocalNetwork: advertisesOnLocalNetwork,
-            sendsBuildExpiryWarnings: sendsBuildExpiryWarnings
+            sendsBuildExpiryWarnings: sendsBuildExpiryWarnings,
+            collectsMacMetrics: collectsMacMetrics
         )
     }
 }

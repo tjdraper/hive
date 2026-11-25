@@ -50,7 +50,7 @@ nonisolated struct ProcessRow: Identifiable, Sendable {
 
     static func rows(_ moment: ProcessMoment) -> [ProcessRow] {
         switch moment {
-        case .sample(_, let groups):
+        case .sample(_, let groups, _):
             groups.map {
                 ProcessRow(
                     command: $0.command,

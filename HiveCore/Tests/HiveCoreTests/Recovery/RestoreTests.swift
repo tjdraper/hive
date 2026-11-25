@@ -128,7 +128,8 @@ struct RestoreTests {
             port: 5_000,
             addressOptions: options,
             advertisesOnLocalNetwork: false,
-            sendsBuildExpiryWarnings: false
+            sendsBuildExpiryWarnings: false,
+            collectsMacMetrics: false
         )
         let changed = try await old.send(.put, HiveEndpoint.settings, json: settings)
         #expect(changed.status == .ok)
@@ -146,6 +147,7 @@ struct RestoreTests {
         #expect(try new.settings.settings().addressOptions == options)
         #expect(try new.settings.settings().advertisesOnLocalNetwork == false)
         #expect(try new.settings.settings().sendsBuildExpiryWarnings == false)
+        #expect(try new.settings.settings().collectsMacMetrics == false)
     }
 
     @Test("A restored Hive writes its recovery files with the same recovery key")

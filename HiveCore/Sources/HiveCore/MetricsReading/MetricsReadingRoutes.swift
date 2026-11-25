@@ -67,9 +67,10 @@ enum MetricsReadingRoutes {
     }
 
     /// Nil when there's no such server. One whose metrics were removed still has its history until it
-    /// ages out.
+    /// ages out, as the Hive Mac does once Hive stops reading it.
     private static func serverID(_ context: HiveRequestContext, scouts: ScoutStore) throws -> UUID? {
-        guard let id = context.idParameter, try scouts.hasMetrics(id) != nil else { return nil }
+        guard let id = context.idParameter else { return nil }
+        guard try scouts.hasMetrics(id) != nil || HiveMac.isHive(id, in: scouts.database) else { return nil }
         return id
     }
 

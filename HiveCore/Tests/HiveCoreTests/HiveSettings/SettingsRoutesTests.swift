@@ -142,7 +142,23 @@ struct SettingsRoutesTests {
         #expect(fixture.listeners.applied.isEmpty)
     }
 
-    @Test("Settings from a Beekeeper that predates advertising and build expiry warnings leave both on")
+    @Test("Turning off the Hive Mac's metrics is saved and recorded, and leaves listening alone")
+    func turnsOffMacMetrics() async throws {
+        // Arrange
+        var settings = try current
+        settings.collectsMacMetrics = false
+
+        // Act
+        let (status, _) = try await put(settings)
+
+        // Assert
+        #expect(status == .ok)
+        #expect(try current.collectsMacMetrics == false)
+        #expect(try fixture.auditEvents().first == .macMetricsChanged(isOn: false))
+        #expect(fixture.listeners.applied.isEmpty)
+    }
+
+    @Test("Settings from a Beekeeper that predates advertising, build expiry warnings and the Mac's metrics leave them on")
     func missingAdvertisingDecodesAsOn() throws {
         // Arrange
         let json = Data(#"{"name":"Hive","networkAccess":{"thisMacOnly":{}},"port":4483,"addressOptions":[]}"#.utf8)
@@ -153,6 +169,7 @@ struct SettingsRoutesTests {
         // Assert
         #expect(settings.advertisesOnLocalNetwork)
         #expect(settings.sendsBuildExpiryWarnings)
+        #expect(settings.collectsMacMetrics)
     }
 
     @Test("Address options are saved in one written form, in order, and recorded")

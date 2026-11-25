@@ -8,6 +8,7 @@ enum MetricsDatabaseMigrator {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("Create the metrics tables", migrate: createMetricsTables)
         migrator.registerMigration("Keep containers and services", migrate: createCgroupTables)
+        migrator.registerMigration("Keep other users' processes", migrate: addOtherUsersProcesses)
         return migrator
     }
 
@@ -177,6 +178,18 @@ enum MetricsDatabaseMigrator {
             // later or once they change.
             table.add(column: "dockerFailedAt", .datetime)
             table.add(column: "dockerFailedConnection", .text)
+        }
+    }
+
+    /// What the Hive Mac's processes that Hive can't read used together.
+    private static func addOtherUsersProcesses(_ database: Database) throws {
+        for (table, isRollup) in [("serverTenSeconds", false), ("serverMinute", true), ("serverHour", true)] {
+            try database.alter(table: table) { table in
+                table.add(column: "otherUsersProcesses", .integer)
+                if isRollup { table.add(column: "otherUsersProcessesHighest", .integer) }
+                table.add(column: "otherUsersCPU", .double)
+                if isRollup { table.add(column: "otherUsersCPUHighest", .double) }
+            }
         }
     }
 

@@ -2,6 +2,8 @@ import Foundation
 
 /// One server on the dashboard: whether it's reporting, its latest figures and its last hour.
 public struct ServerMetricsSummary: Codable, Hashable, Sendable {
+    /// The Hive's own ID for the Hive Mac, whose figures Hive reads itself. Its metrics routes take
+    /// that ID as a server's.
     public let serverID: UUID
     public let reporting: MetricsReporting
     /// Hive's clock, when the server last sent anything, kept or refused.
@@ -100,10 +102,12 @@ public struct ServerMetricsLatest: Codable, Hashable, Sendable {
 public struct CPUShares: Codable, Hashable, Sendable {
     public let user: Double
     public let system: Double
-    public let ioWait: Double
-    public let steal: Double
+    /// Nil for the Hive Mac, which counts waiting for a disk as idle.
+    public let ioWait: Double?
+    /// Nil for the Hive Mac, which doesn't count it.
+    public let steal: Double?
 
-    public init(user: Double, system: Double, ioWait: Double, steal: Double) {
+    public init(user: Double, system: Double, ioWait: Double?, steal: Double?) {
         self.user = user
         self.system = system
         self.ioWait = ioWait
