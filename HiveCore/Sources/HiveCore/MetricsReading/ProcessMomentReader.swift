@@ -46,11 +46,8 @@ struct ProcessMomentReader: Sendable {
 private extension ProcessGroupPlace {
     init?(containerID: String?, service: String?, names: [String: ContainerName]) {
         guard containerID != nil || service != nil else { return nil }
-        self.init(
-            containerID: containerID,
-            containerGroup: containerID.map { CgroupGroupKey.container($0, named: names[$0]).name },
-            service: service
-        )
+        let group = containerID.map { CgroupGroupKey.container($0, named: names[$0]) }
+        self.init(containerID: containerID, containerGroup: group?.name, composeProject: group?.composeProject, service: service)
     }
 }
 

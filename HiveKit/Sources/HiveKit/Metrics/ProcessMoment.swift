@@ -15,12 +15,15 @@ public struct ProcessGroupPlace: Codable, Hashable, Sendable {
     public let containerID: String?
     /// The container's Swarm or Compose service, its name, or its short ID where Hive couldn't name it.
     public let containerGroup: String?
+    /// The Compose project of a Compose service, since every project has its own `db`.
+    public let composeProject: String?
     /// Such as `cron.service`.
     public let service: String?
 
-    public init(containerID: String?, containerGroup: String?, service: String?) {
+    public init(containerID: String?, containerGroup: String?, composeProject: String? = nil, service: String?) {
         self.containerID = containerID
         self.containerGroup = containerGroup
+        self.composeProject = composeProject
         self.service = service
     }
 }

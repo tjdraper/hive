@@ -15,6 +15,7 @@ struct ServerMetricsPage: View {
     @State private var range = MetricsRange.hour
     @State private var state: ServerMetricsState?
     @State private var history: ServerHistory?
+    @State private var cgroups: CgroupHistory?
     @State private var failure: String?
     @State private var moment = MetricsMoment()
 
@@ -123,6 +124,9 @@ struct ServerMetricsPage: View {
                 }
             )
         }
+        if let cgroups {
+            containerCharts(cgroups, timeline: timeline.with(bucketSeconds: cgroups.bucketSeconds))
+        }
         ForEach(history.disks) { disk in
             MetricsChart(title: "Disk \(disk.name ?? "")", lines: history.activity(of: disk), format: .bytesPerSecond, timeline: timeline)
         }
@@ -132,6 +136,28 @@ struct ServerMetricsPage: View {
                 lines: history.traffic(of: interface),
                 format: .bytesPerSecond,
                 timeline: timeline
+            )
+        }
+    }
+
+    /// Containers by service, and systemd services, whose CPU counts work too brief for the process lists.
+    @ViewBuilder private func containerCharts(_ cgroups: CgroupHistory, timeline: MetricsTimeline) -> some View {
+        if !cgroups.containers.isEmpty {
+            MetricsChart(
+                title: "Containers, CPU",
+                lines: cgroups.cpu(of: cgroups.containers),
+                format: .share,
+                timeline: timeline,
+                links: [MetricsChartLink(title: "Containers") { onShowPage(.cgroups(.containers)) }]
+            )
+        }
+        if !cgroups.services.isEmpty {
+            MetricsChart(
+                title: "Services, CPU",
+                lines: cgroups.cpu(of: cgroups.services),
+                format: .share,
+                timeline: timeline,
+                links: [MetricsChartLink(title: "Services") { onShowPage(.cgroups(.services)) }]
             )
         }
     }
@@ -163,8 +189,10 @@ struct ServerMetricsPage: View {
     private func load() async {
         do {
             let read = try await ServerHistory.read(ServerHistory.figures, over: range, ofServer: serverID, from: link)
+            let cgroups = try await CgroupHistory.read(over: read.history.range, ofServer: serverID, from: link)
             state = read.state
             history = read.history
+            self.cgroups = cgroups
             failure = nil
         } catch is CancellationError {
             return

@@ -83,7 +83,10 @@ struct ProcessesPage: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(when)
                     .font(.headline)
-                Text("Grouped by command and user. Memory is each group's own, without what it shares, so it's approximate.")
+                Text(
+                    "Grouped by command, user and container or service. "
+                        + "Memory is each group's own, without what it shares, so it's approximate."
+                )
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -120,6 +123,11 @@ struct ProcessesPage: View {
                         .truncationMode(.middle)
                 }
                 TableColumn("User", value: \.user)
+                TableColumn("Where", value: \.placeText) { row in
+                    Text(row.placeText)
+                        .foregroundStyle(.secondary)
+                        .truncationMode(.middle)
+                }
                 TableColumn("CPU", value: \.cpuOrder) { row in
                     Text(row.cpuText)
                         .monospacedDigit()

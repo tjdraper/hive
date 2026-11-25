@@ -116,10 +116,16 @@ struct ContainerNamingTests {
         try await report([TestMetrics.sample(at: now - 10)])
         _ = await name([Self.firstDB])
         let ids = [Self.firstDB, Self.replacementDB, Self.shopDB, Self.blogDB, Self.loose]
-        try await report([sample(at: now, containers: ids)])
+        var withProcesses = sample(at: now, containers: ids)
+        withProcesses.processes?.groups = [Self.shopDB, Self.blogDB].map {
+            ProcessGroup(command: "postgres", user: "70", containerID: $0, count: 6, cpuCores: 0.1, ownMemoryBytes: 30_000_000)
+        }
+        try await report([withProcesses])
 
         // Act
         let moment = try await moment(at: now)
+        let processAnswer = try await fixture.send(.get, HiveEndpoint.processes(ofServer: server.id, at: now))
+        let processes = try processAnswer.decoded(as: ProcessMoment.self)
 
         // Assert
         guard case .sample(_, let containerCount, let serviceCount, let containers, let services) = moment else {
@@ -140,6 +146,12 @@ struct ContainerNamingTests {
         #expect(containers.first { $0.name == "adminer" }?.kind == .container)
         #expect(services.map(\.name) == ["cron.service"])
         #expect(services.first?.cpuCores == 0.25)
+        guard case .sample(_, let groups) = processes else {
+            Issue.record("Not a sample: \(processes)")
+            return
+        }
+        let places = groups.compactMap(\.place).map { "\($0.composeProject ?? "") \($0.containerGroup ?? "")" }
+        #expect(Set(places) == ["shop db", "blog db"])
     }
 
     @Test("A service's hours keep its name across a replaced container, and after its containers' names are gone")

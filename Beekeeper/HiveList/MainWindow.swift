@@ -235,6 +235,8 @@ struct MainWindow: View {
                 switch page {
                 case .processes:
                     ProcessesPage(hive: hive, link: link, serverID: serverID, path: path)
+                case .cgroups(let kind):
+                    ContainersPage(hive: hive, link: link, serverID: serverID, kind: kind, path: path)
                 case .filesystem(let mountPoint):
                     FilesystemPage(hive: hive, link: link, serverID: serverID, mountPoint: mountPoint, path: path)
                 }

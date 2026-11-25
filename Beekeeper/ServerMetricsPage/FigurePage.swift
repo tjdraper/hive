@@ -3,6 +3,7 @@ import SwiftUI
 /// A page of one kind of a server's figures, reached from its metrics page.
 enum FigurePage: Hashable {
     case processes
+    case cgroups(ContainersPage.Kind)
     case filesystem(mountPoint: String)
 }
 

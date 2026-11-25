@@ -25,7 +25,7 @@ Check off a slice here when its "done when" is true.
 - [x] [B5. The dashboard](10-B5-TheDashboard.md) — UI, 1–2 sessions
 - [x] [B6. A server's metrics](11-B6-AServersMetrics.md) — UI, 2 sessions
 - [x] [B7. Containers and services in Scout and Hive](12-B7-ContainersAndServicesInScoutAndHive.md) — Engine, 1–2 sessions
-- [ ] [B8. Containers and services in Beekeeper](13-B8-ContainersAndServicesInBeekeeper.md) — UI, 1 session
+- [x] [B8. Containers and services in Beekeeper](13-B8-ContainersAndServicesInBeekeeper.md) — UI, 1 session
 - [ ] [B9. Metrics on iPhone and iPad](14-B9-MetricsOnIPhoneAndIPad.md) — UI, 1 session, TestFlight
 
 ### Phase C — Alerts, Macs and release

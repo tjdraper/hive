@@ -2,8 +2,18 @@ import HiveKit
 import SwiftUI
 
 /// The server's processes at the moment chosen on its charts: the sample nearest it, or that hour's
-/// busiest groups once single samples have aged out.
+/// busiest groups once single samples have aged out. Its containers and services are a choice away.
 struct MomentProcesses: View {
+    enum Subject: String, CaseIterable, Identifiable {
+        case processes = "Processes"
+        case containers = "Containers"
+        case services = "Services"
+
+        var id: Self {
+            self
+        }
+    }
+
     enum Order: String, CaseIterable, Identifiable {
         case cpu = "CPU"
         case memory = "Memory"
@@ -23,20 +33,24 @@ struct MomentProcesses: View {
     @State private var processes: ProcessMoment?
     @State private var failure: String?
     @State private var order = Order.cpu
+    @State private var subject = Subject.processes
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Processes")
-                        .font(.headline)
-                    Spacer()
+                    Picker("Show", selection: $subject) {
+                        ForEach(Subject.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    Spacer(minLength: 4)
                     Button("Close", systemImage: "xmark", action: onClose)
                         .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
                         .help("Close the processes")
                 }
-                if let caption {
+                if subject == .processes, let caption {
                     Text(caption)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -48,7 +62,11 @@ struct MomentProcesses: View {
                 .labelsHidden()
             }
             .padding(12)
-            content
+            switch subject {
+            case .processes: content
+            case .containers: MomentCgroups(link: link, serverID: serverID, moment: moment, kind: .containers, order: order)
+            case .services: MomentCgroups(link: link, serverID: serverID, moment: moment, kind: .services, order: order)
+            }
         }
         .task(id: moment) { await load() }
     }
@@ -102,7 +120,7 @@ struct MomentProcesses: View {
                 Text(row.name)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(row.user)
+                Text(row.placeText.isEmpty ? row.user : "\(row.user) · \(row.placeText)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

@@ -43,10 +43,26 @@ enum MetricsValueFormat {
 /// What every chart on a server's page shares: the range on one time axis, its buckets and the backup
 /// runs marked across them.
 struct MetricsTimeline {
-    let history: ServerHistory
+    let range: Range<Int64>
+    private(set) var bucketSeconds: Int64
+    let backupRuns: [BackupRunMark]
+
+    init(history: ServerHistory) {
+        range = history.range
+        bucketSeconds = history.bucketSeconds
+        backupRuns = history.backupRuns
+    }
+
+    /// The same range in other buckets, for figures Hive keeps at their own resolutions, such as
+    /// containers', which are kept by the hour after a day.
+    func with(bucketSeconds: Int64) -> MetricsTimeline {
+        var timeline = self
+        timeline.bucketSeconds = bucketSeconds
+        return timeline
+    }
 
     var domain: ClosedRange<Date> {
-        Self.date(history.range.lowerBound) ... Self.date(history.range.upperBound)
+        Self.date(range.lowerBound) ... Self.date(range.upperBound)
     }
 
     /// Seconds since 1970 on the server's clock, as the charts' dates stand for them.
@@ -60,11 +76,11 @@ struct MetricsTimeline {
 
     /// Each bucket at its middle, since a point stands for the whole bucket.
     func middle(of point: MetricsChartPoint) -> Date {
-        Self.date(point.start).addingTimeInterval(TimeInterval(history.bucketSeconds) / 2)
+        Self.date(point.start).addingTimeInterval(TimeInterval(bucketSeconds) / 2)
     }
 
     func time(_ date: Date) -> String {
-        if history.range.count > 86_400 {
+        if range.count > 86_400 {
             date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
         } else {
             date.formatted(.dateTime.hour().minute().second())
@@ -73,12 +89,12 @@ struct MetricsTimeline {
 
     func backupRun(at date: Date) -> BackupRunMark? {
         let second = Self.second(date)
-        return history.backupRuns.last { $0.startedAt <= second && second < end(of: $0) }
+        return backupRuns.last { $0.startedAt <= second && second < end(of: $0) }
     }
 
     /// A run shorter than a bucket is drawn a bucket wide, so it still shows on a long range.
     func end(of run: BackupRunMark) -> Int64 {
-        max(run.finishedAt ?? history.range.upperBound, run.startedAt + history.bucketSeconds)
+        max(run.finishedAt ?? range.upperBound, run.startedAt + bucketSeconds)
     }
 }
 
@@ -160,10 +176,10 @@ struct MetricsChart: View {
     }
 
     @ChartContentBuilder private var backupRuns: some ChartContent {
-        ForEach(Array(timeline.history.backupRuns.enumerated()), id: \.offset) { _, run in
+        ForEach(Array(timeline.backupRuns.enumerated()), id: \.offset) { _, run in
             RectangleMark(
-                xStart: .value("Backup start", MetricsTimeline.date(max(run.startedAt, timeline.history.range.lowerBound))),
-                xEnd: .value("Backup end", MetricsTimeline.date(min(timeline.end(of: run), timeline.history.range.upperBound)))
+                xStart: .value("Backup start", MetricsTimeline.date(max(run.startedAt, timeline.range.lowerBound))),
+                xEnd: .value("Backup end", MetricsTimeline.date(min(timeline.end(of: run), timeline.range.upperBound)))
             )
             .foregroundStyle(run.failure == nil ? Color.gray.opacity(0.16) : Color.red.opacity(0.14))
         }
@@ -260,7 +276,7 @@ private struct MetricsChartLegend: View {
                         .monospacedDigit()
                 }
             }
-            HStack(spacing: 12) {
+            LegendLayout {
                 ForEach(lines) { line in
                     HStack(spacing: 4) {
                         swatch(line)
@@ -277,9 +293,9 @@ private struct MetricsChartLegend: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                Spacer(minLength: 0)
             }
             .font(.caption)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -296,7 +312,7 @@ private struct MetricsChartLegend: View {
 
     private func value(of line: MetricsChartLine) -> Double? {
         guard let shown = moment.shown else { return line.points.last?.average }
-        return line.point(at: MetricsTimeline.second(shown), bucketSeconds: timeline.history.bucketSeconds)?.average
+        return line.point(at: MetricsTimeline.second(shown), bucketSeconds: timeline.bucketSeconds)?.average
     }
 }
 

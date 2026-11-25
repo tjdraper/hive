@@ -6,6 +6,7 @@ import SwiftUI
 nonisolated struct ProcessRow: Identifiable, Sendable {
     let command: String
     let user: String
+    let place: ProcessGroupPlace?
     let count: Int
     let cpuCores: Double?
     let memoryBytes: UInt64
@@ -13,8 +14,15 @@ nonisolated struct ProcessRow: Identifiable, Sendable {
     var highestCPUCores: Double?
     var highestMemoryBytes: UInt64?
 
+    /// The same command and user can run in several containers, and in a service besides.
     var id: String {
-        "\(command) \(user)"
+        "\(command) \(user) \(place?.containerID ?? place?.service ?? "")"
+    }
+
+    /// The container group or service it runs in, empty for neither.
+    var placeText: String {
+        if let group = place?.containerGroup { return CgroupHistory.name(group, composeProject: place?.composeProject) }
+        return place?.service ?? ""
     }
 
     /// For sorting, with a group missing its CPU, as in a Scout's first sample, last.
@@ -44,13 +52,21 @@ nonisolated struct ProcessRow: Identifiable, Sendable {
         switch moment {
         case .sample(_, let groups):
             groups.map {
-                ProcessRow(command: $0.command, user: $0.user, count: $0.count, cpuCores: $0.cpuCores, memoryBytes: $0.ownMemoryBytes)
+                ProcessRow(
+                    command: $0.command,
+                    user: $0.user,
+                    place: $0.place,
+                    count: $0.count,
+                    cpuCores: $0.cpuCores,
+                    memoryBytes: $0.ownMemoryBytes
+                )
             }
         case .hour(_, let groups):
             groups.map {
                 ProcessRow(
                     command: $0.command,
                     user: $0.user,
+                    place: $0.place,
                     count: $0.highestCount,
                     cpuCores: $0.averageCPUCores,
                     memoryBytes: $0.averageOwnMemoryBytes,
@@ -64,7 +80,7 @@ nonisolated struct ProcessRow: Identifiable, Sendable {
     }
 
     /// Most groups use well under 1% of a core, which whole percents would all show as 0.
-    private static func share(_ cores: Double) -> String {
+    static func share(_ cores: Double) -> String {
         cores.formatted(.percent.precision(.fractionLength(cores < 0.1 ? 1 : 0)))
     }
 
