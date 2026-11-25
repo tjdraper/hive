@@ -15,7 +15,7 @@ struct ServerMetricsCard: View {
                 Spacer(minLength: 0)
                 ReportingBadge(reporting: server.reporting)
             }
-            if let problem {
+            if let problem = Self.problem(of: server) {
                 Text(problem)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -33,12 +33,12 @@ struct ServerMetricsCard: View {
         .background(.fill.quinary, in: .rect(cornerRadius: 12))
         .overlay {
             RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(border, lineWidth: 1)
+                .strokeBorder(Self.border(of: server), lineWidth: 1)
         }
         .contentShape(.rect(cornerRadius: 12))
     }
 
-    private var problem: LocalizedStringKey? {
+    static func problem(of server: DashboardServer) -> LocalizedStringKey? {
         switch server.reporting {
         case .reporting:
             nil
@@ -57,7 +57,7 @@ struct ServerMetricsCard: View {
         }
     }
 
-    private var border: AnyShapeStyle {
+    private static func border(of server: DashboardServer) -> AnyShapeStyle {
         switch server.reporting {
         case .stopped, .refused: AnyShapeStyle(.red.opacity(0.7))
         case .clockAhead: AnyShapeStyle(.orange.opacity(0.8))
@@ -115,7 +115,7 @@ struct ServerMetricsCard: View {
         max(.now, Date(timeIntervalSince1970: TimeInterval(latest.takenAt)))
     }
 
-    private static func percent(_ share: Double) -> String {
+    static func percent(_ share: Double) -> String {
         share.formatted(.percent.precision(.fractionLength(0)))
     }
 
@@ -159,7 +159,7 @@ private struct FigureCell: View {
 }
 
 /// An icon and a word for whether the server is reporting, so it never rests on color alone.
-private struct ReportingBadge: View {
+struct ReportingBadge: View {
     let reporting: MetricsReporting
 
     var body: some View {
@@ -169,6 +169,8 @@ private struct ReportingBadge: View {
             Image(systemName: symbol)
                 .foregroundStyle(color)
         }
+        // A list shows a label in a row as its icon only, which would leave the state to color alone.
+        .labelStyle(.titleAndIcon)
         .font(.caption)
         .foregroundStyle(.secondary)
         .lineLimit(1)
@@ -205,13 +207,13 @@ private struct ReportingBadge: View {
     }
 }
 
-private extension CPUShares {
+extension CPUShares {
     var busy: Double {
         user + system + ioWait + steal
     }
 }
 
-private extension MemoryUse {
+extension MemoryUse {
     var usedBytes: UInt64 {
         totalBytes > availableBytes ? totalBytes - availableBytes : 0
     }

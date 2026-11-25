@@ -65,25 +65,7 @@ struct CgroupProcesses: View {
                 ContentUnavailableView("None Among the Busiest", systemImage: "list.bullet.rectangle")
             } else {
                 List(rows) { row in
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(row.name)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Text(row.user)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 4)
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("\(row.cpuText) CPU")
-                            Text(row.memoryText)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .monospacedDigit()
-                    }
-                    .accessibilityElement(children: .combine)
+                    ProcessListRow(row: row, showsPlace: false)
                 }
             }
         }

@@ -20,6 +20,11 @@ struct ServerFacts: View {
                     GridRow { cells(0 ..< 3) }
                     GridRow { cells(3 ..< 6) }
                 }
+                Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 10) {
+                    GridRow { cells(0 ..< 2) }
+                    GridRow { cells(2 ..< 4) }
+                    GridRow { cells(4 ..< 6) }
+                }
             }
             warnings
         }

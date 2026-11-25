@@ -97,7 +97,7 @@ struct MomentProcesses: View {
 
     private func list(_ rows: [ProcessRow]) -> some View {
         List(sorted(rows)) { row in
-            rowView(row)
+            ProcessListRow(row: row, order: order)
         }
     }
 
@@ -112,31 +112,6 @@ struct MomentProcesses: View {
         case .notKept, nil:
             nil
         }
-    }
-
-    private func rowView(_ row: ProcessRow) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(row.name)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(row.placeText.isEmpty ? row.user : "\(row.user) · \(row.placeText)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 4)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("\(row.cpuText) CPU")
-                    .fontWeight(order == .cpu ? .semibold : .regular)
-                Text(row.memoryText)
-                    .font(.caption)
-                    .fontWeight(order == .memory ? .semibold : .regular)
-                    .foregroundStyle(.secondary)
-            }
-            .monospacedDigit()
-        }
-        .accessibilityElement(children: .combine)
     }
 
     /// Scout sends the busiest by CPU and by memory, so each order's top is complete.

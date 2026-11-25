@@ -33,7 +33,7 @@ struct MomentCgroups: View {
                 ContentUnavailableView(kind == .containers ? "No Containers" : "No Services", systemImage: "shippingbox")
             } else {
                 List(rows) { row in
-                    rowView(row)
+                    CgroupListRow(row: row, order: order)
                 }
             }
         case .notKept:
@@ -82,33 +82,6 @@ struct MomentCgroups: View {
         case .cpu: rows.sorted { $0.cpuOrder > $1.cpuOrder }
         case .memory: rows.sorted { $0.memoryOrder > $1.memoryOrder }
         }
-    }
-
-    private func rowView(_ row: CgroupRow) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(row.containerCount.map { $0 > 1 ? "\(row.name) ×\($0)" : row.name } ?? row.name)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                if !row.detail.isEmpty {
-                    Text(row.detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            Spacer(minLength: 4)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("\(row.cpuText) CPU")
-                    .fontWeight(order == .cpu ? .semibold : .regular)
-                Text(row.memoryText)
-                    .font(.caption)
-                    .fontWeight(order == .memory ? .semibold : .regular)
-                    .foregroundStyle(.secondary)
-            }
-            .monospacedDigit()
-        }
-        .accessibilityElement(children: .combine)
     }
 
     private func load() async {

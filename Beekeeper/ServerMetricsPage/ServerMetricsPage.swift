@@ -18,16 +18,15 @@ struct ServerMetricsPage: View {
     @State private var cgroups: CgroupHistory?
     @State private var failure: String?
     @State private var moment = MetricsMoment()
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var shownChart: MetricsChart.ID?
+    #endif
 
     var body: some View {
         HiveConnectionGate(hive: hive, link: link) {
             content
-                .task(id: range) {
-                    while !Task.isCancelled {
-                        await load()
-                        try? await Task.sleep(for: range.refreshInterval)
-                    }
-                }
+                .reloading(every: range.refreshInterval, id: range) { await load() }
         }
         .environment(moment)
         .navigationTitle(name)
@@ -36,19 +35,17 @@ struct ServerMetricsPage: View {
             LocationPath.Part(title: "Metrics", systemImage: "chart.xyaxis.line", action: onShowDashboard),
             LocationPath.Part(title: name, systemImage: "server.rack"),
         ])
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("Range", selection: $range) {
-                    ForEach(MetricsRange.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
-        }
+        .metricsRangeToolbar($range)
         .onChange(of: range) { moment.chosen = nil }
         .inspector(isPresented: isShowingProcesses) {
             processes
                 .inspectorColumnWidth(min: 260, ideal: 320, max: 480)
+                #if os(iOS)
+                // At iPhone width the inspector is a sheet, which leaves the chart above it to choose
+                // another moment on.
+                .presentationDetents([.fraction(0.45), .large])
+                .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.45)))
+                #endif
         }
     }
 
@@ -58,7 +55,15 @@ struct ServerMetricsPage: View {
 
     @ViewBuilder private var content: some View {
         if let history, let scout = state?.scout {
+            #if os(iOS)
+            if sizeClass == .compact {
+                compactPage(history, scout: scout)
+            } else {
+                page(history, scout: scout)
+            }
+            #else
             page(history, scout: scout)
+            #endif
         } else if let failure {
             ContentUnavailableView {
                 Label("Couldn't Read Metrics", systemImage: "exclamationmark.triangle")
@@ -79,41 +84,72 @@ struct ServerMetricsPage: View {
     }
 
     private func page(_ history: ServerHistory, scout: ScoutState) -> some View {
-        let timeline = MetricsTimeline(history: history)
-        return ScrollView {
+        ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 ServerFacts(scout: scout, history: history, serverNow: serverNow)
-                Text(moment.chosen == nil ? "Click a chart to see the processes at that moment." : " ")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 420), spacing: 16, alignment: .top)], spacing: 16) {
-                    charts(history, timeline: timeline)
+                hint
+                LazyVGrid(columns: MetricsChart.columns, spacing: 16) {
+                    ForEach(charts(history)) { $0 }
                 }
             }
             .padding()
         }
     }
 
-    @ViewBuilder private func charts(_ history: ServerHistory, timeline: MetricsTimeline) -> some View {
-        MetricsChart(title: "CPU", lines: history.cpu, format: .share, timeline: timeline, yDomain: 0 ... 1, links: [processesLink])
-        MetricsChart(title: "Load", lines: history.load, format: .load, timeline: timeline)
-        MetricsChart(
-            title: "Memory",
-            lines: history.memory,
-            format: .bytes,
-            timeline: timeline,
-            yDomain: history.memoryTotal.map { 0 ... max($0, 1) },
-            links: [processesLink]
-        )
+    #if os(iOS)
+    /// The chart first, high enough on the screen that the moment's sheet leaves it in view.
+    private func compactPage(_ history: ServerHistory, scout: ScoutState) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                MetricsRangePicker(range: $range)
+                    .padding(.horizontal)
+                MetricsChartPager(charts: charts(history), shown: $shownChart)
+                    .frame(height: 320)
+                VStack(alignment: .leading, spacing: 16) {
+                    hint
+                    ServerFacts(scout: scout, history: history, serverNow: serverNow)
+                }
+                .padding(.horizontal)
+            }
+            .padding(.vertical)
+        }
+    }
+    #endif
+
+    private var hint: some View {
+        #if os(macOS)
+        let text = "Click a chart to see the processes at that moment."
+        #else
+        let text = "Tap a chart to see the processes at that moment, or touch and hold to move along it."
+        #endif
+        return Text(moment.chosen == nil ? text : " ")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private func charts(_ history: ServerHistory) -> [MetricsChart] {
+        let timeline = MetricsTimeline(history: history)
+        var charts = [
+            MetricsChart(title: "CPU", lines: history.cpu, format: .share, timeline: timeline, yDomain: 0 ... 1, links: [processesLink]),
+            MetricsChart(title: "Load", lines: history.load, format: .load, timeline: timeline),
+            MetricsChart(
+                title: "Memory",
+                lines: history.memory,
+                format: .bytes,
+                timeline: timeline,
+                yDomain: history.memoryTotal.map { 0 ... max($0, 1) },
+                links: [processesLink]
+            ),
+        ]
         if let swapTotal = history.swapTotal {
-            MetricsChart(title: "Swap", lines: history.swap, format: .bytes, timeline: timeline, yDomain: 0 ... swapTotal)
-            MetricsChart(title: "Swapping, pages", lines: history.swapping, format: .perSecond, timeline: timeline)
+            charts.append(MetricsChart(title: "Swap", lines: history.swap, format: .bytes, timeline: timeline, yDomain: 0 ... swapTotal))
+            charts.append(MetricsChart(title: "Swapping, pages", lines: history.swapping, format: .perSecond, timeline: timeline))
         }
         if !history.pressure.isEmpty {
-            MetricsChart(title: "Pressure, time stalled", lines: history.pressure, format: .share, timeline: timeline)
+            charts.append(MetricsChart(title: "Pressure, time stalled", lines: history.pressure, format: .share, timeline: timeline))
         }
         if !history.filesystems.isEmpty {
-            MetricsChart(
+            charts.append(MetricsChart(
                 title: "Disk space used",
                 lines: history.diskSpace,
                 format: .share,
@@ -122,15 +158,15 @@ struct ServerMetricsPage: View {
                 links: history.filesystems.compactMap(\.name).map { mountPoint in
                     MetricsChartLink(title: mountPoint) { onShowPage(.filesystem(mountPoint: mountPoint)) }
                 }
-            )
+            ))
         }
         if let cgroups {
-            containerCharts(cgroups, timeline: timeline.with(bucketSeconds: cgroups.bucketSeconds))
+            charts += containerCharts(cgroups, timeline: timeline.with(bucketSeconds: cgroups.bucketSeconds))
         }
-        ForEach(history.disks) { disk in
+        charts += history.disks.map { disk in
             MetricsChart(title: "Disk \(disk.name ?? "")", lines: history.activity(of: disk), format: .bytesPerSecond, timeline: timeline)
         }
-        ForEach(history.interfaces) { interface in
+        charts += history.interfaces.map { interface in
             MetricsChart(
                 title: "Network \(interface.name ?? "")",
                 lines: history.traffic(of: interface),
@@ -138,28 +174,31 @@ struct ServerMetricsPage: View {
                 timeline: timeline
             )
         }
+        return charts
     }
 
     /// Containers by service, and systemd services, whose CPU counts work too brief for the process lists.
-    @ViewBuilder private func containerCharts(_ cgroups: CgroupHistory, timeline: MetricsTimeline) -> some View {
+    private func containerCharts(_ cgroups: CgroupHistory, timeline: MetricsTimeline) -> [MetricsChart] {
+        var charts: [MetricsChart] = []
         if !cgroups.containers.isEmpty {
-            MetricsChart(
+            charts.append(MetricsChart(
                 title: "Containers, CPU",
                 lines: cgroups.cpu(of: cgroups.containers),
                 format: .share,
                 timeline: timeline,
                 links: [MetricsChartLink(title: "Containers") { onShowPage(.cgroups(.containers)) }]
-            )
+            ))
         }
         if !cgroups.services.isEmpty {
-            MetricsChart(
+            charts.append(MetricsChart(
                 title: "Services, CPU",
                 lines: cgroups.cpu(of: cgroups.services),
                 format: .share,
                 timeline: timeline,
                 links: [MetricsChartLink(title: "Services") { onShowPage(.cgroups(.services)) }]
-            )
+            ))
         }
+        return charts
     }
 
     private var processesLink: MetricsChartLink {

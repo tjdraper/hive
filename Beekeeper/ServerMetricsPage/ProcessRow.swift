@@ -88,3 +88,37 @@ nonisolated struct ProcessRow: Identifiable, Sendable {
         Date(timeIntervalSince1970: TimeInterval(second)).formatted(date: .abbreviated, time: .standard)
     }
 }
+
+/// A process group as a list's row: what it runs, who runs it and where, and its CPU and memory, with
+/// the one the list is in order of in bold.
+struct ProcessListRow: View {
+    let row: ProcessRow
+    var order = MomentProcesses.Order.cpu
+    /// Left out where every row runs in the same place, as in a container's processes.
+    var showsPlace = true
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.name)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(showsPlace && !row.placeText.isEmpty ? "\(row.user) · \(row.placeText)" : row.user)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(row.cpuText) CPU")
+                    .fontWeight(order == .cpu ? .semibold : .regular)
+                Text(row.memoryText)
+                    .font(.caption)
+                    .fontWeight(order == .memory ? .semibold : .regular)
+                    .foregroundStyle(.secondary)
+            }
+            .monospacedDigit()
+        }
+        .accessibilityElement(children: .combine)
+    }
+}

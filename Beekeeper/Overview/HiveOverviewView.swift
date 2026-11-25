@@ -10,6 +10,7 @@ struct HiveOverviewView: View {
     let onOpenSettings: () -> Void
     /// Rows for the Hive's other pages at the end, where they aren't tabs.
     let onOpenPage: ((HivePage) -> Void)?
+    let onShowMetrics: () -> Void
     let onSelectServer: (UUID) -> Void
     let onRestored: (RestoreOutcome) -> Void
 
@@ -62,7 +63,7 @@ struct HiveOverviewView: View {
             }
             RemovedJobsSection(hive: hive, link: link, statuses: servers.statuses, removed: removedJobs)
             if let onOpenPage {
-                HivePageLinks(onOpen: onOpenPage)
+                HivePageLinks(onShowMetrics: onShowMetrics, onOpen: onOpenPage)
             }
         }
         .formStyle(.grouped)

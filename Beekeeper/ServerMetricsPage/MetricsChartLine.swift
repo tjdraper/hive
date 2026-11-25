@@ -60,3 +60,13 @@ struct MetricsChartLine: Identifiable {
         }
     }
 }
+
+/// A page with more of what a chart shows, such as a filesystem's, linked beside its title.
+struct MetricsChartLink: Identifiable {
+    let title: String
+    let action: () -> Void
+
+    var id: String {
+        title
+    }
+}

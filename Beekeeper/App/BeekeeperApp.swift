@@ -4,6 +4,10 @@ import SwiftUI
 @main
 struct BeekeeperApp: App {
     @State private var hives = HiveListStore()
+    #if os(iOS)
+    /// The app's, which is in the background only once every window is.
+    @Environment(\.scenePhase) private var scenePhase
+    #endif
     #if os(macOS)
     @NSApplicationDelegateAdaptor private var appDelegate: BeekeeperAppDelegate
     @State private var updater = BeekeeperUpdater()
@@ -22,6 +26,15 @@ struct BeekeeperApp: App {
                 #endif
         }
         .defaultSize(width: 960, height: 620)
+        #if os(iOS)
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background: hives.pauseLiveUpdates()
+            case .active: hives.resumeLiveUpdates()
+            default: break
+            }
+        }
+        #endif
         .commands {
             CommandGroup(after: .newItem) {
                 AddHiveCommand()

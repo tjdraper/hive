@@ -88,6 +88,7 @@ struct HiveDetail: View {
             onAddServer: onAddServer,
             onOpenSettings: { page = .settings },
             onOpenPage: onOpenPage,
+            onShowMetrics: { selection = .dashboard(hiveID: hive.id) },
             onSelectServer: { selection = .server(hiveID: hive.id, serverID: $0) },
             onRestored: restored
         )

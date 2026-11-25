@@ -3,28 +3,52 @@ import HiveKit
 import SwiftUI
 
 /// The main window at iPhone width: the Hives, then one Hive, one server and one job, each pushed on the
-/// last. The stack follows the selection, so anything that selects a Hive or server goes back to it.
+/// last. The stack follows the selection, so anything that selects a Hive or server goes back to it. A
+/// page opened from the one showing is pushed on it, so Back returns there, such as from a server's
+/// metrics to the dashboard it was opened from.
 struct CompactNavigation<Destination: View>: View {
     @Binding var selection: SidebarItem?
     @ViewBuilder let destination: (SidebarItem) -> Destination
+
+    @State private var stack: [SidebarItem] = []
 
     var body: some View {
         NavigationStack(path: path) {
             CompactHiveList { selection = .hive($0) }
                 .navigationDestination(for: SidebarItem.self, destination: destination)
         }
+        .onChange(of: selection, initial: true) { _, selected in
+            stack = Self.stack(to: selected, from: stack)
+        }
     }
 
     private var path: Binding<[SidebarItem]> {
         Binding {
-            selection?.ancestry ?? []
+            stack
         } set: {
+            stack = $0
             selection = $0.last
         }
+    }
+
+    private static func stack(to item: SidebarItem?, from stack: [SidebarItem]) -> [SidebarItem] {
+        guard let item else { return [] }
+        if let index = stack.lastIndex(of: item) { return Array(stack[...index]) }
+        if let last = stack.last, item.openedFrom.contains(last) { return stack + [item] }
+        return item.ancestry
     }
 }
 
 private extension SidebarItem {
+    /// The pages that open this one: its parent in the sidebar, and others with a way to it.
+    var openedFrom: [SidebarItem] {
+        let parent = Array(ancestry.dropLast().suffix(1))
+        return switch self {
+        case .serverMetrics(let hiveID, _): parent + [.dashboard(hiveID: hiveID)]
+        default: parent
+        }
+    }
+
     var ancestry: [SidebarItem] {
         switch self {
         case .hive:

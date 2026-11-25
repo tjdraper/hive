@@ -13,6 +13,7 @@ final class HiveListStore {
     private var serverLists: [UUID: ServerList] = [:]
     private var recoveryFiles: [UUID: RecoveryFileCopies] = [:]
     private var liveMetrics: [UUID: LiveServerMetrics] = [:]
+    private var followers: [UUID: LiveUpdateFollower] = [:]
     private var liveUpdates: [UUID: Task<Void, Never>] = [:]
     /// Hives first paired since Beekeeper opened, whose setup goes on to their recovery key.
     private var newlyPaired: Set<UUID> = []
@@ -106,8 +107,27 @@ final class HiveListStore {
         ) { [weak self] addresses in
             self?.follow(hive.id, to: addresses)
         }
+        followers[hive.id] = follower
         liveUpdates[hive.id] = Task { await follower.follow() }
     }
+
+    #if os(iOS)
+    /// iOS suspends Beekeeper soon after it leaves the screen, cutting its connections without always
+    /// saying so. Live updates stop when it leaves rather than wait to find that out, and start afresh
+    /// when it's back, beginning with where every job stands.
+    func pauseLiveUpdates() {
+        for task in liveUpdates.values {
+            task.cancel()
+        }
+        liveUpdates = [:]
+    }
+
+    func resumeLiveUpdates() {
+        for (id, follower) in followers where liveUpdates[id] == nil {
+            liveUpdates[id] = Task { await follower.follow() }
+        }
+    }
+    #endif
 
     /// True once for a Hive first paired since Beekeeper opened.
     func takeNewlyPaired(_ id: UUID) -> Bool {
@@ -192,6 +212,7 @@ final class HiveListStore {
         serverLists[id] = nil
         recoveryFiles[id] = nil
         liveMetrics[id] = nil
+        followers[id] = nil
         liveUpdates.removeValue(forKey: id)?.cancel()
     }
 

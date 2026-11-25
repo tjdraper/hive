@@ -16,16 +16,14 @@ struct MetricsDashboard: View {
 
     @State private var summaries: [ServerMetricsSummary]?
     @State private var failure: String?
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
 
     var body: some View {
         HiveConnectionGate(hive: hive, link: link) {
             content
-                .task {
-                    while !Task.isCancelled {
-                        await load()
-                        try? await Task.sleep(for: Self.refreshInterval)
-                    }
-                }
+                .reloading(every: Self.refreshInterval, id: hive.id) { await load() }
                 .onChange(of: hasServerMissingFromSummaries) { _, missing in
                     if missing { Task { await load() } }
                 }
@@ -47,7 +45,15 @@ struct MetricsDashboard: View {
                     description: Text("Add metrics to a server from its page. It shows here once its Scout reports.")
                 )
             } else {
+                #if os(iOS)
+                if sizeClass == .compact {
+                    rows(arranged)
+                } else {
+                    cards(arranged)
+                }
+                #else
                 cards(arranged)
+                #endif
             }
         } else if let failure {
             ContentUnavailableView {
@@ -76,6 +82,23 @@ struct MetricsDashboard: View {
             .animation(.default, value: arranged.map(\.id))
         }
     }
+
+    #if os(iOS)
+    private func rows(_ arranged: [DashboardServer]) -> some View {
+        List(arranged) { server in
+            Button { onSelectServer(server.id) } label: {
+                HStack {
+                    ServerMetricsRow(server: server)
+                    Image(systemName: "chevron.forward")
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+        }
+        .animation(.default, value: arranged.map(\.id))
+    }
+    #endif
 
     private var names: [UUID: String] {
         Dictionary(servers.servers.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })

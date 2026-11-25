@@ -31,6 +31,9 @@ struct ContainersPage: View {
     @State private var moment = MetricsMoment()
     @State private var selection: CgroupRow.ID?
     @State private var sortOrder = [KeyPathComparator(\CgroupRow.cpuOrder, order: .reverse)]
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
 
     init(hive: KnownHive, link: HiveLink, serverID: UUID, kind: Kind, path: MetricsPagePath) {
         self.hive = hive
@@ -43,33 +46,14 @@ struct ContainersPage: View {
     var body: some View {
         HiveConnectionGate(hive: hive, link: link) {
             content
-                .task(id: range) {
-                    while !Task.isCancelled {
-                        await load()
-                        try? await Task.sleep(for: range.refreshInterval)
-                    }
-                }
-                .task(id: moment.chosen) {
-                    // A chosen moment's figures don't change. The newest do, with every sample.
-                    while !Task.isCancelled {
-                        await loadFigures()
-                        guard moment.chosen == nil else { return }
-                        try? await Task.sleep(for: .seconds(10))
-                    }
-                }
+                .reloading(every: range.refreshInterval, id: range) { await load() }
+                // A chosen moment's figures don't change. The newest do, with every sample.
+                .reloading(every: moment.chosen == nil ? .seconds(10) : nil, id: moment.chosen) { await loadFigures() }
         }
         .environment(moment)
         .navigationTitle(kind.rawValue)
         .locationPath(path.parts("Containers and Services", systemImage: "shippingbox"))
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("Range", selection: $range) {
-                    ForEach(MetricsRange.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
-        }
+        .metricsRangeToolbar($range)
         .onChange(of: range) { moment.chosen = nil }
         .onChange(of: kind) { selection = nil }
         .onChange(of: grouping) { selection = nil }
@@ -77,18 +61,15 @@ struct ContainersPage: View {
 
     @ViewBuilder private var content: some View {
         if let history, let cgroups {
-            VStack(alignment: .leading, spacing: 12) {
-                Picker("Show", selection: $kind) {
-                    ForEach(Kind.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                charts(cgroups, timeline: MetricsTimeline(history: history).with(bucketSeconds: cgroups.bucketSeconds))
-                caption
-                list(cgroups)
+            #if os(iOS)
+            if sizeClass == .compact {
+                compactPage(history, cgroups: cgroups)
+            } else {
+                page(history, cgroups: cgroups)
             }
-            .padding()
+            #else
+            page(history, cgroups: cgroups)
+            #endif
         } else if let failure {
             ContentUnavailableView {
                 Label("Couldn't Read Metrics", systemImage: "exclamationmark.triangle")
@@ -102,15 +83,65 @@ struct ContainersPage: View {
         }
     }
 
-    private func charts(_ cgroups: CgroupHistory, timeline: MetricsTimeline) -> some View {
+    private func page(_ history: ServerHistory, cgroups: CgroupHistory) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            kindPicker
+                .fixedSize()
+            HStack(alignment: .top, spacing: 16) {
+                ForEach(charts(history, cgroups: cgroups)) { $0 }
+            }
+            caption
+            list(cgroups)
+        }
+        .padding()
+    }
+
+    private var kindPicker: some View {
+        Picker("Show", selection: $kind) {
+            ForEach(Kind.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+    }
+
+    /// Memory is left out where the server doesn't account for it, as on cgroup v1 without its controller.
+    private func charts(_ history: ServerHistory, cgroups: CgroupHistory) -> [MetricsChart] {
+        let timeline = MetricsTimeline(history: history).with(bucketSeconds: cgroups.bucketSeconds)
         let groups = kind == .containers ? cgroups.containers : cgroups.services
         let memory = cgroups.memory(of: groups)
-        return HStack(alignment: .top, spacing: 16) {
-            MetricsChart(title: "CPU", lines: cgroups.cpu(of: groups), format: .share, timeline: timeline)
-            if !memory.isEmpty {
-                MetricsChart(title: "Memory", lines: memory, format: .bytes, timeline: timeline)
-            }
+        var charts = [MetricsChart(title: "CPU", lines: cgroups.cpu(of: groups), format: .share, timeline: timeline)]
+        if !memory.isEmpty {
+            charts.append(MetricsChart(title: "Memory", lines: memory, format: .bytes, timeline: timeline))
         }
+        return charts
+    }
+
+    #if os(iOS)
+    private func compactPage(_ history: ServerHistory, cgroups: CgroupHistory) -> some View {
+        CompactContainersPage(
+            kind: $kind,
+            range: $range,
+            grouping: $grouping,
+            selection: $selection,
+            charts: charts(history, cgroups: cgroups),
+            when: when,
+            note: note,
+            rows: rows.isEmpty || isEachContainerAfterADay ? nil : rows,
+            cgroups: cgroups,
+            processes: processes.map(ProcessRow.rows) ?? []
+        ) {
+            list(cgroups)
+        }
+    }
+    #endif
+
+    private var groupingPicker: some View {
+        Picker("Grouping", selection: $grouping) {
+            ForEach(ContainerGrouping.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
     }
 
     private var caption: some View {
@@ -124,17 +155,12 @@ struct ContainersPage: View {
             }
             Spacer()
             if kind == .containers {
-                Picker("Grouping", selection: $grouping) {
-                    ForEach(ContainerGrouping.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+                groupingPicker
             }
             if moment.chosen != nil {
                 Button("Show Live") { moment.chosen = nil }
             } else {
-                Text("Click a chart to see another moment.")
+                Text(MetricsMoment.hint)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -154,42 +180,24 @@ struct ContainersPage: View {
         }
     }
 
-    /// Scout sends only the busiest, so a group holds only those of its containers among them.
-    private var note: String {
-        switch (figures, kind) {
-        case (.sample(_, let containerCount, _, let containers, _), .containers):
-            let shown = containers.reduce(0) { $0 + $1.containerCount }
-            guard shown < containerCount else { return "\(containerCount) running." }
-            return "\(containerCount) running. Scout sends the busiest \(shown), so a group counts only those of its containers."
-        case (.sample(_, _, let serviceCount, _, let services), .services):
-            let shown = services.count < serviceCount
-                ? "\(serviceCount) running, the busiest \(services.count) shown. "
-                : "\(serviceCount) running. "
-            return shown + "A service's CPU includes work that started and finished between samples, such as cron jobs."
-        case (.hour, _):
-            return "Single samples are kept for a day, and each hour's busiest for 90 days."
-        default:
-            return " "
-        }
+    private var rows: [CgroupRow] {
+        (figures?.rows(of: kind, eachContainer: grouping == .eachContainer) ?? []).sorted(using: sortOrder)
     }
 
-    private var rows: [CgroupRow] {
-        let rows: [CgroupRow] = switch (figures, kind, grouping) {
-        case (.sample(_, _, _, let containers, _), .containers, .eachContainer): CgroupRow.containers(containers)
-        case (.sample(_, _, _, let containers, _), .containers, .byService), (.hour(_, let containers, _), .containers, _):
-            CgroupRow.groups(containers)
-        case (.sample(_, _, _, _, let services), .services, _), (.hour(_, _, let services), .services, _):
-            CgroupRow.services(services)
-        case (.notKept, _, _), (nil, _, _):
-            []
-        }
-        return rows.sorted(using: sortOrder)
+    private var note: String {
+        figures?.note(of: kind) ?? " "
+    }
+
+    /// Hive keeps each container only with its sample, for a day.
+    private var isEachContainerAfterADay: Bool {
+        if case .hour = figures, kind == .containers, grouping == .eachContainer { return true }
+        return false
     }
 
     @ViewBuilder private func list(_ cgroups: CgroupHistory) -> some View {
         switch figures {
         case .sample, .hour:
-            if case .hour = figures, kind == .containers, grouping == .eachContainer {
+            if isEachContainerAfterADay {
                 ContentUnavailableView(
                     "Each Container Kept for a Day",
                     systemImage: "shippingbox",
@@ -272,7 +280,7 @@ struct ContainersPage: View {
 }
 
 /// Whether the containers list shows each group, as the charts do, or each container in it.
-private enum ContainerGrouping: String, CaseIterable, Identifiable {
+enum ContainerGrouping: String, CaseIterable, Identifiable {
     case byService = "By Service"
     case eachContainer = "Each Container"
 

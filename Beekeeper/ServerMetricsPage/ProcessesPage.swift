@@ -19,52 +19,37 @@ struct ProcessesPage: View {
     @State private var processesFailure: String?
     @State private var moment = MetricsMoment()
     @State private var sortOrder = [KeyPathComparator(\ProcessRow.cpuOrder, order: .reverse)]
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var order = MomentProcesses.Order.cpu
+    @State private var shownChart: MetricsChart.ID?
+    #endif
 
     var body: some View {
         HiveConnectionGate(hive: hive, link: link) {
             content
-                .task(id: range) {
-                    while !Task.isCancelled {
-                        await load()
-                        try? await Task.sleep(for: range.refreshInterval)
-                    }
-                }
-                .task(id: moment.chosen) {
-                    // A chosen moment's processes don't change. The newest do, with every sample.
-                    while !Task.isCancelled {
-                        await loadProcesses()
-                        guard moment.chosen == nil else { return }
-                        try? await Task.sleep(for: .seconds(10))
-                    }
-                }
+                .reloading(every: range.refreshInterval, id: range) { await load() }
+                // A chosen moment's processes don't change. The newest do, with every sample.
+                .reloading(every: moment.chosen == nil ? .seconds(10) : nil, id: moment.chosen) { await loadProcesses() }
         }
         .environment(moment)
         .navigationTitle("Processes")
         .locationPath(path.parts("Processes", systemImage: "list.bullet.rectangle"))
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("Range", selection: $range) {
-                    ForEach(MetricsRange.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
-        }
+        .metricsRangeToolbar($range)
         .onChange(of: range) { moment.chosen = nil }
     }
 
     @ViewBuilder private var content: some View {
         if let history {
-            VStack(alignment: .leading, spacing: 12) {
-                let timeline = MetricsTimeline(history: history)
-                HStack(alignment: .top, spacing: 16) {
-                    MetricsChart(title: "CPU", lines: history.cpu, format: .share, timeline: timeline, yDomain: 0 ... 1)
-                    MetricsChart(title: "Processes", lines: history.processCount, format: .count, timeline: timeline)
-                }
-                caption
-                list
+            #if os(iOS)
+            if sizeClass == .compact {
+                compactPage(history)
+            } else {
+                page(history)
             }
-            .padding()
+            #else
+            page(history)
+            #endif
         } else if let failure {
             ContentUnavailableView {
                 Label("Couldn't Read Metrics", systemImage: "exclamationmark.triangle")
@@ -77,6 +62,64 @@ struct ProcessesPage: View {
             ProgressView()
         }
     }
+
+    private func page(_ history: ServerHistory) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 16) {
+                ForEach(charts(history)) { $0 }
+            }
+            caption
+            list
+        }
+        .padding()
+    }
+
+    private func charts(_ history: ServerHistory) -> [MetricsChart] {
+        let timeline = MetricsTimeline(history: history)
+        return [
+            MetricsChart(title: "CPU", lines: history.cpu, format: .share, timeline: timeline, yDomain: 0 ... 1),
+            MetricsChart(title: "Processes", lines: history.processCount, format: .count, timeline: timeline),
+        ]
+    }
+
+    #if os(iOS)
+    /// One chart at a time above the list, with the groups as rows, since a table at iPhone width shows
+    /// only its first column.
+    private func compactPage(_ history: ServerHistory) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            MetricsRangePicker(range: $range)
+                .padding(.horizontal)
+            MetricsChartPager(charts: charts(history), shown: $shownChart)
+                .frame(height: 240)
+            MomentCaption(when: when, isChosen: moment.chosen != nil) { moment.chosen = nil }
+                .padding(.horizontal)
+            Picker("Order", selection: $order) {
+                ForEach(MomentProcesses.Order.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal)
+            switch processes {
+            case .sample, .hour:
+                List(compactRows) { row in
+                    ProcessListRow(row: row, order: order)
+                }
+                .listStyle(.plain)
+            default:
+                list
+            }
+        }
+        .padding(.top)
+    }
+
+    private var compactRows: [ProcessRow] {
+        let rows = processes.map(ProcessRow.rows) ?? []
+        return switch order {
+        case .cpu: rows.sorted { $0.cpuOrder > $1.cpuOrder }
+        case .memory: rows.sorted { $0.memoryBytes > $1.memoryBytes }
+        }
+    }
+    #endif
 
     private var caption: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -94,7 +137,7 @@ struct ProcessesPage: View {
             if moment.chosen != nil {
                 Button("Show Live") { moment.chosen = nil }
             } else {
-                Text("Click a chart to see another moment.")
+                Text(MetricsMoment.hint)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

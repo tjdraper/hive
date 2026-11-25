@@ -30,4 +30,4 @@ What was decided along the way:
 
 Follow-ups:
 
-- **iPhone has no way to the dashboard yet,** since its Hive page is the Overview. B9 adds it as a list.
+- **iPhone has no way to the dashboard yet,** since its Hive page is the Overview. B9 adds it as a list: done, from a Metrics row on the Hive's page.

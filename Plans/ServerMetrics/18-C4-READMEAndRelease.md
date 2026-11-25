@@ -10,5 +10,6 @@ References like §2 point to [00-Info.md](00-Info.md).
 
 - **A Developer ID Installer certificate on Ivy,** which signs the `.pkg`. Only the Application certificate is there (A5).
 - **The first real servers,** which A4's test VMs couldn't stand in for: they're arm64 containers sharing one kernel. Check on real servers that the x86_64 binary installs and runs as a service; that Scout starts again after a real reboot; that systemd applies the unit's lockdown itself, which OrbStack turned off and A4's script turned back on; that OpenRC's CPU and memory caps apply on a real Alpine server, where OrbStack couldn't turn on their controllers; and that samples reach Hive over the tailnet, within §3's budget.
+- **B9's checks on a real iPhone and iPad,** in [TestFlightChecks.md](TestFlightChecks.md), with a TestFlight build from the release commit against the released Hive. They waited for the release, since a TestFlight build ahead of it shows Update Hive for the installed 2026.4.
 
-**Done when:** a release with Scout's binaries is published, and with your go-ahead, the published Beekeeper installs Scout on a real server both ways: from Beekeeper, and by its command; the checks above pass on at least one real server, and an Alpine one if you have it.
+**Done when:** a release with Scout's binaries is published, and with your go-ahead, the published Beekeeper installs Scout on a real server both ways: from Beekeeper, and by its command; the checks above pass on at least one real server, and an Alpine one if you have it; and B9's TestFlight checks pass.

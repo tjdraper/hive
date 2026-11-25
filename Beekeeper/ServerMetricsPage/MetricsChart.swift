@@ -103,7 +103,14 @@ struct MetricsTimeline {
 ///
 /// Only the legend and the overlay read the moment, so moving the pointer redraws those and leaves the
 /// marks alone.
-struct MetricsChart: View {
+struct MetricsChart: View, Identifiable {
+    #if os(macOS)
+    static let columns = [GridItem(.adaptive(minimum: 420), spacing: 16, alignment: .top)]
+    #else
+    /// Narrower than the Mac's, since iPad's detail beside its sidebar can be narrower than 420 points.
+    static let columns = [GridItem(.adaptive(minimum: 340), spacing: 16, alignment: .top)]
+    #endif
+
     let title: String
     let lines: [MetricsChartLine]
     let format: MetricsValueFormat
@@ -112,12 +119,18 @@ struct MetricsChart: View {
     var yDomain: ClosedRange<Double>?
     /// Pages with more of what the chart shows, such as each filesystem's.
     var links: [MetricsChartLink] = []
+    /// Nil takes the height it's given, as one chart at a time does.
+    var height: CGFloat? = 150
+
+    var id: String {
+        title
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             MetricsChartLegend(title: title, lines: lines, format: format, timeline: timeline, links: links)
             chart
-                .frame(height: 150)
+                .frame(height: height)
         }
         .padding(12)
         .background(.fill.quinary, in: .rect(cornerRadius: 10))
@@ -230,15 +243,6 @@ struct MetricsChart: View {
     }
 }
 
-struct MetricsChartLink: Identifiable {
-    let title: String
-    let action: () -> Void
-
-    var id: String {
-        title
-    }
-}
-
 /// A chart's title, and each line's figure at the moment shown, or its newest.
 private struct MetricsChartLegend: View {
     let title: String
@@ -341,6 +345,25 @@ private struct MomentOverlay: View {
                             moment.chosen = date(at: tap.location, in: plot)
                         }
                     )
+                    #if os(iOS)
+                    // Touch has no pointer to follow, so a finger held on the chart moves the moment
+                    // instead, and lifting it chooses the moment there. A plain drag still scrolls.
+                    .simultaneousGesture(
+                        LongPressGesture(minimumDuration: 0.25)
+                            .sequenced(before: DragGesture(minimumDistance: 0))
+                            .onChanged { value in
+                                if case .second(true, let drag?) = value {
+                                    moment.hovered = date(at: drag.location, in: plot)
+                                }
+                            }
+                            .onEnded { value in
+                                if case .second(true, let drag?) = value {
+                                    moment.chosen = date(at: drag.location, in: plot)
+                                }
+                                moment.hovered = nil
+                            }
+                    )
+                    #endif
                 if let chosen = moment.chosen {
                     rule(at: chosen, in: plot)
                         .stroke(Color.accentColor, lineWidth: 1.5)
