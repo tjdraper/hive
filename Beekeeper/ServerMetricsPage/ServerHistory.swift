@@ -1,0 +1,226 @@
+import HiveKit
+import SwiftUI
+
+/// A server's figures over a range, as the lines of its charts.
+struct ServerHistory {
+    static let figures: [MetricsFigure] = [
+        .cores, .cpuUser, .cpuSystem, .cpuIOWait, .cpuSteal, .loadOneMinute,
+        .memoryTotal, .memoryAvailable, .memoryCache, .swapTotal, .swapUsed, .swapInPages, .swapOutPages,
+        .pressureCPUSome, .pressureMemorySome, .pressureIOSome,
+        .filesystemUsed, .filesystemAvailable,
+        .diskReadBytes, .diskWrittenBytes,
+        .networkReceivedBytes, .networkSentBytes,
+    ]
+
+    /// For lines that stand for names, such as each filesystem, which have no color of their own.
+    private static let palette: [Color] = [
+        Color(.metricsCPU), Color(.metricsMemory), .orange, .purple, .teal, .pink, .brown, .indigo,
+    ]
+
+    /// Seconds since 1970 on the server's clock.
+    let range: Range<Int64>
+    let bucketSeconds: Int64
+    let backupRuns: [BackupRunMark]
+    let filesystems: [SubjectFigures]
+    let disks: [SubjectFigures]
+    let interfaces: [SubjectFigures]
+    private let server: SubjectFigures?
+
+    init(series: MetricsSeries, range: Range<Int64>, backupRuns: [BackupRunMark]) {
+        self.range = range
+        self.backupRuns = backupRuns
+        bucketSeconds = series.bucketSeconds
+        let subjects = series.subjects.map { SubjectFigures($0, bucketSeconds: series.bucketSeconds) }
+        server = subjects.first { $0.kind == .server }
+        filesystems = subjects.filter { $0.kind == .filesystem }
+        disks = subjects.filter { $0.kind == .disk }
+        interfaces = subjects.filter { $0.kind == .networkInterface }
+    }
+
+    /// Each part stacked, so the top is all the time the CPU was busy. Hive keeps each part's highest
+    /// apart, so their sum can overstate a bucket's busiest moment when the parts peaked at different
+    /// times. A 10-second bucket is one sample, with no highest of its own.
+    var cpu: [MetricsChartLine] {
+        guard let server else { return [] }
+        let parts: [(name: String, figure: MetricsFigure)] = [
+            ("User", .cpuUser), ("System", .cpuSystem), ("I/O wait", .cpuIOWait), ("Steal", .cpuSteal),
+        ]
+        let colors = [Color(.metricsCPU), .orange, .purple, .red]
+        var lines = MetricsChartLine.stacked(zip(parts, colors).map { server.line($0.name, color: $1, figure: $0.figure) })
+        if bucketSeconds > 10 {
+            lines.append(server.line("Highest", color: .secondary, style: .outline) { index in
+                let highs = parts.map { server.highest($0.figure, index) ?? server.average($0.figure, index) }
+                guard highs.allSatisfy({ $0 != nil }) else { return nil }
+                return SubjectFigures.Reading(average: min(1, highs.compactMap(\.self).reduce(0, +)))
+            })
+        }
+        return lines
+    }
+
+    var load: [MetricsChartLine] {
+        guard let server else { return [] }
+        return [
+            server.line("Load", color: Color(.metricsCPU), figure: .loadOneMinute),
+            server.line("Cores", color: .secondary, style: .outline) { index in
+                server.average(.cores, index).map { SubjectFigures.Reading(average: $0) }
+            },
+        ]
+    }
+
+    /// In use is the total less what's available, so its highest comes from available's lowest.
+    var memory: [MetricsChartLine] {
+        guard let server else { return [] }
+        let inUse = server.line("In use", color: Color(.metricsMemory)) { index in
+            guard let total = server.average(.memoryTotal, index),
+                  let available = server.average(.memoryAvailable, index)
+            else { return nil }
+            return SubjectFigures.Reading(
+                average: total - available,
+                highest: server.lowest(.memoryAvailable, index).map { total - $0 },
+                lowest: server.highest(.memoryAvailable, index).map { total - $0 }
+            )
+        }
+        return [inUse, server.line("Cache", color: .teal, figure: .memoryCache)]
+    }
+
+    var cores: Double? {
+        server?.largest(.cores)
+    }
+
+    var memoryTotal: Double? {
+        server?.largest(.memoryTotal)
+    }
+
+    /// Nil when the server had no swap in the range.
+    var swapTotal: Double? {
+        server?.largest(.swapTotal).flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    var swap: [MetricsChartLine] {
+        guard let server else { return [] }
+        return [server.line("In use", color: .orange, figure: .swapUsed)]
+    }
+
+    /// Swapping in steadily means the server is short of memory; swap merely in use is often harmless.
+    var swapping: [MetricsChartLine] {
+        guard let server else { return [] }
+        return [
+            server.line("In", color: .pink, figure: .swapInPages),
+            server.line("Out", color: .teal, figure: .swapOutPages),
+        ]
+    }
+
+    /// Empty where the server's kernel doesn't report pressure.
+    var pressure: [MetricsChartLine] {
+        guard let server else { return [] }
+        return [
+            server.line("CPU", color: Color(.metricsCPU), figure: .pressureCPUSome),
+            server.line("Memory", color: Color(.metricsMemory), figure: .pressureMemorySome),
+            server.line("I/O", color: .purple, figure: .pressureIOSome),
+        ]
+        .filter { !$0.points.isEmpty }
+    }
+
+    /// Each filesystem's share used, of what's usable without root's reserve, as `df` shows it.
+    var diskSpace: [MetricsChartLine] {
+        filesystems.enumerated().map { offset, filesystem in
+            filesystem.line(filesystem.name ?? "", color: Self.palette[offset % Self.palette.count]) { index in
+                guard let used = filesystem.average(.filesystemUsed, index),
+                      let available = filesystem.average(.filesystemAvailable, index),
+                      used + available > 0
+                else { return nil }
+                let usable = used + available
+                return SubjectFigures.Reading(
+                    average: used / usable,
+                    highest: filesystem.lowest(.filesystemAvailable, index).map { (usable - $0) / usable },
+                    lowest: filesystem.highest(.filesystemAvailable, index).map { (usable - $0) / usable }
+                )
+            }
+        }
+    }
+
+    func activity(of disk: SubjectFigures) -> [MetricsChartLine] {
+        [
+            disk.line("Read", color: .teal, figure: .diskReadBytes),
+            disk.line("Written", color: .orange, figure: .diskWrittenBytes),
+        ]
+    }
+
+    func traffic(of interface: SubjectFigures) -> [MetricsChartLine] {
+        [
+            interface.line("Received", color: .teal, figure: .networkReceivedBytes),
+            interface.line("Sent", color: .orange, figure: .networkSentBytes),
+        ]
+    }
+}
+
+/// A subject's figures by bucket: the server's own, or one filesystem's, disk's or interface's.
+struct SubjectFigures: Identifiable {
+    struct Reading {
+        let average: Double
+        var highest: Double?
+        var lowest: Double?
+    }
+
+    let kind: MetricsSubjectKind
+    let name: String?
+    private let bucketSeconds: Int64
+    private let bucketStarts: [Int64]
+    private let figures: [MetricsFigure: MetricsFigureSeries]
+
+    var id: String {
+        "\(kind.rawValue) \(name ?? "")"
+    }
+
+    init(_ subject: MetricsSeriesSubject, bucketSeconds: Int64) {
+        kind = subject.kind
+        name = subject.name
+        self.bucketSeconds = bucketSeconds
+        bucketStarts = subject.bucketStarts
+        figures = Dictionary(subject.figures.map { ($0.figure, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    func average(_ figure: MetricsFigure, _ index: Int) -> Double? {
+        figures[figure]?.average[index]
+    }
+
+    func highest(_ figure: MetricsFigure, _ index: Int) -> Double? {
+        figures[figure]?.highest?[index]
+    }
+
+    func lowest(_ figure: MetricsFigure, _ index: Int) -> Double? {
+        figures[figure]?.lowest?[index]
+    }
+
+    func largest(_ figure: MetricsFigure) -> Double? {
+        figures[figure]?.average.compactMap(\.self).max()
+    }
+
+    func line(_ name: String, color: Color, figure: MetricsFigure) -> MetricsChartLine {
+        line(name, color: color) { index in
+            average(figure, index).map { Reading(average: $0, highest: highest(figure, index), lowest: lowest(figure, index)) }
+        }
+    }
+
+    /// Each bucket's reading, with a new run after each gap or bucket without one.
+    func line(
+        _ name: String,
+        color: Color,
+        style: MetricsChartLine.Style = .line,
+        reading: (Int) -> Reading?
+    ) -> MetricsChartLine {
+        var points: [MetricsChartPoint] = []
+        var run = 0
+        var previous: Int64?
+        for (index, start) in bucketStarts.enumerated() {
+            guard let value = reading(index) else {
+                previous = nil
+                continue
+            }
+            if !points.isEmpty, previous.map({ start - $0 > bucketSeconds }) ?? true { run += 1 }
+            points.append(MetricsChartPoint(start: start, run: run, average: value.average, highest: value.highest, lowest: value.lowest))
+            previous = start
+        }
+        return MetricsChartLine(name: name, color: color, style: style, points: points)
+    }
+}

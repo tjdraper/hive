@@ -29,18 +29,20 @@ enum SidebarItem: Hashable {
     /// The Hive's servers' metrics together.
     case dashboard(hiveID: UUID)
     case server(hiveID: UUID, serverID: UUID)
+    /// A server's metrics page, reached from the dashboard and from the server's page.
+    case serverMetrics(hiveID: UUID, serverID: UUID)
     case job(hiveID: UUID, serverID: UUID, jobID: UUID)
 
     var hiveID: UUID {
         switch self {
-        case .hive(let id), .dashboard(let id), .server(let id, _), .job(let id, _, _): id
+        case .hive(let id), .dashboard(let id), .server(let id, _), .serverMetrics(let id, _), .job(let id, _, _): id
         }
     }
 
     var serverID: UUID? {
         switch self {
         case .hive, .dashboard: nil
-        case .server(_, let id), .job(_, let id, _): id
+        case .server(_, let id), .serverMetrics(_, let id), .job(_, let id, _): id
         }
     }
 }
@@ -170,16 +172,8 @@ struct MainWindow: View {
                 }
                 // Otherwise another Hive's page keeps this one's state, and its loads stay on this Hive.
                 .id(hive.id)
-            case .dashboard:
-                MetricsDashboard(
-                    hive: hive,
-                    link: link,
-                    servers: servers,
-                    live: store.liveMetrics(for: hive.id),
-                    onShowHive: { self.selection = .hive(hive.id) },
-                    onSelectServer: { self.selection = .server(hiveID: hive.id, serverID: $0) }
-                )
-                .id(hive.id)
+            case .dashboard, .serverMetrics:
+                metricsDetail(for: item, hive: hive, link: link, servers: servers)
             case .server(_, let serverID):
                 ServerDetail(
                     hive: hive,
@@ -188,7 +182,8 @@ struct MainWindow: View {
                     serverID: serverID,
                     onShowHive: { self.selection = .hive(hive.id) },
                     onAddJob: { addJob(to: serverID, on: hive.id) },
-                    onSelectJob: { self.selection = .job(hiveID: hive.id, serverID: serverID, jobID: $0) }
+                    onSelectJob: { self.selection = .job(hiveID: hive.id, serverID: serverID, jobID: $0) },
+                    onShowMetrics: { self.selection = .serverMetrics(hiveID: hive.id, serverID: serverID) }
                 )
                 .id(serverID)
             case .job(_, let serverID, let jobID):
@@ -208,6 +203,31 @@ struct MainWindow: View {
             }
         } else {
             ContentUnavailableView("Choose a Hive", systemImage: "hexagon")
+        }
+    }
+
+    @ViewBuilder
+    private func metricsDetail(for item: SidebarItem, hive: KnownHive, link: HiveLink, servers: ServerList) -> some View {
+        if case .serverMetrics(_, let serverID) = item {
+            ServerMetricsPage(
+                hive: hive,
+                link: link,
+                servers: servers,
+                serverID: serverID,
+                onShowHive: { self.selection = .hive(hive.id) },
+                onShowDashboard: { self.selection = .dashboard(hiveID: hive.id) }
+            )
+            .id(serverID)
+        } else {
+            MetricsDashboard(
+                hive: hive,
+                link: link,
+                servers: servers,
+                live: store.liveMetrics(for: hive.id),
+                onShowHive: { self.selection = .hive(hive.id) },
+                onSelectServer: { self.selection = .serverMetrics(hiveID: hive.id, serverID: $0) }
+            )
+            .id(hive.id)
         }
     }
 

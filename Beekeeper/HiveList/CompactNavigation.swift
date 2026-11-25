@@ -33,7 +33,7 @@ private extension SidebarItem {
             [.hive(hiveID), self]
         case .server(let hiveID, _):
             [.hive(hiveID), self]
-        case .job(let hiveID, let serverID, _):
+        case .serverMetrics(let hiveID, let serverID), .job(let hiveID, let serverID, _):
             [.hive(hiveID), .server(hiveID: hiveID, serverID: serverID), self]
         }
     }

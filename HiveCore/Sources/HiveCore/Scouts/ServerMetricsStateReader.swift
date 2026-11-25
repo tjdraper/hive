@@ -29,6 +29,10 @@ struct ServerMetricsStateReader: Sendable {
             platform: scout.platform,
             distribution: reported?.distribution,
             kernel: reported?.kernel,
+            startedAt: reported.flatMap { record in
+                guard let takenAt = record.lastSampleAt, let uptime = record.uptimeSeconds else { return nil }
+                return takenAt - Int64(uptime.rounded())
+            },
             clockOffsetSeconds: reported?.clockOffsetSeconds.map(Int.init),
             processesHidden: reported?.processesHidden,
             lastRefusal: reported?.lastRefusal,

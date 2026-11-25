@@ -122,6 +122,22 @@ struct MetricsSeriesTests {
         #expect(memory.lowest?.suffix(6).allSatisfy { $0 == 1_000_000_000 } == true)
     }
 
+    @Test("A range starting partway through an hour reads its samples, not the whole hour's figures")
+    func rangeStartingMidHour() throws {
+        // Arrange: a quiet first half hour, then a busy one, a report a minute's samples as Scout sends.
+        for minute in 0 ..< 60 {
+            try keep((0 ..< 6).map { sample(at: start + Int64(minute * 60 + $0 * 10), cpu: minute < 30 ? 0.1 : 0.5) })
+        }
+
+        // Act
+        let series = try series(start + 1_800 ..< start + 3_600, now: start + 3_600, [.cpuUser])
+
+        // Assert
+        let server = try #require(series.subjects.only)
+        #expect(server.bucketStarts == Array(stride(from: start + 1_800, to: start + 3_600, by: 10)))
+        #expect(try #require(server.figures.only).average.allSatisfy { $0 == 0.5 })
+    }
+
     @Test("A range crossing from pruned periods to recent ones reads each from the resolution still kept")
     func crossesResolutions() throws {
         // Arrange

@@ -7,6 +7,7 @@ import SwiftUI
 struct ServerMetricsSection: View {
     let link: HiveLink
     let server: Server
+    let onShowMetrics: () -> Void
 
     /// Often enough that the last report stays close to the truth.
     private static let refreshInterval = Duration.seconds(15)
@@ -107,6 +108,7 @@ struct ServerMetricsSection: View {
     }
 
     @ViewBuilder private func reporting(_ scout: ScoutState) -> some View {
+        Button("Show Metrics", systemImage: "chart.xyaxis.line", action: onShowMetrics)
         LabeledContent("Last report") {
             if let lastReport = scout.lastReportAt {
                 Text(lastReport, format: .relative(presentation: .named))

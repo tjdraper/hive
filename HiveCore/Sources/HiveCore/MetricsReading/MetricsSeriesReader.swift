@@ -82,12 +82,17 @@ private struct SubjectReading {
 
     func subjects(over range: Range<Int64>, in database: Database) throws -> [MetricsSeriesSubject] {
         let firstBucket = Self.floor(range.lowerBound, to: bucketSeconds)
+        // Every resolution is read from where the coarsest one's first row starts. A coarser row holds
+        // samples from before the range, so finer ones read only from the range's start would hold
+        // fewer and give way to it, spreading its figures over the stretch they cover.
+        let coarsest = max(bucketSeconds, MetricsResolution.allCases.map(\.seconds).max() ?? 0)
+        let readStart = Self.floor(firstBucket, to: coarsest)
         // By subject, then by start.
         var pieces: [Int64: [Int64: Piece]] = [:]
         // Finest first, so a coarser row replaces what's there only when it holds more samples.
         for source in MetricsResolution.allCases {
             let seconds = max(bucketSeconds, source.seconds)
-            let read = Self.floor(firstBucket, to: seconds) ..< range.upperBound
+            let read = readStart ..< range.upperBound
             for piece in try self.read(source, inPiecesOf: seconds, over: read, in: database) {
                 let (key, start) = (piece.subjectKey, piece.start)
                 let inside = pieces[key, default: [:]].filter { $0.key >= start && $0.key < start + seconds }

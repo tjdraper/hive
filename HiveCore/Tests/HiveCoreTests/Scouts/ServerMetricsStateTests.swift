@@ -53,6 +53,7 @@ struct ServerMetricsStateTests {
         #expect(reported.platform == "linux-x86_64")
         #expect(reported.distribution == "Debian GNU/Linux 12 (bookworm)")
         #expect(reported.kernel == "6.1.0")
+        #expect(reported.startedAt == now - 1_000)
         #expect(reported.clockOffsetSeconds == -90)
         #expect(reported.processesHidden == false)
         #expect(reported.update == nil)

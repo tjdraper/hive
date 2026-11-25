@@ -29,6 +29,8 @@ public struct ScoutState: Codable, Hashable, Sendable {
     /// Such as "Debian GNU/Linux 12 (bookworm)".
     public let distribution: String?
     public let kernel: String?
+    /// When the server last started, in seconds since 1970 on its clock, as of its newest sample.
+    public let startedAt: Int64?
     /// The server's clock less Hive's, in seconds.
     public let clockOffsetSeconds: Int?
     /// `/proc` hides other users' processes from Scout.
@@ -46,6 +48,7 @@ public struct ScoutState: Codable, Hashable, Sendable {
         platform: String?,
         distribution: String?,
         kernel: String?,
+        startedAt: Int64?,
         clockOffsetSeconds: Int?,
         processesHidden: Bool?,
         lastRefusal: String?,
@@ -58,6 +61,7 @@ public struct ScoutState: Codable, Hashable, Sendable {
         self.platform = platform
         self.distribution = distribution
         self.kernel = kernel
+        self.startedAt = startedAt
         self.clockOffsetSeconds = clockOffsetSeconds
         self.processesHidden = processesHidden
         self.lastRefusal = lastRefusal

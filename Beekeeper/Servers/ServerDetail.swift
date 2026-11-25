@@ -14,6 +14,7 @@ struct ServerDetail: View {
     /// Asks for SSH details instead when the server has none.
     let onAddJob: () -> Void
     let onSelectJob: (UUID) -> Void
+    let onShowMetrics: () -> Void
 
     @State private var editRequest: ServerEditRequest?
 
@@ -50,7 +51,7 @@ struct ServerDetail: View {
                     Button("Add SSH Details…", systemImage: "plus", action: onAddJob)
                 }
             }
-            ServerMetricsSection(link: link, server: server)
+            ServerMetricsSection(link: link, server: server, onShowMetrics: onShowMetrics)
         }
         .formStyle(.grouped)
         .hostsFormSheets()
