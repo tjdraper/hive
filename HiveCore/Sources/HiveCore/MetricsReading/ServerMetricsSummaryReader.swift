@@ -80,6 +80,7 @@ struct ServerMetricsSummaryReader: Sendable {
            let swapTotal: UInt64 = row["swapTotal"], let swapUsed: UInt64 = row["swapUsed"] {
             memory = MemoryUse(totalBytes: total, availableBytes: available, swapTotalBytes: swapTotal, swapUsedBytes: swapUsed)
         }
+        let cgroups = try CgroupMomentReader.sample(at: takenAt, serverKey: serverKey, in: database)
         return ServerMetricsLatest(
             serverID: record.serverID,
             takenAt: takenAt,
@@ -87,7 +88,9 @@ struct ServerMetricsSummaryReader: Sendable {
             cpu: cpu,
             load: load,
             memory: memory,
-            fullestFilesystem: filesystems.max { $0.usedShare < $1.usedShare }
+            fullestFilesystem: filesystems.max { $0.usedShare < $1.usedShare },
+            containers: cgroups.containers,
+            services: cgroups.services
         )
     }
 

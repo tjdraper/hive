@@ -12,6 +12,8 @@ enum FigureLimit: CaseIterable, Sendable {
     case disks
     case interfaces
     case processGroups
+    case containers
+    case services
 
     var limit: Int {
         switch self {
@@ -19,6 +21,7 @@ enum FigureLimit: CaseIterable, Sendable {
         case .disks: MetricsReportCheck.largestDiskCount
         case .interfaces: MetricsReportCheck.largestInterfaceCount
         case .processGroups: MetricsReportCheck.largestProcessGroupCount
+        case .containers, .services: MetricsReportCheck.largestCgroupCount
         }
     }
 
@@ -35,6 +38,10 @@ enum FigureLimit: CaseIterable, Sendable {
             sample.processes?.groups = (0 ..< count).map {
                 ProcessGroup(command: "c\($0)", user: "u", count: 1, cpuCores: 0, ownMemoryBytes: 0)
             }
+        case .containers:
+            sample.containers = TestMetrics.cgroups((0 ..< count).map { TestMetrics.containerID($0) })
+        case .services:
+            sample.services = TestMetrics.cgroups((0 ..< count).map { "s\($0).service" })
         }
         return sample
     }
@@ -272,6 +279,37 @@ struct MetricsReportTests {
         #expect(dayLater.status == .noContent)
         #expect(try !storedTimes().contains(refusedAt))
         #expect(try fixture.metricsDatabase.count("metricsName") == MetricsReportCheck.largestNewNameCountPerDay + 1)
+    }
+
+    @Test("A container ID that isn't 64 lowercase hex digits is refused, in the containers and in the process groups")
+    func containerIDs() async throws {
+        // Arrange
+        let token = try await fixture.scoutToken(scout)
+        let good = TestMetrics.containerID(0xABC_DEF)
+        var short = TestMetrics.sample(at: now - 30)
+        short.containers = TestMetrics.cgroups([String(good.dropLast())])
+        var capitals = TestMetrics.sample(at: now - 20)
+        capitals.containers = TestMetrics.cgroups([good.uppercased()])
+        var inProcesses = TestMetrics.sample(at: now - 10)
+        inProcesses.processes?.groups = [
+            ProcessGroup(command: "sh", user: "0", containerID: "../\(good)", count: 1, cpuCores: 0, ownMemoryBytes: 0),
+        ]
+        var accepted = TestMetrics.sample(at: now)
+        accepted.containers = TestMetrics.cgroups([good])
+
+        // Act
+        var answers: [APIAnswer] = []
+        for sample in [short, capitals, inProcesses] {
+            answers.append(try await send(TestMetrics.report([sample]), token: token))
+        }
+        let acceptedAnswer = try await send(TestMetrics.report([accepted]), token: token)
+
+        // Assert
+        for answer in answers {
+            #expect(try refusal(answer) == .valueOutOfRange)
+        }
+        #expect(acceptedAnswer.status == .noContent)
+        #expect(try storedTimes() == [now])
     }
 
     @Test("A figure out of its range, or a name with a control character, is refused, and one at the end of its range accepted")

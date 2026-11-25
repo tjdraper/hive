@@ -110,6 +110,27 @@ enum TestMetrics {
 }
 
 extension TestMetrics {
+    /// A container's full ID, different for each number.
+    static func containerID(_ number: Int) -> String {
+        let hex = String(number, radix: 16)
+        return String(repeating: "0", count: 64 - hex.count) + hex
+    }
+
+    /// Containers or services by name, each using a little CPU and memory.
+    static func cgroups(_ names: [String], cpuCores: Double = 0.01, memoryBytes: UInt64 = 1_000_000) -> CgroupFigures {
+        CgroupFigures(count: names.count, top: names.map {
+            CgroupUse(
+                name: $0,
+                cpuCores: cpuCores,
+                memoryBytes: memoryBytes,
+                readBytesPerSecond: 0,
+                writtenBytesPerSecond: 0,
+                processes: 1,
+                commands: []
+            )
+        })
+    }
+
     static func isClose(_ value: Double, _ expected: Double) -> Bool {
         abs(value - expected) < 1e-9
     }

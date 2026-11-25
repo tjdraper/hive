@@ -131,6 +131,8 @@ struct ScoutSessionTests {
             (HiveEndpoint.metricsSummary, .get),
             (HiveEndpoint.metricsSeries(ofServer: server.id, from: 0, to: 3_600, figures: [.cpuUser]), .get),
             (HiveEndpoint.processes(ofServer: server.id, at: 0), .get),
+            (HiveEndpoint.containers(ofServer: server.id, at: 0), .get),
+            (HiveEndpoint.containerSeries(ofServer: server.id, from: 0, to: 3_600), .get),
             (HiveEndpoint.filesystemForecasts(ofServer: server.id), .get),
             (HiveEndpoint.backupRunMarks(ofServer: server.id, from: 0, to: 3_600), .get),
         ]

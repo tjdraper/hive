@@ -7,6 +7,8 @@ import Hummingbird
 enum MetricsReadingRoutes {
     static let seriesPath = RouterPath("\(HiveEndpoint.servers)/:id/metrics/series")
     static let processesPath = RouterPath("\(HiveEndpoint.servers)/:id/metrics/processes")
+    static let containersPath = RouterPath("\(HiveEndpoint.servers)/:id/metrics/containers")
+    static let containerSeriesPath = RouterPath("\(HiveEndpoint.servers)/:id/metrics/containers/series")
     static let forecastsPath = RouterPath("\(HiveEndpoint.servers)/:id/metrics/filesystem-forecasts")
     static let backupRunsPath = RouterPath("\(HiveEndpoint.servers)/:id/metrics/backup-runs")
 
@@ -43,6 +45,24 @@ enum MetricsReadingRoutes {
             guard let id = try serverID(context, scouts: scouts) else { return JSONResponse(status: .notFound) }
             guard let range = range(request.uri.queryParameters) else { return JSONResponse(status: .badRequest) }
             return try JSONResponse(backupRuns.marks(ofServer: id, over: range))
+        }
+
+        addContainerRoutes(to: router, api: api)
+    }
+
+    private static func addContainerRoutes(to router: Router<HiveRequestContext>, api: HiveAPI) {
+        let (scouts, cgroupMoments, cgroupSeries) = (api.scouts, api.cgroupMoments, api.cgroupSeries)
+
+        router.get(containersPath) { request, context in
+            guard let id = try serverID(context, scouts: scouts) else { return JSONResponse(status: .notFound) }
+            guard let moment = request.uri.queryParameters.get("at", as: Int64.self) else { return JSONResponse(status: .badRequest) }
+            return try JSONResponse(cgroupMoments.cgroups(ofServer: id, at: moment))
+        }
+
+        router.get(containerSeriesPath) { request, context in
+            guard let id = try serverID(context, scouts: scouts) else { return JSONResponse(status: .notFound) }
+            guard let range = range(request.uri.queryParameters) else { return JSONResponse(status: .badRequest) }
+            return try JSONResponse(cgroupSeries.series(ofServer: id, over: range))
         }
     }
 

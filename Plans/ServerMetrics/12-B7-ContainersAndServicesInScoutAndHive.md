@@ -35,3 +35,42 @@ Which site is using the server, when every site runs the same `nginx` and `php-f
 - A server where `docker ps` fails shows IDs and commands, and isn't asked again every minute
 
 **Done when:** in the test VM with Docker in Swarm mode, the Developer window shows each Swarm service's CPU and memory by name, and a load made inside one service shows on it; a cron job's CPU shows under its systemd service; a server without `docker` access shows IDs and commands; and the tests pass.
+
+## Session 1
+
+Done: the whole slice, and the "done when".
+
+Checked on Ivy with the development Hive (2026-11-25), through the Developer window:
+
+- **Swarm services by name:** on the Debian VM's Scout (B3 Debian root), Hive named all 9 containers, and the groups read `scout-test_web`, `scout-test_cache` and the rest. A busy loop run inside `scout-test_cache`'s container showed as about 100% CPU on that group.
+- **A cron job:** `/etc/cron.d/scout-test-cron` runs a 5-second busy loop each minute, and `cron.service` showed about 50% CPU, though no process list ever caught it.
+- **Without `docker` access:** on the Alpine VM (Test: A4 Alpine), Hive's user can't run `docker`, so `docker ps` failed once and wasn't asked again. Its two containers showed as `unnamed` by short ID, running `redis-server` and `nginx`.
+- **The tests pass,** and `Scripts/build-and-test.sh` is clean.
+
+What was decided along the way:
+
+- **Scout** (`ScoutCore/Cgroups/`): `CgroupLayout` finds cgroup v2, or v1's `systemd` or `cpuacct` hierarchy, and lists `system.slice`'s services and the slices in it, Docker's containers under both drivers, and Podman's `libpod-` scopes in `machine.slice`. `CgroupReader` keeps up to 100 cgroups' files open between samples, and counts all of a new or recreated cgroup's work, so a container started between samples isn't lost. Memory is the cgroup's less its `inactive_file`, as `docker stats` gives it.
+- **Each process group's place** comes from the cgroup whose `cgroup.procs` lists it, so groups are by command, user and container or service. A container's users show by number, since the host's names for them are another system's.
+- **Protocol version 2,** Scout 0.3.0: samples carry `containers` and `services`, each the top 10 by CPU and by memory with a count of all, and process groups carry `containerID` or `service`. Hive refuses more than 20 of each, more than 5 commands each, and a container ID that isn't 64 lowercase hex digits.
+- **Naming** (`ContainerNaming/`): `ContainerListing` is a constant `docker ps` command, so nothing Scout sends goes into it. `ContainerNamingWorkflow` runs on its own task after a report is kept, at most once a minute per server, and only when a sample carries an ID Hive hasn't seen. IDs `docker ps` doesn't list are kept without a name so they aren't asked about again. After a failure it asks again only a day later, or once the server's SSH details change. Names are pruned 2 days after they were last seen.
+- **Storage:** the raw figures go with each 10-second sample, compressed, for a day, keyed by container ID so a name learned later still applies. Each hour keeps its grouped busiest, with average and highest, for 90 days.
+- **Grouping** (`CgroupGrouping`): by Swarm service, then Compose project and service, then container name, then `unnamed` with the short ID and its commands.
+- **Hive's API is version 5** (oldest compatible 4): a moment's groups and services, their series over a range, and the newest in live updates. B8's file lists what it needs from them.
+
+Measured on the Debian VM with 50 containers and about 365 processes, over 5 minutes each:
+
+| Scout build | CPU of one core | Resident memory |
+| --- | --- | --- |
+| Parsing cgroup files as strings | 0.160–0.170% | |
+| Parsing them as bytes (kept) | 0.143% | 21.5 MB, 26.3 MB at its highest |
+
+§3's budget is 0.15%, and A1 measured 0.100% with 9 containers. Most of what's left is the kernel's: reading every cgroup's files every 10 seconds costs it about 0.03% of a core on its own. Storage came to 1.45 KB a sample, so about 15 MB for a day of samples, and a scratch run of 90 days of hours to about 9 MB. §6 is corrected.
+
+That check found a bug, now fixed: `.map(Double.init)` on an optional `UInt64` picked `Double(bitPattern:)`, so groups' memory read as nearly zero. `ContainerNamingTests` now checks a group's memory.
+
+Scout's tests read two new captures, `debian-12-swarm` (systemd's driver, 9 containers) and `alpine-3.22-docker` (cgroupfs's driver, only the `cpu` controller, so no memory or I/O).
+
+Follow-ups:
+
+- **Groups count only the containers in Scout's top lists,** so a Swarm service with many idle replicas can read as fewer. B8 has the note.
+- **0.143% leaves little room** under the budget. A server with many more processes or containers could pass it; reading fewer cgroup files for idle containers would be the place to save.

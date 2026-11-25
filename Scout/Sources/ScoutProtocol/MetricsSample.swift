@@ -15,6 +15,9 @@ public struct MetricsSample: Codable, Hashable, Sendable {
     public var networkInterfaces: [NetworkInterfaceFigures]
     /// Missing where `/proc` hides other users' processes, which ``ServerFacts/processesHidden`` reports.
     public var processes: ProcessFigures?
+    /// Missing where Scout can't read cgroups, and from a Scout older than protocol version 2.
+    public var containers: CgroupFigures?
+    public var services: CgroupFigures?
 
     public init(
         takenAt: Int64,
@@ -25,7 +28,9 @@ public struct MetricsSample: Codable, Hashable, Sendable {
         filesystems: [FilesystemFigures],
         disks: [DiskFigures],
         networkInterfaces: [NetworkInterfaceFigures],
-        processes: ProcessFigures?
+        processes: ProcessFigures?,
+        containers: CgroupFigures? = nil,
+        services: CgroupFigures? = nil
     ) {
         self.takenAt = takenAt
         self.server = server
@@ -36,5 +41,7 @@ public struct MetricsSample: Codable, Hashable, Sendable {
         self.disks = disks
         self.networkInterfaces = networkInterfaces
         self.processes = processes
+        self.containers = containers
+        self.services = services
     }
 }

@@ -24,7 +24,8 @@ struct ProcessMomentReader: Sendable {
             ORDER BY ABS(startsAt - ?), startsAt LIMIT 1
             """, arguments: [serverKey, moment - Self.nearestSampleSeconds, moment + Self.nearestSampleSeconds, moment]) {
                 let groups = try ProcessGroupStorage.decode([ProcessGroup].self, from: row["groups"])
-                return .sample(takenAt: row["startsAt"], groups: groups.map(ProcessGroupFigures.init))
+                let names = try ContainerName.kept(forServer: serverKey, in: database)
+                return .sample(takenAt: row["startsAt"], groups: groups.map { ProcessGroupFigures($0, names: names) })
             }
 
             let hour = MetricsResolution.hour.periodStart(of: moment)
@@ -34,18 +35,31 @@ struct ProcessMomentReader: Sendable {
                 arguments: [serverKey, hour]
             ) {
                 let groups = try ProcessGroupStorage.decode([HourlyProcessGroup].self, from: blob)
-                return .hour(startsAt: hour, groups: groups.map(HourlyProcessGroupFigures.init))
+                let names = try ContainerName.kept(forServer: serverKey, in: database)
+                return .hour(startsAt: hour, groups: groups.map { HourlyProcessGroupFigures($0, names: names) })
             }
             return .notKept
         }
     }
 }
 
+private extension ProcessGroupPlace {
+    init?(containerID: String?, service: String?, names: [String: ContainerName]) {
+        guard containerID != nil || service != nil else { return nil }
+        self.init(
+            containerID: containerID,
+            containerGroup: containerID.map { CgroupGroupKey.container($0, named: names[$0]).name },
+            service: service
+        )
+    }
+}
+
 private extension ProcessGroupFigures {
-    init(_ group: ProcessGroup) {
+    init(_ group: ProcessGroup, names: [String: ContainerName]) {
         self.init(
             command: group.command,
             user: group.user,
+            place: ProcessGroupPlace(containerID: group.containerID, service: group.service, names: names),
             count: group.count,
             cpuCores: group.cpuCores,
             ownMemoryBytes: group.ownMemoryBytes
@@ -54,10 +68,11 @@ private extension ProcessGroupFigures {
 }
 
 private extension HourlyProcessGroupFigures {
-    init(_ group: HourlyProcessGroup) {
+    init(_ group: HourlyProcessGroup, names: [String: ContainerName]) {
         self.init(
             command: group.command,
             user: group.user,
+            place: ProcessGroupPlace(containerID: group.containerID, service: group.service, names: names),
             highestCount: group.highestCount,
             averageCPUCores: group.averageCPUCores,
             highestCPUCores: group.highestCPUCores,

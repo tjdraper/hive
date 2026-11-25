@@ -13,6 +13,7 @@ public struct Sampler {
     private var disks: DiskReader
     private var network: NetworkReader
     private var processes: ProcessReader
+    private let cgroups: CgroupReader
     private var previousTime: ReadingTime?
 
     public init(files: SystemFiles = SystemFiles(), on eventLoop: ScoutEventLoop = .shared) {
@@ -30,6 +31,7 @@ public struct Sampler {
         disks = DiskReader(files: files)
         network = NetworkReader(files: files)
         processes = ProcessReader(files: files)
+        cgroups = CgroupReader(files: files)
     }
 
     /// - Parameter takenAt: the sample's mark, in seconds since 1970.
@@ -40,13 +42,15 @@ public struct Sampler {
 
         let mounts = files.text(at: "/proc/self/mountinfo").map(Mount.all(parsing:)) ?? []
         let processesHidden = mounts.processesHidden
+        // Before processes, which are grouped by the unit each is in.
+        let units = cgroups.read(elapsed: elapsed)
+        let processReading = processesHidden ? nil : processes.read(at: time, elapsed: elapsed, units: units?.unitOfProcess ?? [:])
         let counters = (
             cpu: cpu.read(elapsed: elapsed),
             memory: memory.read(elapsed: elapsed),
             pressure: pressure.read(elapsed: elapsed),
             disks: disks.read(elapsed: elapsed),
-            network: network.read(elapsed: elapsed),
-            processes: processesHidden ? nil : processes.read(at: time, elapsed: elapsed)
+            network: network.read(elapsed: elapsed)
         )
         // Last, since a filesystem that doesn't answer holds the sample up until it times out.
         let filesystems = await filesystems.read(mounts: mounts, on: eventLoop)
@@ -60,7 +64,9 @@ public struct Sampler {
             filesystems: filesystems,
             disks: counters.disks,
             networkInterfaces: counters.network,
-            processes: counters.processes
+            processes: processReading?.figures,
+            containers: units.map { CgroupReader.figures(of: $0.containers, commands: processReading?.containerCommands ?? [:]) },
+            services: units.map { CgroupReader.figures(of: $0.services) }
         )
     }
 }

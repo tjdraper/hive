@@ -147,6 +147,18 @@ public enum HiveEndpoint {
         "\(metrics(ofServer: id))/processes?at=\(moment)"
     }
 
+    /// `GET` reads the server's `CgroupMoment`, its containers and services, at `at`, seconds since 1970
+    /// on the server's clock.
+    public static func containers(ofServer id: UUID, at moment: Int64) -> String {
+        "\(metrics(ofServer: id))/containers?at=\(moment)"
+    }
+
+    /// `GET` reads the `CgroupSeries` of the server's container groups and services from `from` up to
+    /// `to`, seconds since 1970 on the server's clock, at most `longestMetricsRange` apart.
+    public static func containerSeries(ofServer id: UUID, from start: Int64, to end: Int64) -> String {
+        "\(metrics(ofServer: id))/containers/series?from=\(start)&to=\(end)"
+    }
+
     /// `GET` reads a `FilesystemForecast` for each of the server's filesystems.
     public static func filesystemForecasts(ofServer id: UUID) -> String {
         "\(metrics(ofServer: id))/filesystem-forecasts"

@@ -23,6 +23,10 @@ struct MetricsServerRecord: Codable, Equatable, FetchableRecord, MutablePersista
     /// Why the last request was refused, cleared once something is kept again.
     var lastRefusal: String?
     var lastRefusedAt: Date?
+    var containersAskedAt: Date?
+    var dockerFailedAt: Date?
+    /// `ContainerNamingWorkflow.connectionKey` of the SSH details `docker ps` failed with.
+    var dockerFailedConnection: String?
 
     mutating func didInsert(_ inserted: InsertionSuccess) {
         id = inserted.rowID

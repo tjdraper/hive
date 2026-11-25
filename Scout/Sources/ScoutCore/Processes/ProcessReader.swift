@@ -7,9 +7,15 @@ import Darwin
 #endif
 import ScoutProtocol
 
-/// Reads every process, groups them by command and user, and keeps each one's CPU time to work out
-/// its share at the next reading.
+/// Reads every process, groups them by command, user and the container or service they're in, and
+/// keeps each one's CPU time to work out its share at the next reading.
 struct ProcessReader {
+    struct Reading {
+        var figures: ProcessFigures
+        /// Each container's command names, the one using the most memory first.
+        var containerCommands: [String: [String]]
+    }
+
     private struct ProcessID: Hashable {
         var pid: Int32
         var startTicks: UInt64
@@ -18,9 +24,11 @@ struct ProcessReader {
     private struct GroupKey: Hashable {
         var command: String
         var userID: UInt32
+        var unit: CgroupUnit?
     }
 
     static let groupsByEachMeasure = 10
+    static let commandsByContainer = 3
 
     let files: SystemFiles
     private let pageSize: UInt64
@@ -45,7 +53,8 @@ struct ProcessReader {
     /// - Parameters:
     ///   - time: when this reading is taken.
     ///   - elapsed: seconds since the previous reading, nil when there's none to compare with.
-    mutating func read(at time: ReadingTime?, elapsed: Double?) -> ProcessFigures? {
+    ///   - units: the container or service each process is in.
+    mutating func read(at time: ReadingTime?, elapsed: Double?, units: [Int32: CgroupUnit] = [:]) -> Reading? {
         guard let entries = files.entries(in: "/proc") else { return nil }
         users.refresh()
 
@@ -72,7 +81,7 @@ struct ProcessReader {
 
             let id = ProcessID(pid: pid, startTicks: stat.startTicks)
             cpuTicks[id] = stat.cpuTicks
-            let key = GroupKey(command: stat.command, userID: userID)
+            let key = GroupKey(command: stat.command, userID: userID, unit: units[pid])
             var group = groups[key]
                 ?? ProcessGroup(command: stat.command, user: "", count: 0, cpuCores: elapsed.map { _ in 0 }, ownMemoryBytes: 0)
             group.count += 1
@@ -89,15 +98,30 @@ struct ProcessReader {
         processFiles.closeAll(except: listed)
 
         let top = Self.top(of: groups)
-        return ProcessFigures(
+        let figures = ProcessFigures(
             count: count,
             zombies: zombies,
             groups: top.map { key, group in
                 var group = group
-                group.user = users.name(of: key.userID)
+                // A container's users are another system's, which the server's names would misname.
+                group.user = key.unit?.kind == .container ? String(key.userID) : users.name(of: key.userID)
+                group.containerID = key.unit?.kind == .container ? key.unit?.name : nil
+                group.service = key.unit?.kind == .service ? key.unit?.name : nil
                 return group
             }
         )
+        return Reading(figures: figures, containerCommands: Self.containerCommands(of: groups))
+    }
+
+    private static func containerCommands(of groups: [GroupKey: ProcessGroup]) -> [String: [String]] {
+        var memory: [String: [String: UInt64]] = [:]
+        for (key, group) in groups {
+            guard let unit = key.unit, unit.kind == .container else { continue }
+            memory[unit.name, default: [:]][key.command, default: 0] += group.ownMemoryBytes
+        }
+        return memory.mapValues { byCommand in
+            byCommand.sorted { ($0.value, $1.key) > ($1.value, $0.key) }.prefix(commandsByContainer).map(\.key)
+        }
     }
 
     /// The top groups by CPU and by memory, each group once, busiest first.

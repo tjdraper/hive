@@ -25,6 +25,7 @@ struct MetricsReportWorkflow: Sendable {
     let limiter: MetricsRateLimiter
     /// Given each report's newest sample while it's current, for live updates.
     let board: MetricsLiveBoard
+    let naming: ContainerNamingWorkflow
     let now: @Sendable () -> Date
 
     /// False when the server's Scout has sent more often than Hive takes, checked before its body is read.
@@ -60,6 +61,7 @@ struct MetricsReportWorkflow: Sendable {
                     "Kept \(samples, privacy: .public) samples and \(minutes, privacy: .public) minutes in \(duration, privacy: .public)"
                 )
                 postIfCurrent(report, forServer: serverID)
+                nameContainers(in: report, forServer: serverID)
                 return .kept
             case .refused(let reason):
                 Self.logger.error("Refused a Scout's figures: \(reason.rawValue, privacy: .public)")
@@ -81,6 +83,14 @@ struct MetricsReportWorkflow: Sendable {
             }
         } catch {
             Self.logger.error("Couldn't read a server's newest figures: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// On a task of its own, so `docker ps` over SSH never holds up Scout's request.
+    private func nameContainers(in report: MetricsReport, forServer serverID: UUID) {
+        guard let newest = report.samples.max(by: { $0.takenAt < $1.takenAt }), newest.containers?.top.isEmpty == false else { return }
+        Task { [naming] in
+            _ = await naming.nameContainers(of: newest, forServer: serverID)
         }
     }
 

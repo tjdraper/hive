@@ -49,6 +49,10 @@ public struct ServerMetricsLatest: Codable, Hashable, Sendable {
     public let memory: MemoryUse?
     /// The local filesystem with the largest share used.
     public let fullestFilesystem: FilesystemUse?
+    /// The busiest container groups and services, as in a `CgroupMoment`'s sample. Nil where the server
+    /// sent none.
+    public let containers: [CgroupGroupFigures]?
+    public let services: [CgroupGroupFigures]?
 
     public init(
         serverID: UUID,
@@ -57,7 +61,9 @@ public struct ServerMetricsLatest: Codable, Hashable, Sendable {
         cpu: CPUShares?,
         load: LoadFigures?,
         memory: MemoryUse?,
-        fullestFilesystem: FilesystemUse?
+        fullestFilesystem: FilesystemUse?,
+        containers: [CgroupGroupFigures]? = nil,
+        services: [CgroupGroupFigures]? = nil
     ) {
         self.serverID = serverID
         self.takenAt = takenAt
@@ -66,6 +72,8 @@ public struct ServerMetricsLatest: Codable, Hashable, Sendable {
         self.load = load
         self.memory = memory
         self.fullestFilesystem = fullestFilesystem
+        self.containers = containers
+        self.services = services
     }
 }
 

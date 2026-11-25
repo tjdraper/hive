@@ -123,6 +123,15 @@ struct MetricsStore: Sendable {
             INSERT INTO processTenSeconds (serverKey, startsAt, groups) VALUES (?, ?, ?) ON CONFLICT DO NOTHING
             """).execute(arguments: [row.key, startsAt, ProcessGroupStorage.encode(processes.groups)])
         }
+        // As Scout sent them, by container ID, so names Hive learns later still apply.
+        if sample.containers != nil || sample.services != nil {
+            try database.cachedStatement(sql: """
+            INSERT INTO cgroupTenSeconds (serverKey, startsAt, containers, services) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING
+            """).execute(arguments: [
+                row.key, startsAt,
+                try sample.containers.map(ProcessGroupStorage.encode), try sample.services.map(ProcessGroupStorage.encode),
+            ])
+        }
     }
 
     /// A minute Scout folded from samples it held. Each name's highest and lowest are matched to its

@@ -28,7 +28,7 @@ struct ProcessReaderTests {
         var reader = ProcessReader(files: server.files, pageSize: Self.pageSize, clockTicksPerSecond: 100)
 
         // Act
-        let processesReading = reader.read(at: nil, elapsed: nil)
+        let processesReading = reader.read(at: nil, elapsed: nil)?.figures
         let processes = try #require(processesReading)
 
         // Assert: nine sleeping, one exited and not yet collected, and the shell that started them.
@@ -50,7 +50,7 @@ struct ProcessReaderTests {
         }
         try server.writeProcess(pid: 200, command: "nginx", cpuTicks: (50, 0), startTicks: 100, pages: (900, 100))
         var reader = Self.reader(for: server)
-        _ = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 1_000), elapsed: nil)
+        _ = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 1_000), elapsed: nil)?.figures
 
         // Each worker used 15 ticks of user time and 5 of system time in 10 seconds.
         for pid in 100..<140 {
@@ -58,7 +58,7 @@ struct ProcessReaderTests {
         }
 
         // Act
-        let processesReading = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 1_010), elapsed: 10)
+        let processesReading = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 1_010), elapsed: 10)?.figures
         let processes = try #require(processesReading)
 
         // Assert
@@ -80,13 +80,13 @@ struct ProcessReaderTests {
         try Self.writeUsers(on: server)
         try server.writeProcess(pid: 300, command: "convert", cpuTicks: (1_000, 0), startTicks: 500, pages: (10, 0))
         var reader = Self.reader(for: server)
-        _ = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 10), elapsed: nil)
+        _ = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 10), elapsed: nil)?.figures
 
         // The first exited, and another started 15 seconds after the server did, at 1,500 ticks.
         try server.writeProcess(pid: 300, command: "convert", cpuTicks: (30, 0), startTicks: 1_500, pages: (10, 0))
 
         // Act
-        let processesReading = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 20), elapsed: 10)
+        let processesReading = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 20), elapsed: 10)?.figures
         let processes = try #require(processesReading)
 
         // Assert: 30 ticks are 0.3 seconds of CPU time in 10 seconds.
@@ -100,11 +100,11 @@ struct ProcessReaderTests {
         try Self.writeUsers(on: server)
         try server.writeProcess(pid: 1, command: "systemd", cpuTicks: (10, 0), startTicks: 1, pages: (10, 0))
         var reader = Self.reader(for: server)
-        _ = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 10), elapsed: nil)
+        _ = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 10), elapsed: nil)?.figures
         try server.writeProcess(pid: 400, command: "postgres", cpuTicks: (9_000, 0), startTicks: 200, pages: (10, 0))
 
         // Act
-        let processesReading = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 20), elapsed: 10)
+        let processesReading = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 20), elapsed: 10)?.figures
         let processes = try #require(processesReading)
 
         // Assert
@@ -124,7 +124,7 @@ struct ProcessReaderTests {
         var reader = Self.reader(for: server)
 
         // Act
-        let processesReading = reader.read(at: nil, elapsed: nil)
+        let processesReading = reader.read(at: nil, elapsed: nil)?.figures
         let processes = try #require(processesReading)
 
         // Assert
@@ -142,7 +142,7 @@ struct ProcessReaderTests {
         var reader = Self.reader(for: server)
 
         // Act
-        let processesReading = reader.read(at: nil, elapsed: nil)
+        let processesReading = reader.read(at: nil, elapsed: nil)?.figures
         let processes = try #require(processesReading)
 
         // Assert
@@ -170,16 +170,48 @@ struct ProcessReaderTests {
         }
         try writeProcesses(1)
         var reader = Self.reader(for: server)
-        _ = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 10), elapsed: nil)
+        _ = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 10), elapsed: nil)?.figures
         try writeProcesses(2)
 
         // Act
-        let processesReading = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 20), elapsed: 10)
+        let processesReading = reader.read(at: ReadingTime(bootID: nil, uptimeSeconds: 20), elapsed: 10)?.figures
         let processes = try #require(processesReading)
 
         // Assert
         #expect(processes.groups.map(\.command).sorted() == (0...18).map { "command-\($0)" }.sorted())
         #expect(processes.count == 25)
+    }
+
+    @Test("One command in a container, in a service and on its own are three groups, and a container's user is its number")
+    func groupsByUnit() throws {
+        // Arrange: the server knows the test's user as www-data, which inside a container is someone else.
+        let server = try TemporaryServer()
+        try Self.writeUsers(on: server)
+        let container = CgroupUnit(kind: .container, name: String(repeating: "ab", count: 32), path: "docker/site")
+        let service = CgroupUnit(kind: .service, name: "nginx.service", path: "system.slice/nginx.service")
+        try server.writeProcess(pid: 100, command: "nginx", cpuTicks: (1, 0), startTicks: 1, pages: (100, 0))
+        try server.writeProcess(pid: 101, command: "nginx", cpuTicks: (1, 0), startTicks: 1, pages: (100, 0))
+        try server.writeProcess(pid: 102, command: "php-fpm", cpuTicks: (1, 0), startTicks: 1, pages: (900, 0))
+        try server.writeProcess(pid: 200, command: "nginx", cpuTicks: (1, 0), startTicks: 1, pages: (100, 0))
+        try server.writeProcess(pid: 300, command: "nginx", cpuTicks: (1, 0), startTicks: 1, pages: (100, 0))
+        var reader = Self.reader(for: server)
+
+        // Act
+        let readingResult = reader.read(at: nil, elapsed: nil, units: [100: container, 101: container, 102: container, 200: service])
+        let reading = try #require(readingResult)
+
+        // Assert
+        let nginx = reading.figures.groups.filter { $0.command == "nginx" }
+        #expect(nginx.count == 3)
+        let inContainer = try #require(nginx.first { $0.containerID == container.name })
+        #expect(inContainer.count == 2)
+        #expect(inContainer.user == String(getuid()))
+        #expect(inContainer.service == nil)
+        let inService = try #require(nginx.first { $0.service == "nginx.service" })
+        #expect(inService.user == "www-data")
+        #expect(inService.containerID == nil)
+        #expect(nginx.contains { $0.containerID == nil && $0.service == nil && $0.user == "www-data" })
+        #expect(reading.containerCommands == [container.name: ["php-fpm", "nginx"]])
     }
 
     @Test("User names come from /etc/passwd, the first for each number")

@@ -24,7 +24,8 @@ public enum ScoutEndpoint {
 /// own version. Hive accepts the current one and the one before it, so Scouts can be updated when it
 /// suits you.
 public enum ScoutProtocolVersion {
-    public static let current = 1
+    /// 2 added containers and services, and which of them each process group is in.
+    public static let current = 2
 
     public static func isAccepted(_ version: Int) -> Bool {
         version == current || version == current - 1

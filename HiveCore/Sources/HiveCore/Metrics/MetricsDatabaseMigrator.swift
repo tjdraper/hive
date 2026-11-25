@@ -7,6 +7,7 @@ enum MetricsDatabaseMigrator {
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("Create the metrics tables", migrate: createMetricsTables)
+        migrator.registerMigration("Keep containers and services", migrate: createCgroupTables)
         return migrator
     }
 
@@ -136,6 +137,46 @@ enum MetricsDatabaseMigrator {
             table.column("sampleCount", .integer).notNull()
             table.column("groups", .blob).notNull()
             table.primaryKey(["serverKey", "startsAt"])
+        }
+    }
+
+    private static func createCgroupTables(_ database: Database) throws {
+        // Each sample's containers and services as compressed JSON, read whole for a moment or a range.
+        try database.create(table: "cgroupTenSeconds") { table in
+            table.column("serverKey", .integer).notNull().references("metricsServer", onDelete: .cascade)
+            table.column("startsAt", .integer).notNull()
+            table.column("containers", .blob)
+            table.column("services", .blob)
+            table.primaryKey(["serverKey", "startsAt"])
+        }
+        // Each hour's busiest container groups and services, named as Hive knew them when the hour closed.
+        try database.create(table: "cgroupHour") { table in
+            table.column("serverKey", .integer).notNull().references("metricsServer", onDelete: .cascade)
+            table.column("startsAt", .integer).notNull()
+            table.column("sampleCount", .integer).notNull()
+            table.column("containers", .blob).notNull()
+            table.column("services", .blob).notNull()
+            table.primaryKey(["serverKey", "startsAt"])
+        }
+        // What `docker ps` said of each container, kept after it's gone so its history keeps its name.
+        try database.create(table: "containerName") { table in
+            table.column("serverKey", .integer).notNull().references("metricsServer", onDelete: .cascade)
+            table.column("containerID", .text).notNull()
+            table.column("name", .text)
+            table.column("swarmService", .text)
+            table.column("composeProject", .text)
+            table.column("composeService", .text)
+            // Hive's clock, when a sample last had it, so names of long-gone containers are dropped.
+            table.column("seenAt", .datetime).notNull()
+            table.primaryKey(["serverKey", "containerID"])
+        }
+        try database.alter(table: "metricsServer") { table in
+            // Hive's clock, when it last asked the server for its containers' names.
+            table.add(column: "containersAskedAt", .datetime)
+            // When `docker ps` last failed, and for which SSH details, so it's asked again only a day
+            // later or once they change.
+            table.add(column: "dockerFailedAt", .datetime)
+            table.add(column: "dockerFailedConnection", .text)
         }
     }
 

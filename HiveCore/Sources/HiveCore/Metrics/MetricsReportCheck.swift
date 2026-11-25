@@ -11,6 +11,10 @@ enum MetricsReportCheck {
     static let largestInterfaceCount = 32
     /// Scout sends the top 10 groups by CPU and the top 10 by memory.
     static let largestProcessGroupCount = 20
+    /// Of containers, and of services, Scout sends the top 10 by CPU and the top 10 by memory.
+    static let largestCgroupCount = 20
+    /// Scout sends a container's 3 largest commands.
+    static let largestContainerCommandCount = 5
     /// New filesystem, disk and interface names together, in any 24 hours.
     static let largestNewNameCountPerDay = 50
     static let largestNameBytes = 255
@@ -55,6 +59,10 @@ enum MetricsReportCheck {
             && sample.disks.count <= largestDiskCount
             && sample.networkInterfaces.count <= largestInterfaceCount
             && (sample.processes?.groups.count ?? 0) <= largestProcessGroupCount
+            && [sample.containers, sample.services].allSatisfy { cgroups in
+                (cgroups?.top.count ?? 0) <= largestCgroupCount
+                    && (cgroups?.top ?? []).allSatisfy { $0.commands.count <= largestContainerCommandCount }
+            }
     }
 
     private static func hasFewEnoughFigures(_ minute: MetricsMinute) -> Bool {
@@ -70,9 +78,12 @@ enum MetricsReportCheck {
             isCount(processes.count) && isCount(processes.zombies) && processes.groups.allSatisfy { group in
                 isName(group.command) && isName(group.user) && isCount(group.count)
                     && isRate(group.cpuCores) && isBytes(group.ownMemoryBytes)
+                    && (group.containerID.map(isContainerID) ?? true) && (group.service.map(isName) ?? true)
             }
         } ?? true
-        return processes && (sample.server.uptimeSeconds.map(isRate) ?? true)
+        let containers = sample.containers.map { isInRange($0, isNamed: isContainerID) } ?? true
+        let services = sample.services.map { isInRange($0, isNamed: isName) } ?? true
+        return processes && containers && services && (sample.server.uptimeSeconds.map(isRate) ?? true)
             && isInRange(MinuteFigures(
                 cpu: sample.cpu,
                 memory: sample.memory,
@@ -128,6 +139,20 @@ enum MetricsReportCheck {
             } ?? true)
         }
         return cpu && memory && pressure && filesystems && disks && interfaces
+    }
+
+    private static func isInRange(_ cgroups: CgroupFigures, isNamed: (String) -> Bool) -> Bool {
+        isCount(cgroups.count) && cgroups.top.allSatisfy { use in
+            isNamed(use.name) && isRate(use.cpuCores) && isBytes(use.memoryBytes)
+                && isRate(use.readBytesPerSecond) && isRate(use.writtenBytesPerSecond)
+                && isCount(use.processes) && use.commands.allSatisfy(isName)
+        }
+    }
+
+    /// The full ID Docker gives a container, 64 lowercase hexadecimal digits, and nothing else, since
+    /// Hive looks containers up by it.
+    static func isContainerID(_ text: String) -> Bool {
+        text.utf8.count == 64 && text.utf8.allSatisfy { (48 ... 57).contains($0) || (97 ... 102).contains($0) }
     }
 
     /// Shown in Beekeeper and kept in the store, so a name is short and holds no control characters.

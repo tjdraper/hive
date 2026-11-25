@@ -14,6 +14,14 @@ extension HiveAPI {
         ProcessMomentReader(database: metrics.database)
     }
 
+    var cgroupMoments: CgroupMomentReader {
+        CgroupMomentReader(database: metrics.database)
+    }
+
+    var cgroupSeries: CgroupSeriesReader {
+        CgroupSeriesReader(database: metrics.database, now: signIn.now)
+    }
+
     var filesystemForecasts: FilesystemForecaster {
         FilesystemForecaster(database: metrics.database)
     }

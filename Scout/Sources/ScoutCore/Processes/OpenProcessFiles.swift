@@ -108,7 +108,7 @@ final class OpenProcessFiles {
     }
 
     /// Two files for each process, up to a thousand processes, within the limit on open files raised
-    /// as far as it goes, keeping room for Scout's connections.
+    /// as far as it goes, keeping room for Scout's connections and the cgroups' files.
     static func limit() -> Int {
         #if canImport(Glibc)
         let openFiles = __rlimit_resource_t(RLIMIT_NOFILE.rawValue)
@@ -122,7 +122,7 @@ final class OpenProcessFiles {
             _ = setrlimit(openFiles, &limit)
             _ = getrlimit(openFiles, &limit)
         }
-        let available = Int(clamping: limit.rlim_cur) - 64
+        let available = Int(clamping: limit.rlim_cur) - 64 - CgroupReader.heldUnitLimit * CgroupReader.filesPerUnit
         return max(0, min(1000, available / 2))
     }
 }

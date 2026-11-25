@@ -24,7 +24,7 @@ Check off a slice here when its "done when" is true.
 - [x] [B4. Reading metrics from Hive](09-B4-ReadingMetricsFromHive.md) — Engine, 1 session
 - [x] [B5. The dashboard](10-B5-TheDashboard.md) — UI, 1–2 sessions
 - [x] [B6. A server's metrics](11-B6-AServersMetrics.md) — UI, 2 sessions
-- [ ] [B7. Containers and services in Scout and Hive](12-B7-ContainersAndServicesInScoutAndHive.md) — Engine, 1–2 sessions
+- [x] [B7. Containers and services in Scout and Hive](12-B7-ContainersAndServicesInScoutAndHive.md) — Engine, 1–2 sessions
 - [ ] [B8. Containers and services in Beekeeper](13-B8-ContainersAndServicesInBeekeeper.md) — UI, 1 session
 - [ ] [B9. Metrics on iPhone and iPad](14-B9-MetricsOnIPhoneAndIPad.md) — UI, 1 session, TestFlight
 
@@ -71,7 +71,7 @@ Check off a slice here when its "done when" is true.
 - **Signing in** is the same challenge and short-lived session token as a device. A Scout's session is for one server and reaches only Scout's routes. A device's session can't use them either.
 - **Hive accepts the current protocol version and the one before it,** so Scouts can be updated whenever it suits you. An older one is refused with a message telling it to update, which it logs and Beekeeper shows.
 - **Removing a server's metrics, or the server,** revokes its Scout's key and ends its sessions at once. Removing the server deletes its metrics history too; removing only its metrics keeps the history until it ages out (§6).
-- **Hive limits what a Scout can send:** how often, how large a request, how many samples in one, how many filesystems, disks, interfaces, processes and containers in a sample, how many new names a server introduces in a day, and values that are finite and in range. A server that's been taken over can fill only its own share of the store. Nothing a Scout sends ever goes into a command Hive runs.
+- **Hive limits what a Scout can send:** how often, how large a request, how many samples in one, how many filesystems, disks, interfaces, process groups, containers and services in a sample, how many new names a server introduces in a day, and values that are finite and in range. A server that's been taken over can fill only its own share of the store. Nothing a Scout sends ever goes into a command Hive runs.
 - **Installing and updating** (A4, A5, B2, B3) never go through Scout's connection to Hive:
   - **From Beekeeper, over Hive's SSH access,** when Hive signs in as root or a user with passwordless `sudo`. Hive already controls such a server, so this adds nothing it couldn't do.
   - **A command you paste once as root,** when Hive's user has no root access. It installs Scout and a `sudo` rule (or `doas`, on Alpine without `sudo`) letting that user run only Scout's own management command as root, so Beekeeper handles updates from then on. Servers without SSH details always use a pasted command.
@@ -101,8 +101,8 @@ From `/proc` and `/sys` on Linux. Each is a handful of small reads.
 - **Network:** received and sent bytes per second, and errors and drops, for each real interface, including `tailscale0`. Loopback and Docker's virtual interfaces are left out.
 - **Processes:** each one's CPU share since the last sample, and its memory of its own: resident memory less what it shares, so forty `php-fpm` workers sharing one cache don't count it forty times. Sent as the top 10 by CPU and the top 10 by memory, grouped by command name and user with a count, so forty workers at 2% each show as one line at 80%. The number of processes and of zombies. Grouped memory is still approximate, and labelled so; containers and services below give the exact figure.
 - **Containers and services** (B7), from their cgroups under `/sys/fs/cgroup`, which any user can read:
-  - **Each Docker container's** CPU, memory, I/O and process count, sent as the top 10 by CPU and by memory. Each process in the lists says which container it's in.
-  - **Each systemd service's** CPU and memory. Unlike the process lists, these count work done by processes that start and finish between samples, such as cron jobs and command-line PHP.
+  - **Each Docker container's** CPU, memory, I/O and process count, sent as the top 10 by CPU and by memory. Each process group in the lists says which container or service it's in, from the cgroup that lists it, and a container's users show by number, since the server's names for them are another system's.
+  - **Each systemd service's** CPU, memory, I/O and process count, also as the top 10 by each. Unlike the process lists, these count work done by processes that start and finish between samples, such as cron jobs and command-line PHP.
   - **Scout never asks Docker.** Access to Docker's socket is root on the server, which Scout must never have. Hive names containers instead, with a read-only `docker ps` over SSH where its SSH user can run `docker`, as it already does to find database containers. Swarm replicas are grouped by service, and Compose ones by project and service, since every Compose project has its own `db`.
   - **Where Hive can't run `docker`,** or the server has no SSH details, containers show by short ID and the commands running in them.
 - **The server itself:** uptime, so a reboot shows; the distribution from `/etc/os-release`; the kernel version; Scout's version; and whether processes are hidden by `hidepid`.
@@ -135,8 +135,8 @@ Left for later:
   | 1 minute | 7 days | a week |
   | 1 hour | 1 year | a month and longer |
 
-- **Processes and containers** are kept with every 10-second sample for 24 hours, and as each hour's top 10 for 14 days. Each container service's and systemd service's hourly average and highest CPU and memory are kept for 90 days, to show which site grew.
-- **Roughly 30–40 MB for each server,** once it's been reporting for a year, so about 350 MB for ten servers. It stays there, since older data is pruned. A3 measured 32 MB with a year of made-up data (three filesystems, two disks, two interfaces and 20 process groups a sample), a quarter of it the last day's processes.
+- **Processes, containers and services** are kept with every 10-second sample for 24 hours. Each hour's top 10 process groups are kept for 14 days, and its busiest container groups and systemd services, with their average and highest CPU and memory, for 90 days, to show which site grew.
+- **Roughly 30–40 MB for each server,** once it's been reporting for a year, so about 350 MB for ten servers. It stays there, since older data is pruned. A3 measured 32 MB with a year of made-up data (three filesystems, two disks, two interfaces and 20 process groups a sample), a quarter of it the last day's processes. **Containers and services add about 20–25 MB** on a server running 50 containers (B7): about 15 MB for the last day's samples, measured on the test VM at 1.45 KB a sample, and 5–9 MB for 90 days of hours, so about 55–65 MB for such a server.
 - **Rollups and pruning** run as samples arrive and once an hour, and a late batch from a Scout that was cut off updates the periods it falls in.
 
 ## §7. Beekeeper
