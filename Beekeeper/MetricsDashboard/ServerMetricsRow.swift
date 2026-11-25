@@ -10,9 +10,8 @@ struct ServerMetricsRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Label(server.name, systemImage: "server.rack")
+                MetricsSourceLabel(source: server.source)
                     .font(.headline)
-                    .lineLimit(1)
                 Spacer(minLength: 0)
                 ReportingBadge(reporting: server.reporting)
             }

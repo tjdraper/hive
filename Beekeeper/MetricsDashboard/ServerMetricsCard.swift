@@ -9,9 +9,8 @@ struct ServerMetricsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Label(server.name, systemImage: "server.rack")
+                MetricsSourceLabel(source: server.source)
                     .font(.headline)
-                    .lineLimit(1)
                 Spacer(minLength: 0)
                 ReportingBadge(reporting: server.reporting)
             }
@@ -187,6 +186,27 @@ extension DashboardServer {
     var isFillingFullest: Bool {
         guard let mountPoint = latest?.fullestFilesystem?.mountPoint else { return false }
         return figureAlerts.contains(.filesystemFilling(mountPoint: mountPoint))
+    }
+}
+
+/// The server's name, or the Hive's beside its Mac, which is tagged so it isn't taken for a server.
+struct MetricsSourceLabel: View {
+    let source: MetricsSource
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Label(source.name, systemImage: source.systemImage)
+                .lineLimit(1)
+            if source.isHiveMac {
+                Text("Hive Mac")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(.fill.tertiary, in: .capsule)
+                    .fixedSize()
+            }
+        }
     }
 }
 

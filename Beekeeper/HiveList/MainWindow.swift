@@ -226,7 +226,7 @@ struct MainWindow: View {
         case .figurePage(_, let serverID, let page):
             let path = MetricsPagePath(
                 hiveName: hive.name,
-                serverName: servers.server(serverID)?.name ?? "Server",
+                source: MetricsSource(serverID: serverID, hive: hive, servers: servers) ?? .removedServer,
                 onShowHive: { self.selection = .hive(hive.id) },
                 onShowDashboard: { self.selection = .dashboard(hiveID: hive.id) },
                 onShowServer: { self.selection = .serverMetrics(hiveID: hive.id, serverID: serverID) }

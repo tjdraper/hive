@@ -8,6 +8,8 @@ struct ServerFacts: View {
     let history: ServerHistory?
     /// The server's clock, now.
     let serverNow: Int64
+    /// Hive reads its own Mac with the Scout it's built with, so there's no Scout of its own to update.
+    var isHiveMac = false
 
     /// Beekeeper warns past this (§5).
     private static let largestClockOffset = 60
@@ -37,7 +39,7 @@ struct ServerFacts: View {
             ("Cores", history?.cores.map { String(Int($0.rounded())) } ?? "—"),
             ("Memory", history?.memoryTotal.map { Int64($0.rounded()).formatted(.byteCount(style: .memory)) } ?? "—"),
             ("Up", uptime ?? "—"),
-            ("Scout", scout.version ?? "—"),
+            ("Scout", isHiveMac ? "Built into Hive" : scout.version ?? "—"),
         ]
     }
 

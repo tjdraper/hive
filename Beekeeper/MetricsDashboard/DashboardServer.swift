@@ -4,7 +4,7 @@ import HiveKit
 /// A server as its card on the dashboard shows it: Hive's summary, with the newer of its own figures and
 /// the live ones.
 struct DashboardServer: Identifiable {
-    let name: String
+    let source: MetricsSource
     let summary: ServerMetricsSummary
     let latest: ServerMetricsLatest?
     let reporting: MetricsReporting
@@ -15,8 +15,8 @@ struct DashboardServer: Identifiable {
         summary.serverID
     }
 
-    init(name: String, summary: ServerMetricsSummary, live: ServerMetricsLatest?) {
-        self.name = name
+    init(source: MetricsSource, summary: ServerMetricsSummary, live: ServerMetricsLatest?) {
+        self.source = source
         self.summary = summary
         let liveIsNewer = live.map { $0.takenAt > summary.latest?.takenAt ?? .min } ?? false
         latest = liveIsNewer ? live : summary.latest
@@ -34,20 +34,20 @@ struct DashboardServer: Identifiable {
     }
 
     /// Servers that stopped reporting or whose figures are refused first, then those with an alert about
-    /// their figures, each by name, then the rest by name.
+    /// their figures, then the rest, each with the Hive Mac first and the servers by name.
     static func arranged(
         _ summaries: [ServerMetricsSummary],
-        names: [UUID: String],
+        source: (UUID) -> MetricsSource?,
         live: [UUID: ServerMetricsLatest]
     ) -> [DashboardServer] {
         summaries
             .compactMap { summary in
-                // A server removed since the summaries were read.
-                names[summary.serverID].map { DashboardServer(name: $0, summary: summary, live: live[summary.serverID]) }
+                source(summary.serverID).map { DashboardServer(source: $0, summary: summary, live: live[summary.serverID]) }
             }
             .sorted { first, second in
                 if first.rank != second.rank { return first.rank < second.rank }
-                return first.name.localizedStandardCompare(second.name) == .orderedAscending
+                if first.source.isHiveMac != second.source.isHiveMac { return first.source.isHiveMac }
+                return first.source.name.localizedStandardCompare(second.source.name) == .orderedAscending
             }
     }
 

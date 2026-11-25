@@ -37,7 +37,11 @@ struct MetricsDashboard: View {
 
     @ViewBuilder private var content: some View {
         if let summaries {
-            let arranged = DashboardServer.arranged(summaries, names: names, live: live?.latest ?? [:])
+            let arranged = DashboardServer.arranged(
+                summaries,
+                source: { MetricsSource(serverID: $0, hive: hive, servers: servers) },
+                live: live?.latest ?? [:]
+            )
             if arranged.isEmpty {
                 ContentUnavailableView(
                     "No Servers with Metrics",
@@ -99,10 +103,6 @@ struct MetricsDashboard: View {
         .animation(.default, value: arranged.map(\.id))
     }
     #endif
-
-    private var names: [UUID: String] {
-        Dictionary(servers.servers.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
-    }
 
     /// A server whose Scout has just enrolled reports live before the summaries list it.
     private var hasServerMissingFromSummaries: Bool {

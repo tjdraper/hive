@@ -29,11 +29,11 @@ struct ServerMetricsPage: View {
                 .reloading(every: range.refreshInterval, id: range) { await load() }
         }
         .environment(moment)
-        .navigationTitle(name)
+        .navigationTitle(source.name)
         .locationPath([
             LocationPath.Part(title: hive.name, systemImage: "hexagon", action: onShowHive),
             LocationPath.Part(title: "Metrics", systemImage: "chart.xyaxis.line", action: onShowDashboard),
-            LocationPath.Part(title: name, systemImage: "server.rack"),
+            LocationPath.Part(title: source.name, systemImage: source.systemImage),
         ])
         .metricsRangeToolbar($range)
         .onChange(of: range) { moment.chosen = nil }
@@ -49,8 +49,8 @@ struct ServerMetricsPage: View {
         }
     }
 
-    private var name: String {
-        servers.server(serverID)?.name ?? "Server"
+    private var source: MetricsSource {
+        MetricsSource(serverID: serverID, hive: hive, servers: servers) ?? .removedServer
     }
 
     @ViewBuilder private var content: some View {
@@ -87,7 +87,7 @@ struct ServerMetricsPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 alerts
-                ServerFacts(scout: scout, history: history, serverNow: serverNow)
+                ServerFacts(scout: scout, history: history, serverNow: serverNow, isHiveMac: source.isHiveMac)
                 hint
                 LazyVGrid(columns: MetricsChart.columns, spacing: 16) {
                     ForEach(charts(history)) { $0 }
@@ -109,7 +109,7 @@ struct ServerMetricsPage: View {
                 VStack(alignment: .leading, spacing: 16) {
                     hint
                     alerts
-                    ServerFacts(scout: scout, history: history, serverNow: serverNow)
+                    ServerFacts(scout: scout, history: history, serverNow: serverNow, isHiveMac: source.isHiveMac)
                 }
                 .padding(.horizontal)
             }
@@ -221,7 +221,9 @@ struct ServerMetricsPage: View {
                 link: link,
                 serverID: serverID,
                 moment: chosen,
-                processesHidden: state?.scout?.processesHidden == true
+                processesHidden: state?.scout?.processesHidden == true,
+                // A Mac has neither containers nor systemd's services.
+                subjects: source.isHiveMac ? [.processes] : MomentProcesses.Subject.allCases
             ) { moment.chosen = nil }
         }
     }

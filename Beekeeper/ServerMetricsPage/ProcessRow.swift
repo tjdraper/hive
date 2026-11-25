@@ -13,10 +13,12 @@ nonisolated struct ProcessRow: Identifiable, Sendable {
     /// The hour's highest, beside its average.
     var highestCPUCores: Double?
     var highestMemoryBytes: UInt64?
+    /// Processes Hive can count but not read, as other users' are on the Hive Mac, in one row.
+    var isOtherUsers = false
 
     /// The same command and user can run in several containers, and in a service besides.
     var id: String {
-        "\(command) \(user) \(place?.containerID ?? place?.service ?? "")"
+        isOtherUsers ? "other users" : "\(command) \(user) \(place?.containerID ?? place?.service ?? "")"
     }
 
     /// The container group or service it runs in, empty for neither.
@@ -43,6 +45,7 @@ nonisolated struct ProcessRow: Identifiable, Sendable {
     }
 
     var memoryText: String {
+        if isOtherUsers { return "—" }
         let average = Int64(clamping: memoryBytes).formatted(.byteCount(style: .memory))
         guard let highestMemoryBytes else { return average }
         return "\(average), up to \(Int64(clamping: highestMemoryBytes).formatted(.byteCount(style: .memory)))"
@@ -50,7 +53,7 @@ nonisolated struct ProcessRow: Identifiable, Sendable {
 
     static func rows(_ moment: ProcessMoment) -> [ProcessRow] {
         switch moment {
-        case .sample(_, let groups, _):
+        case .sample(_, let groups, let otherUsers):
             groups.map {
                 ProcessRow(
                     command: $0.command,
@@ -60,7 +63,7 @@ nonisolated struct ProcessRow: Identifiable, Sendable {
                     cpuCores: $0.cpuCores,
                     memoryBytes: $0.ownMemoryBytes
                 )
-            }
+            } + (otherUsers.map { [otherUsersRow($0)] } ?? [])
         case .hour(_, let groups):
             groups.map {
                 ProcessRow(
@@ -78,6 +81,24 @@ nonisolated struct ProcessRow: Identifiable, Sendable {
             []
         }
     }
+
+    /// Their memory can't be had, and what the readable processes use adds up to more than the system
+    /// counts as in use, so it can't be worked out either (§11).
+    private static func otherUsersRow(_ figures: OtherUsersProcessFigures) -> ProcessRow {
+        ProcessRow(
+            command: "Other users' processes",
+            user: "Various",
+            place: nil,
+            count: figures.count,
+            cpuCores: figures.cpuCores,
+            memoryBytes: 0,
+            isOtherUsers: true
+        )
+    }
+
+    /// For a moment with other users' processes in one row.
+    static let otherUsersNote = "Hive can't read other users' processes. Their CPU is what's left of the busy cores, "
+        + "the system's own work included, and their memory is unknown."
 
     /// Most groups use well under 1% of a core, which whole percents would all show as 0.
     static func share(_ cores: Double) -> String {

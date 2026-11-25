@@ -45,3 +45,21 @@ Built in the first session:
 - **Cost:** a sample takes about 5 ms of CPU in a release build on Ivy (10 cores, 770 processes), about 0.05% of one core. Processes take 1.6 ms of it and the interface list 3.2 ms.
 
 Left for the UI session: Beekeeper drops summaries it has no server name for, so the Hive Mac doesn't show yet; the dashboard card, the page and its charts that a Mac has no figures for; the other users line; and the setting beside the Hive's others.
+
+## UI notes
+
+Built in the second session:
+
+- **`MetricsSource`** (`Beekeeper/HiveMacMetrics/`) names what a card or page is about: a server, or the Hive Mac when the ID is the Hive's own, named after the Hive, with a Mac's icon. The dashboard card and row tag it "Hive Mac", and it comes first among cards of the same standing. Its page and the pages below it use the same name and icon, and on iPhone they go back to the dashboard, since there's no server page above them.
+- **What a Mac leaves out:** the CPU chart drops I/O wait and steal when the range has none, and the moment's panel offers only processes, without containers or services. Pressure was already hidden when missing. The facts say Scout is "Built into Hive".
+- **Other users' processes** are one row, "Other users' processes ×N", with their CPU and "—" for memory, and a note in the caption saying why.
+- **The setting** is "Read the Hive Mac's Metrics" in the Hive's settings, after Build Expiry Warnings, and saves as soon as it's changed. While it's off the dashboard leaves the Mac out.
+- **Checked against macOS on Ivy** with the development daemon: memory in use, swap and "/" agree with `vm_stat` (counted as Activity Monitor counts it), `sysctl vm.swapusage` and `df`; CPU is within a couple of points of `top`.
+- **The installed build** shows the Mac on the dashboard and its own page, with the daemon running as the installing user. Its added CPU, measured with `ps` over a minute with the setting on (0.46% of a core) and a minute off (0.24%), was about 0.22% of a core, over §3's 0.15%. The engine session's 5 ms a sample counts only reading the figures, so most of the rest is likely keeping them: writing the sample, rollups, alert checks and live updates. Its memory was about 30 MB in all, so what the sampling adds couldn't be told apart.
+
+Follow-ups:
+
+- Find where the daemon's added CPU goes, with a longer measurement and a profile, and bring it under §3's budget. C2 isn't checked off until it is.
+- A Mac filesystem's page shows no disk charts: `disk(holding:)` matches Linux device names, and an APFS volume such as `disk3s1s1` is on a synthesized container, not the physical disk IOKit counts. Mapping it needs the container's physical store from the engine.
+- The Hive Mac uses the default alert limits, with no way to change them from Beekeeper yet.
+- The processes table's Where column is always empty for the Hive Mac.

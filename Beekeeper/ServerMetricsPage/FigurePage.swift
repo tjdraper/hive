@@ -10,7 +10,7 @@ enum FigurePage: Hashable {
 /// Where a page of a server's figures sits: its Hive, the dashboard and the server's metrics page.
 struct MetricsPagePath {
     let hiveName: String
-    let serverName: String
+    let source: MetricsSource
     let onShowHive: () -> Void
     let onShowDashboard: () -> Void
     let onShowServer: () -> Void
@@ -19,7 +19,7 @@ struct MetricsPagePath {
         [
             LocationPath.Part(title: hiveName, systemImage: "hexagon", action: onShowHive),
             LocationPath.Part(title: "Metrics", systemImage: "chart.xyaxis.line", action: onShowDashboard),
-            LocationPath.Part(title: serverName, systemImage: "server.rack", action: onShowServer),
+            LocationPath.Part(title: source.name, systemImage: source.systemImage, action: onShowServer),
             LocationPath.Part(title: title, systemImage: systemImage),
         ]
     }

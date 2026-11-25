@@ -70,10 +70,12 @@ struct ServerHistory {
             ("User", .cpuUser), ("System", .cpuSystem), ("I/O wait", .cpuIOWait), ("Steal", .cpuSteal),
         ]
         let colors = [Color(.metricsCPU), .orange, .purple, .red]
-        var lines = MetricsChartLine.stacked(zip(parts, colors).map { server.line($0.name, color: $1, figure: $0.figure) })
+        // A Mac counts neither I/O wait nor steal.
+        let shown = zip(parts, colors).filter { [.cpuUser, .cpuSystem].contains($0.0.figure) || server.largest($0.0.figure) != nil }
+        var lines = MetricsChartLine.stacked(shown.map { server.line($0.name, color: $1, figure: $0.figure) })
         if bucketSeconds > 10 {
             lines.append(server.line("Highest", color: .secondary, style: .outline) { index in
-                let highs = parts.map { server.highest($0.figure, index) ?? server.average($0.figure, index) }
+                let highs = shown.map { server.highest($0.0.figure, index) ?? server.average($0.0.figure, index) }
                 guard highs.allSatisfy({ $0 != nil }) else { return nil }
                 return SubjectFigures.Reading(average: min(1, highs.compactMap(\.self).reduce(0, +)))
             })

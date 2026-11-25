@@ -90,7 +90,8 @@ enum MetricsPreviewData {
         cpu: Double,
         memory: Double,
         disk: Double,
-        alerts: [MetricAlert] = []
+        alerts: [MetricAlert] = [],
+        isHiveMac: Bool = false
     ) -> DashboardServer {
         let gigabyte: UInt64 = 1_073_741_824
         let latest = ServerMetricsLatest(
@@ -120,7 +121,7 @@ enum MetricsPreviewData {
             lastHour: [],
             alerts: alerts
         )
-        return DashboardServer(name: name, summary: summary, live: nil)
+        return DashboardServer(source: MetricsSource(name: name, isHiveMac: isHiveMac), summary: summary, live: nil)
     }
 
     static let dashboard = [
@@ -129,6 +130,7 @@ enum MetricsPreviewData {
             alerts: [.stoppedReporting(since: .now.addingTimeInterval(-2_700), withOthers: false)]
         ),
         server("mail", .reporting, cpu: 0.95, memory: 0.4, disk: 0.93, alerts: [.cpuBusy, .filesystemFilling(mountPoint: "/")]),
+        server("Studio", .reporting, cpu: 0.1, memory: 0.77, disk: 0.94, alerts: [.filesystemFilling(mountPoint: "/")], isHiveMac: true),
         server("B3 Debian root", .reporting, cpu: 0.12, memory: 0.38, disk: 0.64),
         server("Test: A4 Alpine", .reporting, cpu: 0.03, memory: 0.21, disk: 0.12),
     ]

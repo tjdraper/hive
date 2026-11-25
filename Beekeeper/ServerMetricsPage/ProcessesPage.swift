@@ -129,6 +129,7 @@ struct ProcessesPage: View {
                 Text(
                     "Grouped by command, user and container or service. "
                         + "Memory is each group's own, without what it shares, so it's approximate."
+                        + (hasOtherUsers ? " " + ProcessRow.otherUsersNote : "")
                 )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -142,6 +143,10 @@ struct ProcessesPage: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var hasOtherUsers: Bool {
+        if case .sample(_, _, .some) = processes { true } else { false }
     }
 
     /// When the list's figures are from, since the nearest kept may be a little off the moment chosen.

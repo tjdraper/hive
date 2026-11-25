@@ -56,7 +56,11 @@ struct HiveSettingsView: View {
 
             EmailSection(hive: hive, link: link)
 
-            BuildExpiryWarningsSection(isOn: state.settings.sendsBuildExpiryWarnings) { await saveBuildExpiryWarnings($0) }
+            BuildExpiryWarningsSection(isOn: state.settings.sendsBuildExpiryWarnings) {
+                await saveAlone(\.sendsBuildExpiryWarnings, $0)
+            }
+
+            HiveMacMetricsSection(isOn: state.settings.collectsMacMetrics) { await saveAlone(\.collectsMacMetrics, $0) }
 
             RecoverySection(hive: hive, link: link, copies: recovery)
 
@@ -205,15 +209,16 @@ struct HiveSettingsView: View {
         }
     }
 
-    /// Saved on its own, keeping any changes above that are waiting for Save.
-    private func saveBuildExpiryWarnings(_ isOn: Bool) async -> String? {
+    /// A switch saved on its own, keeping any changes above that are waiting for Save.
+    private func saveAlone(_ setting: WritableKeyPath<HiveSettings, Bool>, _ isOn: Bool) async -> String? {
         guard let state else { return nil }
         var new = state.settings
-        new.sendsBuildExpiryWarnings = isOn
+        new[keyPath: setting] = isOn
         do {
             let saved: HiveSettingsState = try await link.perform { try await $0.put(HiveEndpoint.settings, body: new) }
             self.state = saved
             draft?.sendsBuildExpiryWarnings = saved.settings.sendsBuildExpiryWarnings
+            draft?.collectsMacMetrics = saved.settings.collectsMacMetrics
             return nil
         } catch {
             return HiveLink.message(for: error)

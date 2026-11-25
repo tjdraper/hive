@@ -57,6 +57,11 @@ private extension SidebarItem {
             [.hive(hiveID), self]
         case .server(let hiveID, _):
             [.hive(hiveID), self]
+        // The Hive Mac's figures are under the Hive's own ID, with no server's page above them.
+        case .serverMetrics(let hiveID, let serverID) where serverID == hiveID:
+            [.hive(hiveID), .dashboard(hiveID: hiveID), self]
+        case .figurePage(let hiveID, let serverID, _) where serverID == hiveID:
+            [.hive(hiveID), .dashboard(hiveID: hiveID), .serverMetrics(hiveID: hiveID, serverID: hiveID), self]
         case .serverMetrics(let hiveID, let serverID), .job(let hiveID, let serverID, _):
             [.hive(hiveID), .server(hiveID: hiveID, serverID: serverID), self]
         case .figurePage(let hiveID, let serverID, _):

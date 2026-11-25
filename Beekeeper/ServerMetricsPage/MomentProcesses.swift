@@ -28,6 +28,7 @@ struct MomentProcesses: View {
     /// Seconds since 1970 on the server's clock.
     let moment: Date
     let processesHidden: Bool
+    var subjects = Subject.allCases
     let onClose: () -> Void
 
     @State private var processes: ProcessMoment?
@@ -39,11 +40,16 @@ struct MomentProcesses: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
-                    Picker("Show", selection: $subject) {
-                        ForEach(Subject.allCases) { Text($0.rawValue).tag($0) }
+                    if subjects.count > 1 {
+                        Picker("Show", selection: $subject) {
+                            ForEach(subjects) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    } else {
+                        Text(subject.rawValue)
+                            .font(.headline)
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
                     Spacer(minLength: 4)
                     Button("Close", systemImage: "xmark", action: onClose)
                         .labelStyle(.iconOnly)
@@ -104,8 +110,9 @@ struct MomentProcesses: View {
     /// When the figures are from, since the nearest kept may be a little off the moment chosen.
     private var caption: String? {
         switch processes {
-        case .sample(let takenAt, _, _):
+        case .sample(let takenAt, _, let otherUsers):
             "At \(ProcessRow.time(takenAt)). Memory is each group's own, so it's approximate."
+                + (otherUsers == nil ? "" : " " + ProcessRow.otherUsersNote)
         case .hour(let startsAt, _):
             "The busiest over the hour from \(ProcessRow.time(startsAt)), on average, with their highest. "
                 + "Single samples are kept for a day. Memory is approximate."
