@@ -48,12 +48,26 @@ enum MetricsRollup {
         serverKey: Int64,
         in database: Database
     ) throws {
+        let sql = rollUpStatements[table.table(resolution)] ?? rollUpStatement(table, to: resolution)
+        var arguments: [DatabaseValue] = [startsAt.databaseValue, serverKey.databaseValue]
+        if let kind = table.nameKind { arguments.append(kind.databaseValue) }
+        arguments += [startsAt.databaseValue, (startsAt + resolution.seconds).databaseValue]
+        try database.cachedStatement(sql: sql).execute(arguments: StatementArguments(arguments))
+    }
+
+    /// Each table's minute and hour statements, by the table they write, built once, since building one
+    /// took half as long again as running it, and every sample runs eight.
+    private static let rollUpStatements = Dictionary(uniqueKeysWithValues: MetricsTables.all.flatMap { table in
+        [MetricsResolution.minute, .hour].map { (table.table($0), rollUpStatement(table, to: $0)) }
+    })
+
+    private static func rollUpStatement(_ table: some MetricsTableShape, to resolution: MetricsResolution) -> String {
         let source: MetricsResolution = resolution == .hour ? .minute : .tenSeconds
         let figures = table.columns.flatMap { aggregates(of: $0, from: source) }
         let sampleCount = source == .tenSeconds ? "COUNT(*)" : "SUM(sampleCount)"
         let columns = [table.keyColumn, "startsAt", "sampleCount"] + table.figureColumns(resolution)
         let keys = table.nameKind == nil ? "serverKey = ?" : "nameID IN (SELECT id FROM metricsName WHERE serverKey = ? AND kind = ?)"
-        let sql = """
+        return """
         INSERT INTO \(table.table(resolution)) (\(columns.joined(separator: ", ")))
         SELECT \(table.keyColumn), ?, \(sampleCount), \(figures.joined(separator: ", "))
         FROM \(table.table(source))
@@ -61,10 +75,6 @@ enum MetricsRollup {
         GROUP BY \(table.keyColumn)
         \(replacing(table, resolution, when: ">="))
         """
-        var arguments: [DatabaseValue] = [startsAt.databaseValue, serverKey.databaseValue]
-        if let kind = table.nameKind { arguments.append(kind.databaseValue) }
-        arguments += [startsAt.databaseValue, (startsAt + resolution.seconds).databaseValue]
-        try database.cachedStatement(sql: sql).execute(arguments: StatementArguments(arguments))
     }
 
     /// The average, highest and lowest of a column over rows from `source`, as far as the column keeps them.

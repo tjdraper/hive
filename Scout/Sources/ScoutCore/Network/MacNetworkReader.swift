@@ -2,14 +2,14 @@
 import Darwin
 import ScoutProtocol
 
-/// A Mac's network interface: its flags, whether it has an address another machine could reach, and
-/// its 64-bit counters from `NET_RT_IFLIST2`. `getifaddrs`' own counters are 32 bits and wrap at 4 GB.
+/// A Mac's network interface, from `getifaddrs`: its index, its flags, and whether it has an address
+/// another machine could reach.
 struct MacInterface: Equatable {
     var name: String
+    var index: UInt16
     /// `IFF_` flags.
     var flags: UInt32
     var hasRoutableAddress: Bool
-    var counters: InterfaceCounters
 
     /// Interfaces that are up and carry the Mac's own traffic: those with an address that isn't
     /// loopback or link-local, such as Ethernet, Wi-Fi and Tailscale's. The system keeps many more
@@ -35,58 +35,53 @@ struct MacInterface: Equatable {
         return traffic
     }
 
+    /// Each interface, by its link-layer entry, which every interface has whatever its addresses.
     static func all() -> [MacInterface] {
-        let addresses = interfaceAddresses()
-        return withCounters(names: addresses.names).map { interface in
-            var interface = interface
-            interface.hasRoutableAddress = addresses.routable.contains(interface.name)
-            return interface
-        }
-    }
-
-    /// Each interface's name by its index, from its link-layer address, and the names of those with a
-    /// routable address. `if_indextoname` reads the whole list again for each interface, which on a Mac
-    /// with dozens of them cost more than the rest of a sample.
-    private static func interfaceAddresses() -> (names: [UInt16: String], routable: Set<String>) {
         var first: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&first) == 0 else { return ([:], []) }
+        guard getifaddrs(&first) == 0 else { return [] }
         defer { freeifaddrs(first) }
-        var names: [UInt16: String] = [:]
+        var interfaces: [String: MacInterface] = [:]
         var routable: Set<String> = []
         var next = first
         while let entry = next?.pointee {
             next = entry.ifa_next
             guard let address = entry.ifa_addr else { continue }
+            let name = String(cString: entry.ifa_name)
             switch Int32(address.pointee.sa_family) {
             case AF_LINK:
                 let index = UnsafeRawPointer(address).loadUnaligned(as: sockaddr_dl.self).sdl_index
-                names[index] = String(cString: entry.ifa_name)
+                interfaces[name] = MacInterface(name: name, index: index, flags: entry.ifa_flags, hasRoutableAddress: false)
             case AF_INET:
                 let ipv4 = UnsafeRawPointer(address).loadUnaligned(as: sockaddr_in.self).sin_addr.s_addr
                 // 169.254.0.0/16, in network order.
-                if ipv4 & 0xFFFF != 0xFEA9 { routable.insert(String(cString: entry.ifa_name)) }
+                if ipv4 & 0xFFFF != 0xFEA9 { routable.insert(name) }
             case AF_INET6:
                 let ipv6 = UnsafeRawPointer(address).loadUnaligned(as: sockaddr_in6.self).sin6_addr
                 // fe80::/10
                 let isLinkLocal = ipv6.__u6_addr.__u6_addr8.0 == 0xFE && ipv6.__u6_addr.__u6_addr8.1 & 0xC0 == 0x80
-                if !isLinkLocal { routable.insert(String(cString: entry.ifa_name)) }
+                if !isLinkLocal { routable.insert(name) }
             default:
                 continue
             }
         }
-        return (names, routable)
+        return interfaces.values.map { interface in
+            var interface = interface
+            interface.hasRoutableAddress = routable.contains(interface.name)
+            return interface
+        }
     }
 
-    /// Each interface's `if_msghdr2`, whose `if_data64` holds 64-bit counters, before its addresses are known.
-    private static func withCounters(names: [UInt16: String]) -> [MacInterface] {
-        var request: [Int32] = [CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST2, 0]
+    /// Its 64-bit counters, from its `if_msghdr2`. `getifaddrs`' own are 32 bits and wrap at 4 GB. Asked
+    /// for by index, since the whole list, with every interface's addresses, cost more than the rest
+    /// of reading the network.
+    func counters() -> InterfaceCounters? {
+        var request: [Int32] = [CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST2, Int32(index)]
         var length = 0
-        guard sysctl(&request, UInt32(request.count), nil, &length, nil, 0) == 0 else { return [] }
+        guard sysctl(&request, UInt32(request.count), nil, &length, nil, 0) == 0 else { return nil }
         var buffer = [UInt8](repeating: 0, count: length)
-        guard sysctl(&request, UInt32(request.count), &buffer, &length, nil, 0) == 0 else { return [] }
+        guard sysctl(&request, UInt32(request.count), &buffer, &length, nil, 0) == 0 else { return nil }
 
-        var interfaces: [MacInterface] = []
-        buffer.withUnsafeBytes { bytes in
+        return buffer.withUnsafeBytes { bytes -> InterfaceCounters? in
             var offset = 0
             while offset + MemoryLayout<if_msghdr>.size <= length {
                 let header = bytes.loadUnaligned(fromByteOffset: offset, as: if_msghdr.self)
@@ -94,10 +89,10 @@ struct MacInterface: Equatable {
                 defer { offset += Int(header.ifm_msglen) }
                 guard Int32(header.ifm_type) == RTM_IFINFO2, offset + MemoryLayout<if_msghdr2>.size <= length else { continue }
                 let message = bytes.loadUnaligned(fromByteOffset: offset, as: if_msghdr2.self)
-                guard let interfaceName = names[message.ifm_index] else { continue }
+                guard message.ifm_index == index else { continue }
                 let data = message.ifm_data
-                let counters = InterfaceCounters(
-                    name: interfaceName,
+                return InterfaceCounters(
+                    name: name,
                     receivedBytes: data.ifi_ibytes,
                     receiveErrors: data.ifi_ierrors,
                     receiveDrops: data.ifi_iqdrops,
@@ -105,12 +100,9 @@ struct MacInterface: Equatable {
                     sendErrors: data.ifi_oerrors,
                     sendDrops: 0
                 )
-                interfaces.append(MacInterface(
-                    name: interfaceName, flags: UInt32(bitPattern: message.ifm_flags), hasRoutableAddress: false, counters: counters
-                ))
             }
+            return nil
         }
-        return interfaces
     }
 }
 
@@ -120,7 +112,7 @@ struct MacNetworkReader {
 
     /// - Parameter elapsed: seconds since the previous reading, nil when there's none to compare with.
     mutating func read(elapsed: Double?) -> [NetworkInterfaceFigures] {
-        let interfaces = MacInterface.all().filter(\.isReported).map(\.counters).sorted { $0.name < $1.name }
+        let interfaces = MacInterface.all().filter(\.isReported).compactMap { $0.counters() }.sorted { $0.name < $1.name }
         defer { previous = Dictionary(interfaces.map { ($0.name, $0) }) { first, _ in first } }
         return interfaces.map { interface in
             let traffic = elapsed.flatMap { seconds in

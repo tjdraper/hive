@@ -5,10 +5,7 @@ import Testing
 
 struct MacNetworkReaderTests {
     private static func interface(_ name: String, flags: UInt32, routable: Bool) -> MacInterface {
-        let counters = InterfaceCounters(
-            name: name, receivedBytes: 0, receiveErrors: 0, receiveDrops: 0, sentBytes: 0, sendErrors: 0, sendDrops: 0
-        )
-        return MacInterface(name: name, flags: flags, hasRoutableAddress: routable, counters: counters)
+        MacInterface(name: name, index: 1, flags: flags, hasRoutableAddress: routable)
     }
 
     @Test("Interfaces carrying the Mac's own traffic are reported, and the system's and virtual machines' aren't")

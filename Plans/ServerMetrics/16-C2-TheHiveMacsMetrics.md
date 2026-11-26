@@ -64,10 +64,17 @@ Built in the second session:
   A sample now costs 13.5 ms with 10-second gaps (8.8 ms reading, 4.6 ms keeping), about 0.135% of a core. Most of what's left is a few calls into the kernel for each process, and writing the sample.
 
   Installed again, the daemon used 0.33% and 0.37% of a core in three-minute windows with the setting on and 0.18% with it off, so the sampling adds about 0.17%: down from 0.26%, but still a little over §3's 0.15%.
+- **A second pass,** with Time Profiler on a release build and instructions counted per sample, which unlike CPU time don't change with the core or what's in its caches, in steady state (75 minutes of history and full hours to roll up). From 52 million instructions a sample to 32 million:
+  - Choosing the top process groups sorted the groups themselves, copying their names at every comparison: half the process reader's time. They're sorted by position now. Scout on Linux uses the same code.
+  - The interface counters come from `NET_RT_IFLIST2` asked for by index, for the interfaces reported, rather than the whole list with every interface's addresses.
+  - The alert check reads its 75 minutes of samples by column position, rather than by name, which GRDB matches against every column's name, ignoring case, for every row.
+  - Each rollup's SQL is built once rather than for every sample's eight rollups.
+
+  Installed again, the daemon used 0.32% of a core in both three-minute windows with the setting on and 0.17% with it off, so the sampling adds about 0.16%: no clear change from the first pass, though the harness counted 40% fewer instructions. So most of what the installed daemon spends on it is outside what the harness runs. Live updates to a Beekeeper that's following, and waking every 10 seconds, are the likeliest places, but neither has been measured.
 
 Follow-ups:
 
-- Bring the installed daemon's added CPU under §3's 0.15%. Keeping a sample, 4.6 ms of the 13.5, is the next place to look, and it's the same path every Scout's report takes. C2 isn't checked off until it's under budget.
+- The installed daemon's added CPU is about 0.16%, against §3's 0.15%, which was written for Scout on a server. Decide whether that's within budget for the Hive Mac, or profile the daemon itself, with a Beekeeper following its live updates, to find the rest.
 - A Mac filesystem's page shows no disk charts: `disk(holding:)` matches Linux device names, and an APFS volume such as `disk3s1s1` is on a synthesized container, not the physical disk IOKit counts. Mapping it needs the container's physical store from the engine.
 - The Hive Mac uses the default alert limits, with no way to change them from Beekeeper yet.
 - The processes table's Where column is always empty for the Hive Mac.

@@ -127,12 +127,15 @@ struct ProcessReader {
     /// The top groups by CPU and by memory, each group once, busiest first. A Mac's are grouped the same way.
     static func top<Key: Hashable>(of groups: [Key: ProcessGroup]) -> [(key: Key, value: ProcessGroup)] {
         let all = Array(groups)
-        let byCPU = all.sorted { ($0.value.cpuCores ?? 0, $0.value.ownMemoryBytes) > ($1.value.cpuCores ?? 0, $1.value.ownMemoryBytes) }
-        let byMemory = all.sorted { $0.value.ownMemoryBytes > $1.value.ownMemoryBytes }
-        var chosen: Set<Key> = []
+        // Sorted by position, since sorting the groups themselves copies their names at every comparison,
+        // which cost more than reading the processes did.
+        let cpuThenMemory = all.map { ($0.value.cpuCores ?? 0, $0.value.ownMemoryBytes) }
+        let byCPU = all.indices.sorted { cpuThenMemory[$0] > cpuThenMemory[$1] }
+        let byMemory = all.indices.sorted { cpuThenMemory[$0].1 > cpuThenMemory[$1].1 }
+        var chosen: Set<Int> = []
         var top: [(key: Key, value: ProcessGroup)] = []
-        for group in byCPU.prefix(groupsByEachMeasure) + byMemory.prefix(groupsByEachMeasure) where chosen.insert(group.key).inserted {
-            top.append(group)
+        for index in byCPU.prefix(groupsByEachMeasure) + byMemory.prefix(groupsByEachMeasure) where chosen.insert(index).inserted {
+            top.append(all[index])
         }
         return top
     }

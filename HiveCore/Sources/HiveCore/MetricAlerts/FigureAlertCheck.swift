@@ -123,15 +123,17 @@ struct FigureAlertCheck: Sendable {
             ORDER BY startsAt
             """, arguments: [serverID, start, end])
         }
-        func figure(_ column: String) -> FigureHistory {
-            FigureHistory(samples: rows.compactMap { row in (row[column] as Double?).map { (row["startsAt"], $0) } })
+        // By position in the SELECT, since a column found by name is matched against every column's name,
+        // ignoring case, for each of the hour and more of rows this reads with every sample.
+        func figure(_ column: Int) -> FigureHistory {
+            FigureHistory(samples: rows.compactMap { row in (row[column] as Double?).map { (row[0], $0) } })
         }
         return ServerHistory(
-            availableShare: figure("availableShare"),
-            swapInPages: figure("swapInPages"),
-            busyShare: figure("busyShare"),
-            stealShare: figure("cpuSteal"),
-            loadPerCore: figure("loadPerCore")
+            availableShare: figure(1),
+            swapInPages: figure(2),
+            busyShare: figure(3),
+            stealShare: figure(4),
+            loadPerCore: figure(5)
         )
     }
 
