@@ -15,6 +15,7 @@ Add a check here whenever a slice leaves one, with the slice it came from. Check
 - [ ] **B9:** On Containers and Services, tapping a group opens its processes in a sheet. By Service and Each Container both list, and an unnamed container shows its short ID and what it runs.
 - [ ] **B9:** Every page reads well in light and dark, and with larger text in Settings › Display & Brightness.
 - [ ] **C1:** A dashboard row with an alert shows it in a line under the server's name, with a triangle beside the figure it's about. Change Alert Limits… on a server's page opens the limits as a sheet, with number keyboards, and Save and Cancel in its bar.
+- [ ] **C2:** The Hive Mac's row is named after the Hive, with a Mac's icon and a "Hive Mac" tag. Tapping it opens its page, and Back returns to the dashboard. Its CPU chart has only user and system, its moment sheet lists processes with no Containers or Services choice, and other users' processes show as one row with "—" for memory.
 
 ## iPad
 
@@ -23,5 +24,7 @@ Add a check here whenever a slice leaves one, with the slice it came from. Check
 - [ ] **B9:** Containers and Services shows its table, and selecting a group shows its processes beside it.
 
 ## Both
+
+- [ ] **C2:** Turning off Read the Hive Mac's Metrics in the Hive's settings takes the Hive Mac off the dashboard, and turning it back on brings it back.
 
 - [ ] **B9:** With a server's page open, leaving Beekeeper for a few minutes and coming back shows the figures from while it was away at once, the dashboard's cards move with samples again within seconds, and Run Now's progress on a job still moves.

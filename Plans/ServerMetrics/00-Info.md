@@ -31,7 +31,7 @@ Check off a slice here when its "done when" is true.
 ### Phase C — Alerts, Macs and release
 
 - [ ] [C1. Metric alerts](15-C1-MetricAlerts.md) — Mixed, 1–2 sessions
-- [ ] [C2. The Hive Mac's metrics](16-C2-TheHiveMacsMetrics.md) — Mixed, 1–2 sessions, installed build
+- [x] [C2. The Hive Mac's metrics](16-C2-TheHiveMacsMetrics.md) — Mixed, 1–2 sessions, installed build
 - [ ] [C3. Scout on other Macs](17-C3-ScoutOnOtherMacs.md) — Engine, 1–2 sessions, installed build, needs you
 - [ ] [C4. README and release](18-C4-READMEAndRelease.md) — Mixed, 1 session, needs you
 

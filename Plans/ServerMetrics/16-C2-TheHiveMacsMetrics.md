@@ -71,10 +71,11 @@ Built in the second session:
   - Each rollup's SQL is built once rather than for every sample's eight rollups.
 
   Installed again, the daemon used 0.32% of a core in both three-minute windows with the setting on and 0.17% with it off, so the sampling adds about 0.16%: no clear change from the first pass, though the harness counted 40% fewer instructions. So most of what the installed daemon spends on it is outside what the harness runs. Live updates to a Beekeeper that's following, and waking every 10 seconds, are the likeliest places, but neither has been measured.
+- **Accepted at about 0.16% of a core** for the Hive Mac, a little over §3's 0.15%, which was written for Scout on a server, where it competes with the server's own work. On the Hive Mac's 10 cores the difference is negligible. The readings were checked against `vm_stat`, `top`, `df` and `sysctl`, the figures Activity Monitor shows, rather than against the app itself.
 
 Follow-ups:
 
-- The installed daemon's added CPU is about 0.16%, against §3's 0.15%, which was written for Scout on a server. Decide whether that's within budget for the Hive Mac, or profile the daemon itself, with a Beekeeper following its live updates, to find the rest.
+- What the installed daemon spends on the Hive Mac's sampling outside what the harness runs, likely live updates to a following Beekeeper or waking every 10 seconds. Profile the development daemon with Beekeeper following it, if the cost ever matters.
 - A Mac filesystem's page shows no disk charts: `disk(holding:)` matches Linux device names, and an APFS volume such as `disk3s1s1` is on a synthesized container, not the physical disk IOKit counts. Mapping it needs the container's physical store from the engine.
 - The Hive Mac uses the default alert limits, with no way to change them from Beekeeper yet.
 - The processes table's Where column is always empty for the Hive Mac.
