@@ -10,6 +10,9 @@ import ScoutProtocol
 public enum InstallError: Error, Equatable {
     case notRoot
     case unknownInitSystem
+    /// Someone other than root can change the binary's folder, so a binary root runs from there could
+    /// be replaced, as Homebrew on an Intel Mac leaves `/usr/local/bin`.
+    case binaryFolderNotRoots(String)
     /// Running install the first time, or after uninstalling, needs a code.
     case needsCode
     case notACode
@@ -39,7 +42,7 @@ public struct InstallWorkflow {
     let say: (String) -> Void
 
     public init(say: @escaping (String) -> Void) {
-        self.init(layout: .server, system: PosixServerSystem(), source: "/proc/self/exe", say: say)
+        self.init(layout: .server, system: PosixServerSystem(), source: ScoutRelease.executablePath, say: say)
     }
 
     init(layout: InstallLayout, system: any ServerSystem, source: String, say: @escaping (String) -> Void) {
@@ -59,7 +62,8 @@ public struct InstallWorkflow {
         guard system.isRoot else { throw .notRoot }
         guard let initSystem = InitSystem.running(in: layout, tools: tools) else { throw .unknownInitSystem }
         let rule = try sshUser.map { name throws(InstallError) in try managementRule(for: name) }
-        let wasInstalled = system.user(named: InstallLayout.user) != nil
+        try checkBinaryFolder()
+        let wasInstalled = system.user(named: layout.user) != nil
             && access(layout.onDisk(initSystem.servicePath(in: layout)), F_OK) == 0
 
         let code = try readCode()
@@ -105,22 +109,62 @@ public struct InstallWorkflow {
         throw .noSudoOrDoas
     }
 
+    /// The binary's folder, or the nearest folder above it that's there, since installing makes the rest.
+    private func checkBinaryFolder() throws(InstallError) {
+        var folder = layout.binary
+        repeat {
+            folder = String(folder[..<(folder.lastIndex(of: "/") ?? folder.startIndex)])
+        } while !folder.isEmpty && access(layout.onDisk(folder), F_OK) != 0
+        guard system.onlyRootCanChange(folder: layout.onDisk(folder.isEmpty ? "/" : folder)) else {
+            throw .binaryFolderNotRoots(folder)
+        }
+    }
+
     /// Says whether it made the user, so a first install that fails can remove it again.
     private func makeUser() throws(InstallError) -> Bool {
-        let name = InstallLayout.user
+        let name = layout.user
         guard system.user(named: name) == nil else { return false }
+        if layout.system == .mac {
+            try makeMacUser(named: name)
+            return true
+        }
         let shell = tools.find("nologin") ?? "/bin/false"
         if let useradd = tools.find("useradd") {
-            let group = system.groupExists(name) ? ["--gid", name] : ["--user-group"]
+            let group = system.groupID(named: name) != nil ? ["--gid", name] : ["--user-group"]
             try run([useradd, "--system"] + group + ["--no-create-home", "--home-dir", layout.stateDirectory, "--shell", shell, name])
         } else if let adduser = tools.find("adduser"), let addgroup = tools.find("addgroup") {
             // BusyBox's, as on Alpine without the shadow package.
-            if !system.groupExists(name) { try run([addgroup, "-S", name]) }
+            if system.groupID(named: name) == nil { try run([addgroup, "-S", name]) }
             try run([adduser, "-S", "-D", "-H", "-h", layout.stateDirectory, "-s", shell, "-G", name, name])
         } else {
             throw .commandFailed(command: "useradd", output: "neither useradd nor adduser is installed")
         }
         return true
+    }
+
+    /// A hidden system user, and a group of its own, with an ID below a Mac's first person's (501),
+    /// from the top down, since macOS's own system users are mostly lower.
+    private func makeMacUser(named name: String) throws(InstallError) {
+        let dscl = tools.find("dscl") ?? "dscl"
+        guard let free = (300...499).reversed().first(where: { !system.idInUse(UInt32($0)) }) else {
+            throw .commandFailed(command: "dscl", output: "no ID between 300 and 499 is free for a system user")
+        }
+        let groupID: UInt32
+        if let existing = system.groupID(named: name) {
+            groupID = existing
+        } else {
+            groupID = UInt32(free)
+            for (key, value) in [("PrimaryGroupID", "\(groupID)"), ("RealName", "Hive Scout"), ("Password", "*")] {
+                try run([dscl, ".", "-create", "/Groups/\(name)", key, value])
+            }
+        }
+        let fields = [
+            ("UniqueID", "\(free)"), ("PrimaryGroupID", "\(groupID)"), ("UserShell", "/usr/bin/false"),
+            ("NFSHomeDirectory", "/var/empty"), ("RealName", "Hive Scout"), ("Password", "*"), ("IsHidden", "1"),
+        ]
+        for (key, value) in fields {
+            try run([dscl, ".", "-create", "/Users/\(name)", key, value])
+        }
     }
 
     /// Makes the folder if it's missing and gives it to Scout's user, without looking inside it.
@@ -133,7 +177,7 @@ public struct InstallWorkflow {
         let descriptor = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard descriptor >= 0 else { throw .file(.couldNotWrite(path: path, errno: errno)) }
         defer { SystemFiles.close(descriptor) }
-        guard let user = system.user(named: InstallLayout.user), system.changeOwner(of: descriptor, to: user),
+        guard let user = system.user(named: layout.user), system.changeOwner(of: descriptor, to: user),
               fchmod(descriptor, 0o700) == 0
         else { throw .file(.couldNotWrite(path: path, errno: errno)) }
         return created
@@ -147,10 +191,21 @@ public struct InstallWorkflow {
 
     private func copyBinary() throws(InstallError) -> Bool {
         do {
+            try makeBinaryFolder()
             let bytes = try InstalledFile.contents(of: source)
             return try InstalledFile.replace(layout.onDisk(layout.binary), with: bytes, mode: 0o755)
         } catch {
             throw .file(error)
+        }
+    }
+
+    /// A Mac may have no `/usr/local/bin` yet.
+    private func makeBinaryFolder() throws(InstalledFileError) {
+        var folder = ""
+        for part in layout.binary.split(separator: "/").dropLast() {
+            folder += "/\(part)"
+            let path = layout.onDisk(folder)
+            guard access(path, F_OK) == 0 || mkdir(path, 0o755) == 0 else { throw .couldNotWrite(path: path, errno: errno) }
         }
     }
 
@@ -192,7 +247,7 @@ public struct InstallWorkflow {
 
     /// Says whether a reload was enough, without a restart.
     private func start(_ initSystem: InitSystem, serviceChanged: Bool, reloadOnly: Bool) throws(InstallError) -> Bool {
-        let name = InstallLayout.user
+        let name = layout.user
         switch initSystem {
         case .systemd:
             let systemctl = tools.find("systemctl") ?? "systemctl"
@@ -206,6 +261,20 @@ public struct InstallWorkflow {
             let rcService = tools.find("rc-service") ?? "rc-service"
             if reloadOnly, system.run([rcService, name, "reload"]).status == 0 { return true }
             try run([rcService, name, "restart"])
+        case .launchd:
+            let launchctl = tools.find("launchctl") ?? "launchctl"
+            let target = InitSystem.launchdTarget
+            let loaded = system.run([launchctl, "print", target]).status == 0
+            // `run` passes the signal on to the process that sends.
+            if reloadOnly, loaded, system.run([launchctl, "kill", "SIGHUP", target]).status == 0 { return true }
+            if serviceChanged || !loaded {
+                // launchd reads the file only when it's loaded.
+                if loaded { try run([launchctl, "bootout", target]) }
+                try run([launchctl, "enable", target])
+                try run([launchctl, "bootstrap", "system", layout.launchDaemon])
+            } else {
+                try run([launchctl, "kickstart", "-k", target])
+            }
         }
         return false
     }

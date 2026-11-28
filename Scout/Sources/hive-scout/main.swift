@@ -16,22 +16,25 @@ guard let command = ScoutCommand(arguments: Array(CommandLine.arguments.dropFirs
     exit(64)
 }
 
-switch command {
-case .enroll, .addresses, .run, .status:
+#if os(macOS)
+// On a Mac, `run` started as root keeps root only to take samples, and its `send` drops it.
+let dropsRootFirst = command.dropsRootFirst && !(command.isRun && geteuid() == 0)
+#else
+let dropsRootFirst = command.dropsRootFirst
+#endif
+if dropsRootFirst {
     do {
         try ScoutUser.dropRoot()
     } catch {
         Console.log(ScoutUser.message(for: error))
         exit(77)
     }
-case .sample, .watch, .install, .uninstall, .manage:
-    break
 }
 
 switch command {
 case .sample:
     let sample = try await ScoutEventLoop.shared.run {
-        var sampler = Sampler()
+        var sampler = ServerSampler()
         return await sampler.sample(takenAt: SampleSchedule.now() / 1_000_000_000)
     }
     let encoder = JSONEncoder()
@@ -79,7 +82,18 @@ case .addresses(let stateDirectory):
         Console.log("Couldn't save the addresses: \(error)")
         exit(1)
     }
-case let .run(stateDirectory, runtimeDirectory):
+case let .run(stateDirectory, runtimeDirectory) where !dropsRootFirst:
+    #if os(macOS)
+    do {
+        try await ScoutEventLoop.shared.run {
+            try await PrivilegedSampling.run(stateDirectory: stateDirectory, runtimeDirectory: runtimeDirectory)
+        }
+    } catch {
+        Console.log("Stopped: \(error)")
+        exit(1)
+    }
+    #endif
+case let .run(stateDirectory, runtimeDirectory), let .send(stateDirectory, runtimeDirectory):
     let enrollment: SavedEnrollment
     do {
         guard let saved = try EnrollmentStore(directory: stateDirectory).load() else {
@@ -92,12 +106,20 @@ case let .run(stateDirectory, runtimeDirectory):
         exit(78)
     }
     do {
-        let loop = RunLoop(
-            enrollment: enrollment,
-            store: EnrollmentStore(directory: stateDirectory),
-            statusFile: SendingStatusFile(directory: runtimeDirectory)
-        )
-        try await ScoutEventLoop.shared.run { try await loop.run() }
+        try await ScoutEventLoop.shared.run {
+            let samples = if case .send = command {
+                try await SampleHandover.samples(on: .shared)
+            } else {
+                RunLoop.samplesTakenHere()
+            }
+            let loop = RunLoop(
+                enrollment: enrollment,
+                store: EnrollmentStore(directory: stateDirectory),
+                statusFile: SendingStatusFile(directory: runtimeDirectory),
+                samples: samples
+            )
+            try await loop.run()
+        }
     } catch {
         Console.log("Stopped: \(error)")
         exit(1)

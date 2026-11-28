@@ -10,7 +10,10 @@ enum InstallMessage {
             "Run this as root, such as with sudo."
         case .unknownInitSystem:
             "This server doesn't run systemd or OpenRC, so Scout can't install a service. Nothing was installed. "
-                + "Your init system can run hive-scout run as the \(InstallLayout.user) user itself."
+                + "Your init system can run hive-scout run as the \(InstallLayout.server.user) user itself."
+        case .binaryFolderNotRoots(let folder):
+            "Users other than root can change \(folder), as Homebrew on an Intel Mac leaves it, so they could replace "
+                + "Scout's binary, which runs as root. Nothing was installed."
         case .needsCode:
             "Scout isn't installed yet, so it needs an enrollment code from Beekeeper. Nothing was installed."
         case .notACode:

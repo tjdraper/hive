@@ -18,7 +18,7 @@ enum ScoutUser {
     /// Does nothing when not run as root.
     static func dropRoot() throws(DropError) {
         guard geteuid() == 0 else { return }
-        guard let entry = getpwnam(InstallLayout.user), entry.pointee.pw_uid != 0 else { throw .noUser }
+        guard let entry = getpwnam(InstallLayout.server.user), entry.pointee.pw_uid != 0 else { throw .noUser }
         let (uid, gid) = (entry.pointee.pw_uid, entry.pointee.pw_gid)
         guard setgroups(0, nil) == 0, setgid(gid) == 0, setuid(uid) == 0 else { throw .couldNotDrop(errno: errno) }
         // Root can't be taken back.
@@ -27,8 +27,8 @@ enum ScoutUser {
 
     static func message(for error: DropError) -> String {
         switch error {
-        case .noUser: "There's no \(InstallLayout.user) user. Install Scout with sudo hive-scout install first."
-        case .couldNotDrop(let errno): "Couldn't switch to the \(InstallLayout.user) user (errno \(errno))."
+        case .noUser: "There's no \(InstallLayout.server.user) user. Install Scout with sudo hive-scout install first."
+        case .couldNotDrop(let errno): "Couldn't switch to the \(InstallLayout.server.user) user (errno \(errno))."
         }
     }
 }

@@ -22,7 +22,12 @@ struct CommandResult: Equatable {
 protocol ServerSystem {
     var isRoot: Bool { get }
     func user(named name: String) -> SystemUser?
-    func groupExists(_ name: String) -> Bool
+    func groupID(named name: String) -> gid_t?
+    /// Whether a user or group has the ID, for choosing a Mac's system user's.
+    func idInUse(_ id: UInt32) -> Bool
+    /// Whether only root can change the folder at `path` or any folder above it, so a binary root runs
+    /// from there can't be replaced by anyone else.
+    func onlyRootCanChange(folder path: String) -> Bool
     /// Runs a program by its absolute path, without a shell.
     func run(_ arguments: [String]) -> CommandResult
     /// Runs `binary enroll` with the code on standard input. Run as root, `enroll` drops to Scout's
@@ -62,8 +67,25 @@ struct PosixServerSystem: ServerSystem {
         getpwnam(name).map { SystemUser(uid: $0.pointee.pw_uid, gid: $0.pointee.pw_gid) }
     }
 
-    func groupExists(_ name: String) -> Bool {
-        getgrnam(name) != nil
+    func groupID(named name: String) -> gid_t? {
+        getgrnam(name).map(\.pointee.gr_gid)
+    }
+
+    func idInUse(_ id: UInt32) -> Bool {
+        getpwuid(uid_t(id)) != nil || getgrgid(gid_t(id)) != nil
+    }
+
+    func onlyRootCanChange(folder path: String) -> Bool {
+        guard let resolved = realpath(path, nil) else { return false }
+        defer { free(resolved) }
+        var folder = String(cString: resolved)
+        while true {
+            var status = stat()
+            guard stat(folder, &status) == 0, status.st_uid == 0, status.st_mode & (S_IWGRP | S_IWOTH) == 0 else { return false }
+            guard folder != "/" else { return true }
+            let parent = folder.split(separator: "/").dropLast().joined(separator: "/")
+            folder = "/" + parent
+        }
     }
 
     func run(_ arguments: [String]) -> CommandResult {

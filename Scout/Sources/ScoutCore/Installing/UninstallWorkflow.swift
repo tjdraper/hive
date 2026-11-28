@@ -38,7 +38,7 @@ public struct UninstallWorkflow {
             throw .file(error)
         }
         try removeStateFolder()
-        // OpenRC's folder; systemd removes its own when the service stops.
+        // OpenRC's folder; systemd removes its own when the service stops, and a Mac's is the state folder.
         try remove(folder: layout.runtimeDirectory)
         try removeUser()
         say("Uninstalled Scout.")
@@ -47,7 +47,7 @@ public struct UninstallWorkflow {
     /// Stops the service first, so none of Scout's processes is left to change the state folder while
     /// it's removed, or to keep its user from being removed.
     private func stopService() throws(InstallError) {
-        let name = InstallLayout.user
+        let name = layout.user
         let unit = layout.onDisk(layout.systemdUnit)
         if access(unit, F_OK) == 0 {
             let systemctl = tools.find("systemctl") ?? "systemctl"
@@ -62,6 +62,12 @@ public struct UninstallWorkflow {
             _ = system.run([tools.find("rc-update") ?? "rc-update", "del", name, "default"])
             try removeFile(script)
         }
+        let daemon = layout.onDisk(layout.launchDaemon)
+        if access(daemon, F_OK) == 0 {
+            // Fails when it isn't loaded, which leaves nothing to stop.
+            _ = system.run([tools.find("launchctl") ?? "launchctl", "bootout", InitSystem.launchdTarget])
+            try removeFile(daemon)
+        }
     }
 
     func removeStateFolder() throws(InstallError) {
@@ -69,7 +75,13 @@ public struct UninstallWorkflow {
     }
 
     func removeUser() throws(InstallError) {
-        let name = InstallLayout.user
+        let name = layout.user
+        if layout.system == .mac {
+            let dscl = tools.find("dscl") ?? "dscl"
+            if system.user(named: name) != nil { try run([dscl, ".", "-delete", "/Users/\(name)"]) }
+            if system.groupID(named: name) != nil { try run([dscl, ".", "-delete", "/Groups/\(name)"]) }
+            return
+        }
         if let user = system.user(named: name) {
             // A systemd user manager, kept by lingering or a login, still runs as the user, and
             // userdel refuses a user with processes.
@@ -81,7 +93,7 @@ public struct UninstallWorkflow {
             try run(command)
         }
         // userdel removes the user's own group on most distributions, but not all.
-        if system.groupExists(name) {
+        if system.groupID(named: name) != nil {
             try run(tools.find("groupdel").map { [$0, name] } ?? [tools.find("delgroup") ?? "delgroup", name])
         }
     }

@@ -13,8 +13,11 @@ enum ScoutCommand: Equatable {
     case watch(HiveTarget?)
     /// Enrolls with a Hive through a code read from standard input, saving the key in the folder.
     case enroll(stateDirectory: String)
-    /// Samples every 10 seconds and sends to the Hive it enrolled with, as the service does.
+    /// Samples every 10 seconds and sends to the Hive it enrolled with, as the service does. On a Mac,
+    /// started as root, it only samples, and starts `send` to do the rest.
     case run(stateDirectory: String, runtimeDirectory: String)
+    /// Sends the samples `run` hands it on standard input, as Scout's own user.
+    case send(stateDirectory: String, runtimeDirectory: String)
     /// Replaces the enrollment's addresses with those read as JSON from standard input, keeping its key
     /// and pin. `manage` runs it for Hive, as Scout's own user.
     case addresses(stateDirectory: String)
@@ -28,12 +31,26 @@ enum ScoutCommand: Equatable {
     /// takes no arguments, so the `sudo` and `doas` rules allow none.
     case manage
 
+    /// Commands that touch Scout's state switch to its user for good before anything else, since that
+    /// user owns the state folder, so root can't trust what's in it.
+    var dropsRootFirst: Bool {
+        switch self {
+        case .enroll, .addresses, .run, .send, .status: true
+        case .sample, .watch, .install, .uninstall, .manage: false
+        }
+    }
+
+    var isRun: Bool {
+        if case .run = self { true } else { false }
+    }
+
     static let usage = """
         usage: hive-scout sample
                hive-scout watch [--tls <host>:<port> --pin <SHA-256 of Hive's key, in hex>]
                hive-scout enroll [--state-directory <path>] < code
                hive-scout addresses [--state-directory <path>] < addresses
                hive-scout run [--state-directory <path>] [--runtime-directory <path>]
+               hive-scout send [--state-directory <path>] [--runtime-directory <path>] < samples
                hive-scout status [--runtime-directory <path>]
                sudo hive-scout install [--ssh-user <name>] < code
                sudo hive-scout uninstall
@@ -73,12 +90,12 @@ enum ScoutCommand: Equatable {
         case "addresses":
             guard let folders = folders(from: options, allowed: ["--state-directory"]) else { return nil }
             return .addresses(stateDirectory: folders["--state-directory"] ?? EnrollmentStore.defaultDirectory)
-        case "run":
+        case "run", "send":
             guard let folders = folders(from: options, allowed: ["--state-directory", "--runtime-directory"]) else { return nil }
-            return .run(
-                stateDirectory: folders["--state-directory"] ?? EnrollmentStore.defaultDirectory,
-                runtimeDirectory: folders["--runtime-directory"] ?? SendingStatusFile.defaultDirectory
-            )
+            let state = folders["--state-directory"] ?? EnrollmentStore.defaultDirectory
+            let runtime = folders["--runtime-directory"] ?? SendingStatusFile.defaultDirectory
+            return name == "run" ? .run(stateDirectory: state, runtimeDirectory: runtime)
+                : .send(stateDirectory: state, runtimeDirectory: runtime)
         case "status":
             guard let folders = folders(from: options, allowed: ["--runtime-directory"]) else { return nil }
             return .status(runtimeDirectory: folders["--runtime-directory"] ?? SendingStatusFile.defaultDirectory)

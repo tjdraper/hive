@@ -2,7 +2,7 @@
 import Testing
 
 struct ServiceAndRuleTextTests {
-    private let layout = InstallLayout.server
+    private let layout = InstallLayout(root: "/")
 
     private static let systemdUnit = """
         # Written by hive-scout install, which replaces it when run again.
@@ -105,6 +105,45 @@ struct ServiceAndRuleTextTests {
             }
 
             """)
+    }
+
+    @Test("The LaunchDaemon starts Scout as root at boot, keeps it running, and runs it in the background")
+    func launchDaemon() {
+        let mac = InstallLayout(root: "/", system: .mac)
+        #expect(InitSystem.launchd.serviceFile(for: mac).text == """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <!-- Written by hive-scout install, which replaces it when run again. -->
+            <plist version="1.0">
+            <dict>
+                <key>Label</key>
+                <string>com.buzzingpixel.hive-scout</string>
+                <key>ProgramArguments</key>
+                <array>
+                    <string>/usr/local/bin/hive-scout</string>
+                    <string>run</string>
+                    <string>--state-directory</string>
+                    <string>/Library/Application Support/Hive Scout</string>
+                    <string>--runtime-directory</string>
+                    <string>/Library/Application Support/Hive Scout</string>
+                </array>
+                <key>RunAtLoad</key>
+                <true/>
+                <key>KeepAlive</key>
+                <true/>
+                <key>ThrottleInterval</key>
+                <integer>10</integer>
+                <key>ProcessType</key>
+                <string>Background</string>
+                <key>Nice</key>
+                <integer>10</integer>
+                <key>Umask</key>
+                <integer>63</integer>
+            </dict>
+            </plist>
+
+            """)
+        #expect(InitSystem.launchd.serviceFile(for: mac).mode == 0o644)
     }
 
     @Test("The sudo rule lets one user run only Scout's management command as root, without a terminal")

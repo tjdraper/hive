@@ -30,10 +30,11 @@ public struct SendingStatus: Codable, Equatable, Sendable {
     public init() {}
 }
 
-/// The running Scout's status, in its runtime folder, which is in memory, so writing it with every
-/// sample doesn't write to disk (§3).
+/// The running Scout's status, in its runtime folder. On Linux that's in memory, so writing it with
+/// every sample doesn't write to disk (§3). A Mac has no such folder, so it isn't synced to disk at each
+/// write either: losing the last one to a crash costs nothing.
 public struct SendingStatusFile: Sendable {
-    public static let defaultDirectory = "/run/hive-scout"
+    public static let defaultDirectory = InstallLayout.server.runtimeDirectory
     static let fileName = "status.json"
 
     let path: String
@@ -48,6 +49,6 @@ public struct SendingStatusFile: Sendable {
     }
 
     public func save(_ status: SendingStatus) throws {
-        try PrivateFile.write(Array(JSONEncoder().encode(status)), to: path)
+        try PrivateFile.write(Array(JSONEncoder().encode(status)), to: path, synced: false)
     }
 }

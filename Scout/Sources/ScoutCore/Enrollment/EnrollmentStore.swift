@@ -61,7 +61,7 @@ public enum AddressChangeError: Error, Equatable {
 
 /// The file in Scout's state folder holding its enrollment, readable only by the user Scout runs as.
 public struct EnrollmentStore: Sendable {
-    public static let defaultDirectory = "/var/lib/hive-scout"
+    public static let defaultDirectory = InstallLayout.server.stateDirectory
     static let fileName = "enrollment.json"
 
     let path: String

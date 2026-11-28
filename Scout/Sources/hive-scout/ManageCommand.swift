@@ -74,7 +74,7 @@ enum ManageCommand {
 
     private static func outcome(of error: InstallError) -> ManagementResponse.Outcome {
         switch error {
-        case .notRoot, .unknownInitSystem, .needsCode, .notACode, .sshUserNotAName, .sshUserMissing, .noSudoOrDoas,
+        case .notRoot, .unknownInitSystem, .binaryFolderNotRoots, .needsCode, .notACode, .sshUserNotAName, .sshUserMissing, .noSudoOrDoas,
              .enrollmentFailed:
             .refused
         case .ruleRefused, .commandFailed, .file:

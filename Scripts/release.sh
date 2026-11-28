@@ -3,7 +3,8 @@
 # Builds a release of Hive and Beekeeper for the Mac under one version: Developer ID exports of both,
 # notarized and stapled, an installer package that puts Hive.app in /Applications owned by root, and the
 # Sparkle zips and appcast entries for both apps. Hive.app carries Scout's Linux binaries, built and
-# signed with the Sparkle key, which are also attached to the GitHub release with their SHA-256s.
+# signed with the Sparkle key, which are also attached to the GitHub release with their SHA-256s, as is
+# Scout's notarized universal binary for other Macs.
 # Publishing is left to you: the script prints the commands at the end.
 #
 # With --rehearsal, builds the same things for trying an update on this Mac only. It skips the git
@@ -320,6 +321,21 @@ EOF
         || fail "the release notes are empty; write them before releasing: $RELEASE_NOTES"
 fi
 
+# Fails unless the statement beside the binary at $1 is signed with the Sparkle key, which is the one
+# key a released Scout takes updates from.
+check_statement_signature() {
+    swift - "$SPARKLE_PUBLIC_KEY" "$1.statement" <<'SWIFT' || fail "$(basename "$1")'s statement isn't signed with the Sparkle key"
+import CryptoKit
+import Foundation
+let arguments = CommandLine.arguments
+let key = try Curve25519.Signing.PublicKey(rawRepresentation: Data(base64Encoded: arguments[1])!)
+let lines = try String(contentsOfFile: arguments[2], encoding: .utf8).split(separator: "\n")
+let signed = lines.dropLast().joined(separator: "\n") + "\n"
+let signature = Data(base64Encoded: String(lines.last!.dropFirst("signature ".count)))!
+exit(lines.count == 5 && key.isValidSignature(signature, for: Data(signed.utf8)) ? 0 : 1)
+SWIFT
+}
+
 # --- Build -----------------------------------------------------------------
 
 rm -rf "$WORK_DIR"
@@ -332,6 +348,7 @@ step "Building Scout for Linux, signed with the Sparkle key"
 "$REPO_ROOT/Scripts/build-scout.sh" --release
 readonly SCOUT_DIR="$REPO_ROOT/build/scout/linux"
 readonly SCOUT_FILES=(hive-scout-linux-x86_64 hive-scout-linux-aarch64)
+readonly SCOUT_MAC_BINARY="$REPO_ROOT/build/scout/macos/hive-scout-macos-universal"
 
 # Where the command Beekeeper builds downloads Scout from. A rehearsal has nowhere a server could reach.
 if [[ -n "$REHEARSAL" ]]; then
@@ -410,17 +427,19 @@ for file in "${SCOUT_FILES[@]}"; do
     for app in "${APPS[@]}"; do
         [[ "$(info_value "$WORK_DIR/export-$app/$app.app" "$plist_key")" == "$hash" ]] || fail "$app's $plist_key isn't $file's hash"
     done
-    swift - "$SPARKLE_PUBLIC_KEY" "$binary.statement" <<'SWIFT' || fail "$file's statement isn't signed with the Sparkle key"
-import CryptoKit
-import Foundation
-let arguments = CommandLine.arguments
-let key = try Curve25519.Signing.PublicKey(rawRepresentation: Data(base64Encoded: arguments[1])!)
-let lines = try String(contentsOfFile: arguments[2], encoding: .utf8).split(separator: "\n")
-let signed = lines.dropLast().joined(separator: "\n") + "\n"
-let signature = Data(base64Encoded: String(lines.last!.dropFirst("signature ".count)))!
-exit(lines.count == 5 && key.isValidSignature(signature, for: Data(signed.utf8)) ? 0 : 1)
-SWIFT
+    check_statement_signature "$binary"
 done
+# The Mac binary isn't in Hive.app. A curl download isn't quarantined, so Gatekeeper never checks it,
+# and it's notarized below for anyone who downloads it in a browser.
+[[ -f "$SCOUT_MAC_BINARY" && -f "$SCOUT_MAC_BINARY.statement" ]] || fail "no Mac Scout and statement in build/scout/macos"
+[[ "$(sed -n 's/^sha256 //p' "$SCOUT_MAC_BINARY.statement")" == "$(shasum -a 256 "$SCOUT_MAC_BINARY" | cut -d ' ' -f 1)" ]] \
+    || fail "the Mac Scout's statement names another binary"
+signature="$(codesign --display --verbose=2 "$SCOUT_MAC_BINARY" 2>&1)"
+codesign --verify --strict "$SCOUT_MAC_BINARY" || fail "the Mac Scout's signature doesn't verify"
+grep -q "flags=.*runtime" <<<"$signature" || fail "the Mac Scout isn't signed with the hardened runtime"
+grep -q "Authority=Developer ID Application" <<<"$signature" || fail "the Mac Scout isn't signed with Developer ID"
+grep -q "^Timestamp=" <<<"$signature" || fail "the Mac Scout's signature has no secure timestamp, which notarization needs"
+check_statement_signature "$SCOUT_MAC_BINARY"
 for app in "${APPS[@]}"; do
     [[ "$(info_value "$WORK_DIR/export-$app/$app.app" ScoutDownloadURL)" == "$scout_download_url" ]] \
         || fail "$app's ScoutDownloadURL isn't '$scout_download_url'"
@@ -449,6 +468,12 @@ if [[ -z "$REHEARSAL" ]]; then
         xcrun stapler validate "$exported"
         spctl --assess --type exec --verbose=2 "$exported"
     done
+
+    # A bare binary can be notarized but not stapled, so Gatekeeper looks its ticket up online.
+    step "Notarizing Scout for macOS (this waits for Apple)"
+    submission="$WORK_DIR/hive-scout-macos-notarization.zip"
+    ditto -c -k "$SCOUT_MAC_BINARY" "$submission"
+    xcrun notarytool submit "$submission" "${notary_key[@]}" --wait
 fi
 
 # --- Installer package -----------------------------------------------------
@@ -534,6 +559,8 @@ step "Adding Scout's binaries to the release"
     done
     shasum -a 256 "${SCOUT_FILES[@]}" > "$OUTPUT_DIR/hive-scout-SHA256SUMS"
 )
+cp "$SCOUT_MAC_BINARY" "$SCOUT_MAC_BINARY.statement" "$OUTPUT_DIR/"
+(cd "$(dirname "$SCOUT_MAC_BINARY")" && shasum -a 256 "$(basename "$SCOUT_MAC_BINARY")") >> "$OUTPUT_DIR/hive-scout-SHA256SUMS"
 
 # --- Next steps ------------------------------------------------------------
 
@@ -571,7 +598,7 @@ Built and notarized Hive and Beekeeper $VERSION, with Scout $(sed -n 's/^SCOUT_V
   $PACKAGE
   $OUTPUT_DIR/Hive-$VERSION.zip
   $OUTPUT_DIR/Beekeeper-$VERSION.zip
-  $OUTPUT_DIR/hive-scout-linux-x86_64, -aarch64, their statements, and hive-scout-SHA256SUMS
+  $OUTPUT_DIR/hive-scout-linux-x86_64, -aarch64, -macos-universal, their statements, and hive-scout-SHA256SUMS
 
 Publish in this order. The tag lands on the release commit, and the downloads go live before the
 appcasts point at them:

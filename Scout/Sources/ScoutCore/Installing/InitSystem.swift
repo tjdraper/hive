@@ -6,13 +6,15 @@ import Musl
 import Darwin
 #endif
 
-/// What runs Scout as a service: systemd on almost every distribution, OpenRC on Alpine.
+/// What runs Scout as a service: systemd on almost every distribution, OpenRC on Alpine, launchd on a Mac.
 enum InitSystem: Equatable {
     case systemd
     case openRC
+    case launchd
 
     /// The one this server was started with. Nil for any other, which can run `hive-scout run` itself.
     static func running(in layout: InstallLayout, tools: ServerTools) -> Self? {
+        if layout.system == .mac { return tools.find("launchctl") != nil ? .launchd : nil }
         // systemd's own test of whether it started the server (`sd_booted`).
         if isDirectory(layout.onDisk("/run/systemd/system")) { return .systemd }
         if isDirectory(layout.onDisk("/run/openrc")), tools.find("openrc-run") != nil { return .openRC }
@@ -23,6 +25,7 @@ enum InitSystem: Equatable {
         switch self {
         case .systemd: layout.systemdUnit
         case .openRC: layout.openRCScript
+        case .launchd: layout.launchDaemon
         }
     }
 
@@ -31,8 +34,12 @@ enum InitSystem: Equatable {
         switch self {
         case .systemd: (Self.systemdUnit(for: layout), 0o644)
         case .openRC: (Self.openRCScript(for: layout), 0o755)
+        case .launchd: (Self.launchDaemon(for: layout), 0o644)
         }
     }
+
+    /// The service as `launchctl` names it.
+    static let launchdTarget = "system/\(InstallLayout.launchdLabel)"
 
     private static func isDirectory(_ path: String) -> Bool {
         var status = stat()
@@ -78,8 +85,8 @@ enum InitSystem: Equatable {
             [Service]
             ExecStart=\(layout.binary) run --state-directory \(layout.stateDirectory) --runtime-directory \(layout.runtimeDirectory)
             ExecReload=/bin/kill -HUP $MAINPID
-            User=\(InstallLayout.user)
-            Group=\(InstallLayout.user)
+            User=\(layout.user)
+            Group=\(layout.user)
             Restart=on-failure
             RestartSec=10
             # Scout exits with 78 when it hasn't enrolled, which starting again can't fix.
@@ -102,7 +109,7 @@ enum InitSystem: Equatable {
     }
 
     private static func openRCScript(for layout: InstallLayout) -> String {
-        let user = InstallLayout.user
+        let user = layout.user
         return """
             #!/sbin/openrc-run
             # Written by hive-scout install, which replaces it when run again.
@@ -141,6 +148,42 @@ enum InitSystem: Equatable {
                 supervise-daemon "${RC_SVCNAME}" --signal HUP
                 eend $?
             }
+
+            """
+    }
+
+    /// Started as root, since on a Mac only root can read other users' processes. `run` keeps root only
+    /// to take samples, and hands them to a process of its own that drops to Scout's user before doing
+    /// anything else. launchd can't cap memory or CPU as systemd does; a background process gets the
+    /// lowest CPU and I/O priority instead.
+    private static func launchDaemon(for layout: InstallLayout) -> String {
+        let arguments = [layout.binary, "run", "--state-directory", layout.stateDirectory, "--runtime-directory", layout.runtimeDirectory]
+        return """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <!-- Written by hive-scout install, which replaces it when run again. -->
+            <plist version="1.0">
+            <dict>
+                <key>Label</key>
+                <string>\(InstallLayout.launchdLabel)</string>
+                <key>ProgramArguments</key>
+                <array>
+            \(arguments.map { "        <string>\($0)</string>" }.joined(separator: "\n"))
+                </array>
+                <key>RunAtLoad</key>
+                <true/>
+                <key>KeepAlive</key>
+                <true/>
+                <key>ThrottleInterval</key>
+                <integer>10</integer>
+                <key>ProcessType</key>
+                <string>Background</string>
+                <key>Nice</key>
+                <integer>10</integer>
+                <key>Umask</key>
+                <integer>63</integer>
+            </dict>
+            </plist>
 
             """
     }

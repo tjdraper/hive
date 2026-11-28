@@ -39,10 +39,12 @@ enum PrivateFile {
         }
     }
 
-    static func write(_ bytes: [UInt8], to path: String) throws {
+    /// - Parameter synced: whether it's on the disk before it's renamed into place, for what a crash
+    ///   mustn't lose, such as Scout's key.
+    static func write(_ bytes: [UInt8], to path: String, synced: Bool = true) throws {
         let staged = path + ".new"
         do {
-            try writeStaged(bytes, to: staged)
+            try writeStaged(bytes, to: staged, synced: synced)
             guard rename(staged, path) == 0 else { throw PrivateFileError.couldNotWrite(path: path, errno: errno) }
         } catch {
             unlink(staged)
@@ -54,11 +56,11 @@ enum PrivateFile {
     /// isn't done only to find its result can't be kept.
     static func checkWritable(beside path: String) throws {
         let staged = path + ".new"
-        try writeStaged([], to: staged)
+        try writeStaged([], to: staged, synced: true)
         unlink(staged)
     }
 
-    private static func writeStaged(_ bytes: [UInt8], to path: String) throws {
+    private static func writeStaged(_ bytes: [UInt8], to path: String, synced: Bool) throws {
         // Not created by following a link someone else left in its place.
         let descriptor = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0o600)
         guard descriptor >= 0 else { throw PrivateFileError.couldNotOpen(path: path, errno: errno) }
@@ -72,7 +74,7 @@ enum PrivateFile {
             guard written > 0 else { throw PrivateFileError.couldNotWrite(path: path, errno: errno) }
             remaining = remaining.dropFirst(written)
         }
-        guard fsync(descriptor) == 0 else { throw PrivateFileError.couldNotWrite(path: path, errno: errno) }
+        guard !synced || fsync(descriptor) == 0 else { throw PrivateFileError.couldNotWrite(path: path, errno: errno) }
     }
 
     private static func systemRead(_ descriptor: Int32, _ buffer: UnsafeMutableRawPointer?, _ count: Int) -> Int {

@@ -21,7 +21,7 @@ struct WatchLoop {
     }
 
     private func takeSamples(signalling marks: AsyncStream<Void>.Continuation) async throws {
-        var sampler = Sampler()
+        var sampler = ServerSampler()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         while true {

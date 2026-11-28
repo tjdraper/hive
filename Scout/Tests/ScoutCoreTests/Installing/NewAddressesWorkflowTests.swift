@@ -27,7 +27,7 @@ struct NewAddressesWorkflowTests {
             chmod(system.layout.onDisk(tool), 0o755)
         }
         try server.write(initSystem.servicePath(in: system.layout), "service")
-        system.users[InstallLayout.user] = SystemUser(uid: 500, gid: 500)
+        system.users[system.layout.user] = SystemUser(uid: 500, gid: 500)
     }
 
     private func replace(with addresses: [EnrollmentCode.Address] = addresses) throws(NewAddressesError) {
